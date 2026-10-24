@@ -6,13 +6,13 @@ le reste est du jugement, écrit à la main et tenu à jour à chaque session.
 
 <!-- AUTO:debut — bloc régénéré par tools/etat-court.sh, ne pas éditer à la main -->
 ```
-Généré le            2026-10-24 23:31
+Généré le            2026-10-24 23:53
 Code                 28252 lignes, 24 modules (src/)
 Bancs de contrôle    39 (tools/tout-verifier.sh)
 Dernière suite       2026-10-24 23:29 — 614 contrôles, 0 échec(s), 39 bancs
 Tests unitaires      161 (cargo test --release)
-Avertissements       1 (cargo build --release)
-Dernière archive     kplayer-2026-10-24-session36.tar.gz — 87 fichiers, 628 Ko
+Avertissements       0 (cargo build --release)
+Dernière archive     kplayer-2026-10-24-session37.tar.gz — 108 fichiers, 704 Ko
 FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
   AV1 logiciel       oui (libdav1d)
   scale_vaapi        oui
@@ -30,11 +30,12 @@ FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
 > (autres moniteurs, non mesurable sous Wayland), F2 (passthrough HDR), F3 (langue d'interface),
 > F6, le reste de F5. Le **passthrough HDR reste inatteignable** (`docs/HDR.md`).
 >
-> **⚠ Disque racine plein** (constaté s.37) : `/` est à 100 %, à cause d'un journal de debug Wine de
+> **Disque racine** : il a été plein (100 %) le 2026-10-24 à cause d'un journal de debug Wine de
 > **39,6 Go** (`~/.var/app/com.valvesoftware.Steam/steam-*.log`), pas des bancs (qui écrivent dans
-> `/tmp`, en RAM). Tant que `/` est plein, cargo affiche « failed to save last-use data » et la
-> ligne « Avertissements » de la fiche compte **1 à tort** ; la relancer (`tools/etat-court.sh`)
-> après avoir libéré de la place.
+> `/tmp`, en RAM). Libéré le jour même (84 %). Le fichier était supprimé mais **encore tenu ouvert
+> par Kate** : l'espace ne revient qu'en fermant le processus ou en tronquant par son descripteur
+> (`: > /proc/<pid>/fd/<n>`). Symptôme à reconnaître : cargo affiche « failed to save last-use data »
+> et la ligne « Avertissements » de la fiche compte 1 à tort.
 
 
 ## Le projet en trois lignes
