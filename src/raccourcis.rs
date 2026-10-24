@@ -277,10 +277,10 @@ impl Action {
             Action::LecturePause => "Espace, ClicMilieu",
             Action::ElementSuivant => "N",
             Action::ElementPrecedent => "P",
-            Action::Reculer5s => "Gauche",
+            Action::Reculer5s => "Gauche, Ctrl+MoletteBas",
             Action::Reculer1s => "Maj+Gauche",
             Action::Reculer30s => "Ctrl+Gauche",
-            Action::Avancer5s => "Droite",
+            Action::Avancer5s => "Droite, Ctrl+MoletteHaut",
             Action::Avancer1s => "Maj+Droite",
             Action::Avancer30s => "Ctrl+Droite",
             Action::VolumePlus => "Haut, MoletteHaut",
@@ -295,8 +295,8 @@ impl Action {
             Action::SignetSuivant => "Ctrl+Maj+Droite",
             Action::SignetPrecedent => "Ctrl+Maj+Gauche",
             Action::SignetSupprimer => "Ctrl+Maj+B",
-            Action::VitesseMoins => "[",
-            Action::VitessePlus => "]",
+            Action::VitesseMoins => "[, Maj+MoletteBas",
+            Action::VitessePlus => "], Maj+MoletteHaut",
             Action::VitesseNormale => "\\",
             Action::ChapitrePrecedent => "PagePrec",
             Action::ChapitreSuivant => "PageSuiv",
@@ -359,14 +359,13 @@ impl Combinaison {
             && self.alt == alt
     }
 
-    pub fn correspond_souris(&self, s: Souris) -> bool {
+    /// Comparaison avec un geste de souris et les modificateurs tenus au moment du geste :
+    /// **égalité exacte** (Ctrl+Molette ne déclenche pas le raccourci « Molette », et inversement).
+    pub fn correspond_souris(&self, s: Souris, ctrl: bool, maj: bool, alt: bool) -> bool {
         matches!(self.touche, Touche::Souris(v) if v == s)
-            // Une molette ne porte pas de modificateur dans egui : on n'exige rien
-            // sur ceux qui n'en ont pas, mais un raccourci qui en demande un ne
-            // doit pas se déclencher par hasard.
-            && !self.ctrl
-            && !self.maj
-            && !self.alt
+            && self.ctrl == ctrl
+            && self.maj == maj
+            && self.alt == alt
     }
 
     /// Texte normalisé, tel qu'il est écrit dans la configuration.
@@ -723,10 +722,10 @@ impl Tableau {
     }
 
     /// Action déclenchée par un bouton ou la molette, ou `None`.
-    pub fn pour_souris(&self, s: Souris) -> Option<Action> {
+    pub fn pour_souris(&self, s: Souris, ctrl: bool, maj: bool, alt: bool) -> Option<Action> {
         self.entrees
             .iter()
-            .find(|(_, combinaisons)| combinaisons.iter().any(|c| c.correspond_souris(s)))
+            .find(|(_, combinaisons)| combinaisons.iter().any(|c| c.correspond_souris(s, ctrl, maj, alt)))
             .map(|(a, _)| *a)
     }
 
@@ -884,12 +883,12 @@ mod tests {
     #[test]
     fn les_raccourcis_souris_repondent() {
         let t = Tableau::construire(&BTreeMap::new());
-        assert_eq!(t.pour_souris(Souris::MoletteHaut), Some(Action::VolumePlus));
-        assert_eq!(t.pour_souris(Souris::MoletteBas), Some(Action::VolumeMoins));
-        assert_eq!(t.pour_souris(Souris::ClicMilieu), Some(Action::LecturePause));
-        assert_eq!(t.pour_souris(Souris::DoubleClic), Some(Action::SousTitresVisibles));
+        assert_eq!(t.pour_souris(Souris::MoletteHaut, false, false, false), Some(Action::VolumePlus));
+        assert_eq!(t.pour_souris(Souris::MoletteBas, false, false, false), Some(Action::VolumeMoins));
+        assert_eq!(t.pour_souris(Souris::ClicMilieu, false, false, false), Some(Action::LecturePause));
+        assert_eq!(t.pour_souris(Souris::DoubleClic, false, false, false), Some(Action::SousTitresVisibles));
         // Le clic droit est réservé au menu contextuel : il ne doit rien déclencher.
-        assert_eq!(t.pour_souris(Souris::ClicDroit), None);
+        assert_eq!(t.pour_souris(Souris::ClicDroit, false, false, false), None);
     }
 
     #[test]
@@ -899,7 +898,7 @@ mod tests {
         let t = Tableau::construire(&sur);
         // La molette n'a pas de modificateur dans egui : on refuse, plutôt que de
         // déclencher au hasard.
-        assert_eq!(t.pour_souris(Souris::MoletteHaut), None);
+        assert_eq!(t.pour_souris(Souris::MoletteHaut, false, false, false), None);
     }
 
     #[test]
@@ -953,5 +952,24 @@ mod tests {
                 texte
             );
         }
+    }
+
+    #[test]
+    fn les_gestes_de_souris_distinguent_les_modificateurs() {
+        let t = Tableau::construire(&BTreeMap::new());
+        // Molette seule : volume. Avec Ctrl : on cherche dans le film. Avec Maj : la vitesse.
+        assert_eq!(t.pour_souris(Souris::MoletteHaut, false, false, false), Some(Action::VolumePlus));
+        assert_eq!(t.pour_souris(Souris::MoletteHaut, true, false, false), Some(Action::Avancer5s));
+        assert_eq!(t.pour_souris(Souris::MoletteBas, true, false, false), Some(Action::Reculer5s));
+        assert_eq!(t.pour_souris(Souris::MoletteHaut, false, true, false), Some(Action::VitessePlus));
+        // Une combinaison non attribuée ne déclenche rien (pas de repli sur le geste nu).
+        assert_eq!(t.pour_souris(Souris::MoletteHaut, false, false, true), None);
+        assert_eq!(t.pour_souris(Souris::ClicMilieu, true, false, false), None);
+        // Une personnalisation Alt+DoubleClic fonctionne.
+        let mut sur = BTreeMap::new();
+        sur.insert("image.capture".to_string(), "Alt+DoubleClic".to_string());
+        let t = Tableau::construire(&sur);
+        assert_eq!(t.pour_souris(Souris::DoubleClic, false, false, true), Some(Action::Capture));
+        assert_eq!(t.pour_souris(Souris::DoubleClic, false, false, false), Some(Action::SousTitresVisibles));
     }
 }

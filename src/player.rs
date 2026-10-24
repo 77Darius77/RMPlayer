@@ -567,6 +567,8 @@ pub struct VideoPlayer {
     ab_retours: u32,
     /// Instant où la pause de fin de boucle prend fin (le retour en A a déjà eu lieu).
     ab_reprise_a: Option<std::time::Instant>,
+    /// Position (ms) de la dernière image affichée : sert à la limite de fréquence d'image.
+    dernier_pts_affiche: Option<u64>,
     /// Reprise de lecture à la position quittée
     resume_enabled: bool,
     /// Positions mémorisées par média
@@ -742,6 +744,7 @@ impl VideoPlayer {
             ab_delay_ms: config.playback.ab_delay_ms.min(crate::config::AB_DELAI_MAX_MS),
             ab_retours: 0,
             ab_reprise_a: None,
+            dernier_pts_affiche: None,
             resume_enabled,
             positions: crate::positions::Positions::load(),
             display_target: (0, 0),
@@ -1198,6 +1201,19 @@ impl VideoPlayer {
                     }
                 }
             }
+        }
+    }
+
+    /// Nom du décodeur vidéo réellement ouvert, et s'il travaille sur le GPU (`hw_requested`).
+    pub fn video_decoder(&self) -> Option<(String, bool)> {
+        let vs = self.video_stream.as_ref()?;
+        unsafe {
+            let codec = (*vs.codec_context).codec;
+            if codec.is_null() {
+                return None;
+            }
+            let nom = std::ffi::CStr::from_ptr((*codec).name).to_string_lossy().to_string();
+            Some((nom, vs.hw_requested))
         }
     }
 
@@ -1861,21 +1877,26 @@ impl VideoPlayer {
                 let stream = &**streams.add(video_index as usize);
                 let codecpar = &*stream.codecpar;
 
-                let codec = avcodec_find_decoder(codecpar.codec_id);
-                if !codec.is_null() {
-                    // Première tentative en décodage matériel (VA-API), seconde en
-                    // logiciel : le pilote peut refuser une variante précise du
-                    // profil (typiquement le H.264 pleine échelle « yuvj420p » des
-                    // vidéos de téléphone), et avcodec_open2() échoue alors.
-                    let codec_hw_capable = codec_supports_vaapi(codec);
+                let codec_defaut = avcodec_find_decoder(codecpar.codec_id);
+                if !codec_defaut.is_null() {
+                    // Décodeur choisi par l'utilisateur pour ce codec (préférences), sinon celui
+                    // que FFmpeg propose. S'il ne s'ouvre pas, on retombe sur le défaut.
+                    let mut codec = decodeur_impose(codec_defaut, codecpar.codec_id, &self.config_video.decoders);
                     let hw_usable = self.hwdec_enabled && self.hw_device.is_some();
-                    let want_hw = hw_usable && codec_hw_capable;
-                    let attempts: &[bool] = if want_hw { &[true, false] } else { &[false] };
+                    let mut codec_hw_capable;
 
                     let mut codec_context: *mut AVCodecContext = std::ptr::null_mut();
                     let mut opened = false;
                     let mut hw_requested = false;
 
+                    loop {
+                    // Première tentative en décodage matériel (VA-API), seconde en
+                    // logiciel : le pilote peut refuser une variante précise du
+                    // profil (typiquement le H.264 pleine échelle « yuvj420p » des
+                    // vidéos de téléphone), et avcodec_open2() échoue alors.
+                    codec_hw_capable = codec_supports_vaapi(codec);
+                    let want_hw = hw_usable && codec_hw_capable;
+                    let attempts: &[bool] = if want_hw { &[true, false] } else { &[false] };
 
                     for &use_hw in attempts {
                         if !codec_context.is_null() {
@@ -1904,6 +1925,17 @@ impl VideoPlayer {
                                 "VA-API refusé pour ce flux (profil non pris en charge) — repli logiciel"
                             );
                         }
+                    }
+
+                    if opened || codec == codec_defaut {
+                        break;
+                    }
+                    tracing::warn!(
+                        "Décodeur imposé « {} » inutilisable pour ce flux — repli sur « {} »",
+                        std::ffi::CStr::from_ptr((*codec).name).to_string_lossy(),
+                        std::ffi::CStr::from_ptr((*codec_defaut).name).to_string_lossy()
+                    );
+                    codec = codec_defaut;
                     }
 
                     if !opened {
@@ -2659,6 +2691,18 @@ impl VideoPlayer {
                 return false;
             }
         }
+        // Limite de fréquence d'image : on n'affiche qu'une image par intervalle. Un saut en
+        // arrière (retour de boucle, seek) est toujours accepté.
+        let plafond = self.config_video.max_fps;
+        if plafond > 0 {
+            let intervalle = 1000 / plafond as u64;
+            if let Some(dernier) = self.dernier_pts_affiche {
+                if pts_ms >= dernier && pts_ms < dernier + intervalle {
+                    return false;
+                }
+            }
+        }
+        self.dernier_pts_affiche = Some(pts_ms);
         true
     }
 
@@ -6409,6 +6453,65 @@ unsafe fn couleur_effective(
         }
     };
     (coef, plage)
+}
+
+/// Noms des décodeurs que FFmpeg propose pour un codec (`"h264"`, `"av1"`…), le défaut en tête.
+/// Vide si le codec est inconnu.
+pub fn decodeurs_pour(nom_codec: &str) -> Vec<String> {
+    unsafe {
+        let Ok(c_nom) = CString::new(nom_codec) else { return Vec::new() };
+        let descripteur = avcodec_descriptor_get_by_name(c_nom.as_ptr());
+        if descripteur.is_null() {
+            return Vec::new();
+        }
+        let id = (*descripteur).id;
+        let defaut = avcodec_find_decoder(id);
+        let mut noms: Vec<String> = Vec::new();
+        if !defaut.is_null() {
+            noms.push(std::ffi::CStr::from_ptr((*defaut).name).to_string_lossy().to_string());
+        }
+        let mut curseur: *mut std::os::raw::c_void = std::ptr::null_mut();
+        loop {
+            let codec = av_codec_iterate(&mut curseur);
+            if codec.is_null() {
+                break;
+            }
+            if av_codec_is_decoder(codec) != 0 && (*codec).id == id {
+                let nom = std::ffi::CStr::from_ptr((*codec).name).to_string_lossy().to_string();
+                if !noms.contains(&nom) {
+                    noms.push(nom);
+                }
+            }
+        }
+        noms
+    }
+}
+
+/// Décodeur à ouvrir pour un codec : celui que l'utilisateur a imposé (`video.decoders`, nom de
+/// codec → nom de décodeur), s'il existe ET s'il décode bien ce codec ; sinon `defaut`.
+unsafe fn decodeur_impose(
+    defaut: *const AVCodec,
+    id: AVCodecID,
+    impose: &std::collections::BTreeMap<String, String>,
+) -> *const AVCodec {
+    if impose.is_empty() {
+        return defaut;
+    }
+    let nom_codec = std::ffi::CStr::from_ptr(avcodec_get_name(id)).to_string_lossy().to_string();
+    let Some(nom_decodeur) = impose.get(&nom_codec).map(|n| n.trim()).filter(|n| !n.is_empty()) else {
+        return defaut;
+    };
+    let Ok(c_nom) = CString::new(nom_decodeur) else { return defaut };
+    let choisi = avcodec_find_decoder_by_name(c_nom.as_ptr());
+    if choisi.is_null() {
+        tracing::warn!("Décodeur « {} » introuvable pour {} — décodeur par défaut", nom_decodeur, nom_codec);
+        return defaut;
+    }
+    if (*choisi).id != id {
+        tracing::warn!("Le décodeur « {} » ne décode pas {} — décodeur par défaut", nom_decodeur, nom_codec);
+        return defaut;
+    }
+    choisi
 }
 
 unsafe fn scale_frame_to_rgba(

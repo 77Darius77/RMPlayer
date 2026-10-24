@@ -168,6 +168,10 @@ pub struct App {
     /// Le démarrage de MPRIS a-t-il déjà été tenté ? (Un échec ne doit pas être
     /// retenté à chaque image : la connexion D-Bus coûte quelques millisecondes.)
     mpris_demande: bool,
+    /// Icône de la zone de notification (si `interface.tray_icon`).
+    pub(crate) tray: Option<crate::tray::Tray>,
+    /// La fenêtre est-elle affichée ? (bascule depuis l'icône de notification)
+    fenetre_visible: bool,
     /// Vignettes de la barre de progression : générateur (fil de travail) et
     /// texture de la vignette affichée pour la tranche courante.
     ///
@@ -332,6 +336,77 @@ pub fn installer_police_sous_titre(ctx: &egui::Context, font_family: &str) {
 }
 
 /// `FontId` du texte des sous-titres : la famille choisie, ou la police par défaut.
+/// Combinaison correspondant à un geste de souris brut (molette, clic du milieu), avec les
+/// modificateurs portés par l'événement — sert à la capture d'un raccourci dans les préférences.
+fn combinaison_souris(evt: &egui::Event) -> Option<crate::raccourcis::Combinaison> {
+    use crate::raccourcis::{Combinaison, Souris, Touche};
+    match evt {
+        egui::Event::MouseWheel { delta, modifiers, .. } => {
+            // Avec Maj, la molette verticale arrive sur l'axe horizontal.
+            let d = delta.y + if modifiers.shift { delta.x } else { 0.0 };
+            let geste = if d > 0.0 {
+                Souris::MoletteHaut
+            } else if d < 0.0 {
+                Souris::MoletteBas
+            } else {
+                return None;
+            };
+            Some(Combinaison { ctrl: modifiers.ctrl, maj: modifiers.shift, alt: modifiers.alt, touche: Touche::Souris(geste) })
+        }
+        egui::Event::PointerButton { button: egui::PointerButton::Middle, pressed: true, modifiers, .. } => Some(Combinaison {
+            ctrl: modifiers.ctrl,
+            maj: modifiers.shift,
+            alt: modifiers.alt,
+            touche: Touche::Souris(Souris::ClicMilieu),
+        }),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests_souris {
+    use super::*;
+
+    #[test]
+    fn la_capture_reconnait_molette_et_clic_milieu_avec_leurs_modificateurs() {
+        let ctrl = egui::Modifiers { ctrl: true, ..Default::default() };
+        let molette = egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, 1.0),
+            modifiers: ctrl,
+        };
+        let c = combinaison_souris(&molette).unwrap();
+        assert_eq!(c.texte(), "Ctrl+MoletteHaut");
+        let bas = egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(0.0, -1.0),
+            modifiers: egui::Modifiers::NONE,
+        };
+        assert_eq!(combinaison_souris(&bas).unwrap().texte(), "MoletteBas");
+        let maj = egui::Modifiers { shift: true, ..Default::default() };
+        let horizontal = egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Line,
+            delta: egui::vec2(1.0, 0.0),
+            modifiers: maj,
+        };
+        assert_eq!(combinaison_souris(&horizontal).unwrap().texte(), "Maj+MoletteHaut");
+        let milieu = egui::Event::PointerButton {
+            pos: egui::pos2(0.0, 0.0),
+            button: egui::PointerButton::Middle,
+            pressed: true,
+            modifiers: egui::Modifiers { alt: true, ..Default::default() },
+        };
+        assert_eq!(combinaison_souris(&milieu).unwrap().texte(), "Alt+ClicMilieu");
+        let relache = egui::Event::PointerButton {
+            pos: egui::pos2(0.0, 0.0),
+            button: egui::PointerButton::Middle,
+            pressed: false,
+            modifiers: egui::Modifiers::NONE,
+        };
+        assert!(combinaison_souris(&relache).is_none());
+    }
+}
+
 /// 16 directions unitaires pour dessiner un contour par copies décalées du texte.
 const DIRECTIONS_CONTOUR: [(f32, f32); 16] = [
     (1.0, 0.0), (0.924, 0.383), (0.707, 0.707), (0.383, 0.924),
@@ -588,6 +663,8 @@ impl App {
             pause_par_focus: false,
             mpris: None,
             mpris_demande: false,
+            tray: None,
+            fenetre_visible: true,
             vignettes: None,
             vignette_affichee: None,
             vignette_cible: None,
@@ -1173,30 +1250,36 @@ impl App {
         if !response.hovered() {
             return actions;
         }
+        // Modificateurs tenus pendant le geste : ils choisissent l'action (Ctrl+Molette ≠ Molette).
+        let (ctrl, maj, alt) = ui.input(|i| (i.modifiers.ctrl, i.modifiers.shift, i.modifiers.alt));
         if response.double_clicked_by(egui::PointerButton::Primary) {
-            if let Some(a) = self.raccourcis.pour_souris(crate::raccourcis::Souris::DoubleClic) {
+            if let Some(a) = self.raccourcis.pour_souris(crate::raccourcis::Souris::DoubleClic, ctrl, maj, alt) {
                 actions.push(a);
             }
         }
         if response.clicked_by(egui::PointerButton::Middle) {
-            if let Some(a) = self.raccourcis.pour_souris(crate::raccourcis::Souris::ClicMilieu) {
+            if let Some(a) = self.raccourcis.pour_souris(crate::raccourcis::Souris::ClicMilieu, ctrl, maj, alt) {
                 actions.push(a);
             }
         }
         // Molette : un cran = un pas. `raw_scroll_delta` donne des pixels.
-        let delta = ui.input(|i| i.raw_scroll_delta.y);
+        // Avec Maj, egui (et la plupart des systèmes) convertit la molette verticale en
+        // défilement HORIZONTAL : on lit donc les deux axes quand Maj est tenue.
+        let delta = ui.input(|i| {
+            i.raw_scroll_delta.y + if i.modifiers.shift { i.raw_scroll_delta.x } else { 0.0 }
+        });
         if delta.abs() > 1.0 {
             self.molette_accumulee += delta;
             let cran = 35.0;
             while self.molette_accumulee >= cran {
                 self.molette_accumulee -= cran;
-                if let Some(a) = self.raccourcis.pour_souris(crate::raccourcis::Souris::MoletteHaut) {
+                if let Some(a) = self.raccourcis.pour_souris(crate::raccourcis::Souris::MoletteHaut, ctrl, maj, alt) {
                     actions.push(a);
                 }
             }
             while self.molette_accumulee <= -cran {
                 self.molette_accumulee += cran;
-                if let Some(a) = self.raccourcis.pour_souris(crate::raccourcis::Souris::MoletteBas) {
+                if let Some(a) = self.raccourcis.pour_souris(crate::raccourcis::Souris::MoletteBas, ctrl, maj, alt) {
                     actions.push(a);
                 }
             }
@@ -1251,6 +1334,22 @@ impl App {
             }
             Action::Reculer5s => self.decaler(-5000),
             Action::Avancer5s => self.decaler(5000),
+            Action::Reculer1s => self.decaler(-1000),
+            Action::Avancer1s => self.decaler(1000),
+            Action::Reculer30s => self.decaler(-30000),
+            Action::Avancer30s => self.decaler(30000),
+            Action::VitesseMoins | Action::VitessePlus | Action::VitesseNormale => {
+                let vitesse = match action {
+                    Action::VitesseMoins => self.player.get_speed() - 0.1,
+                    Action::VitessePlus => self.player.get_speed() + 0.1,
+                    _ => 1.0,
+                };
+                self.player.set_speed(vitesse);
+                self.annonce(&format!("Vitesse : {:.1}×", self.player.get_speed()));
+            }
+            Action::SignetAjouter => self.signet_ajouter(),
+            Action::SignetSuivant => self.signet_aller(false),
+            Action::SignetPrecedent => self.signet_aller(true),
             // **Passer par `play_playlist_index`, pas par `player.play_next()`** :
             // le chemin direct sautait `appliquer_regles` et `after_media_loaded`
             // (sous-titres, chapitres, OSD) — donc une règle de profil automatique
@@ -1275,6 +1374,60 @@ impl App {
 
     /// Déplace la lecture de `delta_ms` (négatif pour reculer), sans dépasser
     /// les bornes du média.
+    /// Icône de la zone de notification : démarrage / arrêt selon le réglage, puis exécution
+    /// des commandes reçues. Les commandes passent par les MÊMES chemins que le clavier
+    /// (`element_suivant`…), jamais par le moteur en direct.
+    fn traiter_tray(&mut self, ctx: &egui::Context) {
+        use crate::tray::CommandeTray;
+        if self.config.interface.tray_icon && self.tray.is_none() {
+            match crate::tray::Tray::demarrer(ctx.clone()) {
+                Ok(t) => {
+                    tracing::info!("Icône de notification publiée");
+                    self.tray = Some(t);
+                }
+                Err(e) => {
+                    tracing::warn!("Icône de notification indisponible : {}", e);
+                    // Ne pas réessayer à chaque image : le réglage est remis à faux.
+                    self.config.interface.tray_icon = false;
+                    let _ = self.config.save();
+                    self.error_message = Some(format!("Icône de notification indisponible : {e}"));
+                }
+            }
+        } else if !self.config.interface.tray_icon {
+            if let Some(t) = self.tray.take() {
+                t.arreter();
+                // Une icône retirée ne doit pas laisser la fenêtre cachée sans moyen de la rouvrir.
+                if !self.fenetre_visible {
+                    self.fenetre_visible = true;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Visible(true));
+                }
+            }
+        }
+        let Some(tray) = self.tray.as_mut() else { return };
+        let titre = self.player.current_path().map(|p| {
+            p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
+        }).unwrap_or_default();
+        tray.mettre_a_jour(&titre, self.player.state() == PlayerState::Playing);
+        for commande in tray.commandes() {
+            match commande {
+                CommandeTray::LecturePause => {
+                    let _ = self.player.toggle_pause();
+                }
+                CommandeTray::Suivant => self.element_suivant(),
+                CommandeTray::Precedent => self.element_precedent(),
+                CommandeTray::AfficherMasquer => {
+                    self.fenetre_visible = !self.fenetre_visible;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Visible(self.fenetre_visible));
+                    if self.fenetre_visible {
+                        ctx.send_viewport_cmd(egui::ViewportCommand::Focus);
+                    }
+                    tracing::info!("Fenêtre {} depuis l'icône", if self.fenetre_visible { "affichée" } else { "masquée" });
+                }
+                CommandeTray::Quitter => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            }
+        }
+    }
+
     /// Pose un signet à la position courante du média ouvert.
     fn signet_ajouter(&mut self) {
         let Some(media) = self.player.current_path().cloned() else {
@@ -2518,6 +2671,7 @@ impl eframe::App for App {
             self.demarrer_mpris(ctx);
         }
         self.traiter_mpris();
+        self.traiter_tray(ctx);
 
         // Vignettes de la barre de progression (module `vignettes`, fil de travail).
         self.traiter_vignettes(ctx);
@@ -2747,6 +2901,19 @@ impl eframe::App for App {
                         };
                         return Some(combo);
                     }
+                    // Gestes de souris : molette, clic du milieu (avec les modificateurs tenus).
+                    if let Some(combo) = combinaison_souris(evt) {
+                        return Some(combo);
+                    }
+                }
+                // Le double-clic n'est pas un événement brut : egui le détecte.
+                if i.pointer.button_double_clicked(egui::PointerButton::Primary) {
+                    return Some(crate::raccourcis::Combinaison {
+                        ctrl: i.modifiers.ctrl,
+                        maj: i.modifiers.shift,
+                        alt: i.modifiers.alt,
+                        touche: crate::raccourcis::Touche::Souris(crate::raccourcis::Souris::DoubleClic),
+                    });
                 }
                 None
             });

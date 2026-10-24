@@ -63,16 +63,16 @@ média (`HashMap<String, u64>`), alors qu'un signet est une **liste** par média
 `~/.cache/kplayer/`, un cache qu'on peut effacer sans perdre de réglage — des signets
 doivent vivre avec la configuration, pas dans le cache.
 
-## Lot 5 — système et intégration (valeur plus faible)
+## Lot 5 — système et intégration (FAIT s.37)
 
 | # | Fonction | Remarque | Effort |
 |---|---|---|---|
-| E1 | **Souris : actions avec Ctrl / Maj / Alt** | PotPlayer `Dialog(458)` ; aujourd'hui molette = volume / seek, clic milieu, double-clic | moyen |
-| E2 | **Choix manuel du décodeur** | `Dialog(423)` ; utile surtout pour forcer le logiciel quand VA-API se comporte mal | moyen |
-| E3 | **Icône de notification** (StatusNotifier) | `ksni` / D-Bus | moyen |
-| E4 | **Démarrage automatique** | un `.desktop` dans `~/.config/autostart` | petit |
-| E5 | **Priorité du processus** | `setpriority` ; utile en 4K seulement | petit |
-| E6 | **Réduire la fréquence d'image** | usage marginal | petit |
+| E1 ✅ | **Souris : actions avec Ctrl / Maj / Alt** (fait s.37, `verif-souris` 4/4 : Ctrl+molette = ±5 s, Maj+molette = vitesse, personnalisable et capturable dans les préférences) | PotPlayer `Dialog(458)` ; aujourd'hui molette = volume / seek, clic milieu, double-clic | moyen |
+| E2 ✅ | **Choix manuel du décodeur** (fait s.37, `verif-decodeur` 7/7 : décodeur par codec, repli sur le défaut s'il ne s'ouvre pas) | `Dialog(423)` ; utile surtout pour forcer le logiciel quand VA-API se comporte mal | moyen |
+| E3 ✅ | **Icône de notification** (fait s.37, `verif-tray` 7/7 : crate `ksni`, clic = afficher/masquer, menu lecture/suivant/précédent/quitter) (StatusNotifier) | `ksni` / D-Bus | moyen |
+| E4 ✅ | **Démarrage automatique** (fait s.37, `verif-systeme` : `--autostart on|off|status`) | un `.desktop` dans `~/.config/autostart` | petit |
+| E5 ✅ | **Priorité du processus** (fait s.37, `verif-systeme` : nice mesuré sur tous les fils ; les fils de shaders de Mesa restent à 19) | `setpriority` ; utile en 4K seulement | petit |
+| E6 ✅ | **Réduire la fréquence d'image** (fait s.37, `verif-systeme` : 59 → 15 / 30 images différentes par seconde mesurées sur la fenêtre) | usage marginal | petit |
 
 ## Lot 6 — conditionnel, à décider (pas de recommandation de les faire)
 

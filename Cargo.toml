@@ -18,6 +18,7 @@ egui_extras = { version = "0.33", features = ["image"] }
 # évite d'installer un exécuteur asynchrone dans le projet : le serveur vit dans
 # son propre fil et l'interface ne fait que déposer des demandes.
 zbus = { version = "5.19", default-features = false, features = ["async-io", "blocking-api"] }
+ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
 
 # Audio (PipeWire/PulseAudio natif)
 # rodio retiré : la sortie audio passe par cpal (src/audio.rs)
