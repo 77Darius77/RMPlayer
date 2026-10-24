@@ -174,6 +174,37 @@ pub fn moteur_force() -> Option<&'static str> {
     }
 }
 
+/// Débit maximal (en mégapixels par seconde) au-delà duquel le **repli CPU** de l'étage HDR
+/// est refusé : 1920 × 1080 × 30.
+///
+/// **Mesuré** (`docs/HDR.md`, 2026-10-24, Ryzen 7 5800X) : `zscale` + `tonemap` tient
+/// 114 i/s en 1080p (237 Mpx/s) et seulement 26 i/s en 4K (216 Mpx/s), en occupant 9 à
+/// 10 cœurs sur 16. Le budget retenu est environ **26 %** de cette capacité : il laisse
+/// le reste du processeur au décodage, à l'audio et à l'interface. Un 4K à 24 i/s
+/// (199 Mpx/s) serait à 92 % de la capacité : lecture saccadée, pire qu'une image non
+/// convertie. Accepté : 1080p30, 720p60, tout ce qui est plus petit. Refusé : 1080p60,
+/// 1440p24, 4K.
+pub const BUDGET_REPLI_CPU_MPX_S: f64 = 1920.0 * 1080.0 * 30.0 / 1_000_000.0;
+
+/// Le moteur CPU peut-il remplacer le GPU pour cette source ? `Err` donne la raison, en
+/// clair, pour le journal et l'interface.
+///
+/// La cadence inconnue (≤ 1 i/s, valeur absente) est prise à 30 i/s : on ne refuse pas
+/// un 1080p parce qu'on ignore sa cadence, mais un 4K reste refusé.
+pub fn repli_cpu_possible(largeur: i32, hauteur: i32, fps: f32) -> Result<(), String> {
+    let fps = if fps > 1.0 { fps as f64 } else { 30.0 };
+    let debit = largeur.max(0) as f64 * hauteur.max(0) as f64 * fps / 1_000_000.0;
+    if debit <= BUDGET_REPLI_CPU_MPX_S {
+        Ok(())
+    } else {
+        Err(format!(
+            "source {}x{} à {:.0} i/s = {:.0} Mpx/s, au-delà des {:.0} Mpx/s que le CPU tient \
+             (1080p30)",
+            largeur, hauteur, fps, debit, BUDGET_REPLI_CPU_MPX_S
+        ))
+    }
+}
+
 /// Ce que l'environnement permet, indépendamment du flux.
 ///
 /// **Trois capacités distinctes, souvent confondues** :
@@ -916,6 +947,45 @@ mod tests {
         let reel = contexte();
         assert!(!reel.sortie_hdr, "aucune sortie HDR ne doit être revendiquée");
         assert!(!reel.raison_sortie.is_empty(), "la raison doit être écrite");
+    }
+
+    #[test]
+    fn le_repli_cpu_suit_le_budget_mesure() {
+        // Acceptés : 1080p30 (le budget lui-même), 720p60, 1080p24, petite mire.
+        assert!(repli_cpu_possible(1920, 1080, 30.0).is_ok(), "1080p30 = le budget");
+        assert!(repli_cpu_possible(1920, 1080, 24.0).is_ok());
+        assert!(repli_cpu_possible(1280, 720, 60.0).is_ok());
+        assert!(repli_cpu_possible(640, 360, 5.0).is_ok());
+        // Refusés : 1080p60, 1440p24, 4K à 24 et 60 i/s.
+        assert!(repli_cpu_possible(1920, 1080, 60.0).is_err());
+        assert!(repli_cpu_possible(2560, 1440, 24.0).is_err());
+        assert!(repli_cpu_possible(3840, 2160, 24.0).is_err());
+        assert!(repli_cpu_possible(3840, 2160, 60.0).is_err());
+        // Cadence inconnue : prise à 30 i/s, donc 1080p accepté, 4K refusé.
+        assert!(repli_cpu_possible(1920, 1080, 0.0).is_ok());
+        assert!(repli_cpu_possible(3840, 2160, 0.0).is_err());
+        // Dimensions absurdes : jamais de panique, et un débit nul est accepté.
+        assert!(repli_cpu_possible(-5, 0, 24.0).is_ok());
+    }
+
+    #[test]
+    fn le_refus_du_repli_cpu_dit_pourquoi() {
+        let raison = repli_cpu_possible(3840, 2160, 24.0).expect_err("4K refusé");
+        assert!(raison.contains("3840x2160"), "la source est nommée : {raison}");
+        assert!(raison.contains("Mpx/s"), "le débit est chiffré : {raison}");
+        assert!(raison.contains("1080p30"), "le budget est nommé : {raison}");
+    }
+
+    #[test]
+    fn le_plan_cpu_force_donne_toujours_un_etage_zscale() {
+        // Le repli de `player.rs` s'appuie sur ce plan : il doit exister même quand le plan
+        // nominal est GPU, et ne jamais être vide pour un flux HDR converti.
+        let pq = detecter(16, 9, 10);
+        let gpu = plan(Some(&pq), &reglages());
+        assert_eq!(gpu.moteur, Moteur::Gpu);
+        let cpu = plan_force(Some(&pq), &reglages(), &Contexte::default(), Some("cpu"));
+        assert_eq!(cpu.moteur, Moteur::Cpu);
+        assert!(cpu.etage.starts_with("zscale="), "tête reconnue par decouper_etage_hdr");
     }
 
     #[test]

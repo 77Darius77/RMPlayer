@@ -43,7 +43,7 @@ marche, limite, a été retiré), `docs/AVANCEMENT.md` (journal des sessions, bu
 | Optimisations GPU et AV1 | `tools/bench-optimisation.sh` — **4/4** (échelle GPU −42 %, désentrelacement GPU −38 %, géométrie intacte, AV1 logiciel) |
 | Vérification des sous-titres (style) | `tools/verif-soustitres.sh` — **5/5** (famille de police mesurée, position horizontale, police inconnue, non-régression) |
 | Mémoire de la fenêtre | `tools/verif-fenetre.sh` — **9/9** (taille, position et état agrandi restitués ; hors écran recentrée ; plein écran n'écrase rien) |
-| HDR (conversion tonale, tramage, débanding, détection écran) | `tools/verif-hdr.sh` — **32/32** (mires en nits : détection, signature de conversion, deux opérateurs, moteur CPU forcé, HLG, tramage, débanding, VA-API = logiciel, Vulkan coupé = image non convertie et journalisée) |
+| HDR (conversion tonale, tramage, débanding, détection écran) | `tools/verif-hdr.sh` — **36/36** (mires en nits : détection, signature de conversion, deux opérateurs, moteur CPU forcé, HLG, tramage, débanding, VA-API = logiciel, Vulkan coupé : repli CPU borné par un budget, sinon image non convertie ; avis à l'écran ; pas de reconstruction à chaque image) |
 | Pause selon le focus | `tools/verif-focus.sh` — **11/11** (pause mesurée sur l'image et dans le journal ; deux fenêtres réelles : jamais / perte de focus / réduite, reprise et respect d'une pause volontaire) |
 | MPRIS (touches média du bureau) | `tools/verif-mpris.sh` — **27/27** (module seul : propriétés, unités µs, commandes, SetPosition filtré, PropertiesChanged, nom rendu, sans bus) + 8 contrôles d'intégration dans `verif-playlist.sh` |
 | Vignettes de la barre de progression | `tools/verif-vignettes.sh` — **14/14** (module seul : taille, position réelle, deux positions → deux images, coût, sortie réutilisée, largeur non multiple de 32, hors durée) + 3 contrôles d'intégration dans `verif-playlist.sh` |
@@ -52,7 +52,7 @@ marche, limite, a été retiré), `docs/AVANCEMENT.md` (journal des sessions, bu
 | Mémoire de la fenêtre — Wayland | `tools/verif-fenetre-wayland.sh` — **12/12** (taille restituée, aucune position inventée, règle KWin appliquée puis retirée ; mesure par script KWin, fenêtre ciblée par PID) |
 | Comparaison des désentrelaceurs | `tools/bench-desentrelacement.sh` — `bwdif` 45,8 dB contre `yadif` 43,4 dB (image immobile), 11,2 contre 13,2 ms/image 1080p |
 | Suite complète | `tools/tout-verifier.sh` — démarre l'écran virtuel si besoin, **verrouille** (une seule suite à la fois), enchaîne les 26 bancs et imprime le total |
-| **Total** | **489 contrôles, 0 échec**, plus **133 tests unitaires** (`cargo test`) |
+| **Total** | **509 contrôles, 0 échec**, plus **136 tests unitaires** (`cargo test`) |
 
 ---
 

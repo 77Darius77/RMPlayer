@@ -438,41 +438,135 @@ else
 fi
 
 echo
-echo "== 12. Vulkan inutilisable : l'étage est retiré, dit, et l'image n'est pas convertie =="
-# **Ce que ce contrôle documente.** Le « repli » à l'exécution (piège 110) n'est PAS une
-# conversion CPU : si `libplacebo` est refusé (pilote absent, session distante), l'étage est
-# retiré et l'image HDR est jouée telle quelle — donc délavée sur un écran SDR. Le moteur CPU
-# (section 5) n'est choisi que par `KPLAYER_HDR_MOTEUR=cpu`, jamais automatiquement.
-# Vulkan est cassé en pointant le chargeur vers un fichier d'ICD inexistant. Le témoin
-# positif est la section 3 (même fichier, même config, Vulkan intact : l'image est convertie).
-XDG_CONFIG_HOME="$BASE/cfg/auto" XDG_CACHE_HOME="$BASE/cfg/auto/cache" \
-    VK_ICD_FILENAMES=/nonexistent VK_DRIVER_FILES=/nonexistent \
-    "$KP" --dump-frame 500 "$BASE/dumps/sans-vulkan.png" "$BASE/clips/bandes.mkv" \
-    >"$BASE/cfg/sans-vulkan.log" 2>&1
-if [ -s "$BASE/dumps/sans-vulkan.png" ]; then
+echo "== 12. Vulkan inutilisable : repli CPU borné, sinon image non convertie et dite =="
+# **Ce que ce banc fixe.** Quand `libplacebo` est refusé à l'exécution (pilote absent, session
+# distante), le lecteur ne s'arrête pas. Deux cas, séparés par un budget de débit
+# (`hdr::repli_cpu_possible`, en mégapixels par seconde) parce que le moteur CPU est mesuré :
+# 114 i/s en 1080p mais 26 i/s en 4K pour 9 cœurs (`docs/HDR.md`) —
+#   * source abordable (ici 640×360 à 5 i/s) : l'étage CPU (`zscale` + `tonemap`) prend le
+#     relais, l'image EST convertie, et le journal dit « repli CPU » ;
+#   * source trop lourde (ici 3840×2160 à 25 i/s) : pas de conversion (une lecture saccadée
+#     serait pire), l'image reste celle d'origine, et le journal dit « repli CPU refusé ».
+# Vulkan est cassé en pointant le chargeur vers un fichier d'ICD inexistant. Le témoin positif
+# est la section 3 (même fichier, même config, Vulkan intact : l'image est convertie).
+VK_CASSE="VK_ICD_FILENAMES=/nonexistent VK_DRIVER_FILES=/nonexistent"
+nettoye() { sed 's/\x1b\[[0-9;]*m//g' "$1"; }
+sans_vulkan() {  # sans_vulkan <config> <clip> <sortie.png> <journal>
+    env $VK_CASSE XDG_CONFIG_HOME="$BASE/cfg/$1" XDG_CACHE_HOME="$BASE/cfg/$1/cache" \
+        "$KP" --dump-frame 500 "$3" "$2" >"$4" 2>&1
+}
+# Trois bandes, par fractions de la largeur : valable pour 640 comme pour 3840 pixels.
+bandes_rel() {
+    python3 - "$1" <<'PY'
+import sys
+import numpy as np
+from PIL import Image
+a = np.asarray(Image.open(sys.argv[1]).convert("L"), dtype=int)
+l = a[a.shape[0] // 2]; n = len(l)
+f = lambda x, y: l[int(n * x):int(n * y)].mean()
+print("%.1f %.1f %.1f" % (f(0.0625, 0.3125), f(0.390625, 0.625), f(0.75, 0.96875)))
+PY
+}
+
+# --- 12a. Source abordable : le CPU prend le relais -----------------------------------
+sans_vulkan auto "$BASE/clips/bandes.mkv" "$BASE/dumps/sv-petit.png" "$BASE/cfg/sv-petit.log"
+if [ -s "$BASE/dumps/sv-petit.png" ]; then
     ok "sans Vulkan : le lecteur ne plante pas et produit une image"
 else
-    ko "sans Vulkan : aucune image produite ($(tail -1 "$BASE/cfg/sans-vulkan.log" | cut -c1-80))"
+    ko "sans Vulkan : aucune image produite ($(tail -1 "$BASE/cfg/sv-petit.log" | cut -c1-80))"
 fi
-if sed 's/\x1b\[[0-9;]*m//g' "$BASE/cfg/sans-vulkan.log" | grep -q "Étage HDR refusé"; then
-    ok "sans Vulkan : le refus de l'étage est journalisé (l'utilisateur peut le savoir)"
+if nettoye "$BASE/cfg/sv-petit.log" | grep -q "Étage HDR refusé.*repli CPU"; then
+    ok "sans Vulkan : le refus du GPU et le repli CPU sont journalisés"
 else
-    ko "sans Vulkan : refus silencieux — aucune ligne « Étage HDR refusé »"
+    ko "sans Vulkan : pas de ligne « Étage HDR refusé … repli CPU » ($(nettoye "$BASE/cfg/sv-petit.log" | grep -o 'Étage HDR[^—]*—[^:]*' | head -1 | cut -c1-90))"
 fi
-read -r bas_sv moy_sv haut_sv <<<"$(bandes "$BASE/dumps/sans-vulkan.png")"
-echo "    sans Vulkan : $bas_sv / $moy_sv / $haut_sv   (converti : $bas_gpu / $moy_gpu / $haut_gpu ; non converti : $bas_off / $moy_off / $haut_off)"
-if python3 - "$bas_off" "$bas_sv" "$haut_off" "$haut_sv" "$haut_gpu" <<'PY'
+read -r bas_sv moy_sv haut_sv <<<"$(bandes "$BASE/dumps/sv-petit.png")"
+echo "    sans Vulkan (abordable) : $bas_sv / $moy_sv / $haut_sv   (non converti : $bas_off / $moy_off / $haut_off ; GPU : $bas_gpu / $moy_gpu / $haut_gpu)"
+if python3 - "$bas_off" "$bas_sv" "$haut_off" "$haut_sv" <<'PY'
 import sys
-bas_off, bas_sv, haut_off, haut_sv, haut_gpu = map(float, sys.argv[1:6])
-# Image d'origine rendue telle quelle (±3) ET nettement différente de l'image convertie :
-# sans la seconde condition, le contrôle passerait si Vulkan n'était pas réellement cassé.
-sys.exit(0 if abs(bas_sv - bas_off) <= 3 and abs(haut_sv - haut_off) <= 3
-         and (haut_gpu - haut_sv) >= 30 else 1)
+bas_off, bas_sv, haut_off, haut_sv = map(float, sys.argv[1:5])
+# Même signature que le repli CPU forcé (section 5) : les basses lumières descendent d'au
+# moins 5 niveaux, les hautes montent d'au moins 20 par rapport à l'image non convertie.
+sys.exit(0 if (bas_off - bas_sv) >= 5 and (haut_sv - haut_off) >= 20 else 1)
 PY
 then
-    ok "sans Vulkan : image HDR non convertie (pas de repli CPU automatique — état assumé)"
+    ok "sans Vulkan, source abordable : l'image est convertie par le CPU"
 else
-    ko "sans Vulkan : l'image n'est ni l'originale ni cohérente avec un Vulkan réellement coupé"
+    ko "sans Vulkan, source abordable : l'image n'est pas convertie (pas de repli CPU effectif)"
+fi
+
+# --- 12b. Source trop lourde : pas de conversion, et on le dit ------------------------
+# Même mire, étirée en 3840×2160 à 25 i/s (ffv1 : les aplats se compressent presque à rien).
+# 25 et non 24 : les images tombent à 480 et 520 ms, donc la position 500 ms n'est PAS une
+# image. À 24 i/s elle l'est, `--dump-frame` s'arrête après UNE image, et libplacebo (une image
+# de latence) n'a encore rien sorti : la mire sortait non convertie, même Vulkan intact.
+$FF -hide_banner -loglevel error -i "$BASE/clips/bandes.mkv" -t 2 \
+    -vf "fps=25,scale=3840:2160:flags=neighbor" \
+    -c:v ffv1 -level 3 -color_trc smpte2084 -color_primaries bt2020 -colorspace bt2020nc -color_range tv \
+    -y "$BASE/clips/lourd.mkv" 2>/dev/null
+if [ -s "$BASE/clips/lourd.mkv" ]; then
+    image jamais "$BASE/clips/lourd.mkv" "$BASE/dumps/lourd-jamais.png"
+    image auto "$BASE/clips/lourd.mkv" "$BASE/dumps/lourd-gpu.png"
+    sans_vulkan auto "$BASE/clips/lourd.mkv" "$BASE/dumps/sv-lourd.png" "$BASE/cfg/sv-lourd.log"
+    read -r bas_lj moy_lj haut_lj <<<"$(bandes_rel "$BASE/dumps/lourd-jamais.png")"
+    read -r bas_lg moy_lg haut_lg <<<"$(bandes_rel "$BASE/dumps/lourd-gpu.png")"
+    read -r bas_ls moy_ls haut_ls <<<"$(bandes_rel "$BASE/dumps/sv-lourd.png")"
+    echo "    4K à 25 i/s : non converti $bas_lj / $moy_lj / $haut_lj ; GPU $bas_lg / $moy_lg / $haut_lg ; sans Vulkan $bas_ls / $moy_ls / $haut_ls"
+    if nettoye "$BASE/cfg/sv-lourd.log" | grep -q "repli CPU refusé"; then
+        ok "sans Vulkan, source 4K à 25 i/s : le refus du repli CPU est journalisé, avec sa raison"
+    else
+        ko "sans Vulkan, source 4K : pas de ligne « repli CPU refusé » ($(nettoye "$BASE/cfg/sv-lourd.log" | grep -o 'Étage HDR[^:]*' | head -1 | cut -c1-90))"
+    fi
+    if python3 - "$bas_lj" "$bas_ls" "$haut_lj" "$haut_ls" "$haut_lg" <<'PY'
+import sys
+bas_lj, bas_ls, haut_lj, haut_ls, haut_lg = map(float, sys.argv[1:6])
+# Image d'origine rendue telle quelle (±3) ET nettement différente de l'image convertie par
+# le GPU : sans la seconde condition, le contrôle passerait si Vulkan n'était pas réellement cassé.
+sys.exit(0 if abs(bas_ls - bas_lj) <= 3 and abs(haut_ls - haut_lj) <= 3
+         and (haut_lg - haut_ls) >= 30 else 1)
+PY
+    then
+        ok "sans Vulkan, source 4K : image non convertie (pas de lecture saccadée imposée)"
+    else
+        ko "sans Vulkan, source 4K : l'image n'est ni l'originale ni cohérente avec un Vulkan réellement coupé"
+    fi
+else
+    info "mire 4K non fabriquée — contrôle 12b ignoré"
+fi
+
+# --- 12c. En lecture réelle, l'échec n'est pas rejoué à chaque image ------------------
+# Défaut constaté le 2026-10-24 : avec un AUTRE filtre actif (ici le contraste), le graphe
+# reconstruit sans l'étage portait la signature de la chaîne réduite, pas celle demandée :
+# à chaque image, le lecteur retentait Vulkan, échouait, reconstruisait (20 refus en 8 s sur
+# un clip à 5 i/s). `--dump-frame` ne décode qu'une image : seule une vraie lecture le voit.
+if command -v Xvfb >/dev/null; then
+    XV=:94
+    Xvfb "$XV" -screen 0 1280x800x24 >"$BASE/xvfb-lecture.log" 2>&1 &
+    XVPID=$!
+    sleep 1.5
+    config contraste '{"contrast": 1.2, "hdr": {"mode": "Auto"}}'
+    joue() {  # joue <clip> <journal>
+        env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 DISPLAY="$XV" \
+            XDG_RUNTIME_DIR=/tmp/kplayer-bench-pas-de-son $VK_CASSE \
+            XDG_CONFIG_HOME="$BASE/cfg/contraste" XDG_CACHE_HOME="$BASE/cfg/contraste/cache" \
+            timeout 5 "$KP" "$1" >"$2" 2>&1
+    }
+    for cas in "petit:$BASE/clips/bandes.mkv" "lourd:$BASE/clips/lourd.mkv"; do
+        nom="${cas%%:*}"; clip="${cas#*:}"
+        [ -s "$clip" ] || continue
+        joue "$clip" "$BASE/cfg/lecture-$nom.log"
+        refus=$(nettoye "$BASE/cfg/lecture-$nom.log" | grep -c "Étage HDR refusé")
+        if [ "$refus" -ge 1 ] && [ "$refus" -le 1 ]; then
+            ok "lecture réelle ($nom, autre filtre actif) : le refus de l'étage est journalisé une seule fois"
+        elif [ "$refus" -eq 0 ]; then
+            ko "lecture réelle ($nom) : aucun refus journalisé — le chemin testé n'a pas été exercé"
+        else
+            ko "lecture réelle ($nom) : l'échec est rejoué à chaque image ($refus refus en 5 s)"
+        fi
+    done
+    kill "$XVPID" 2>/dev/null
+else
+    info "Xvfb absent — contrôle de lecture réelle (12c) ignoré"
 fi
 
 echo

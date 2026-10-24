@@ -1094,6 +1094,20 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      consécutives, 60 × 133 réussites. Reste à faire dans `etat-court.sh` : refuser de publier
      un nombre de tests quand `failed` est non nul.
 
+117. 🔴 **Un échec « géré » peut être rejoué à chaque image sans que personne le voie.** Quand
+     l'étage HDR GPU était refusé et qu'il restait d'autres filtres, `apply_video_filters`
+     reconstruisait le graphe sans l'étage mais lui donnait la **signature de la chaîne réduite** ;
+     l'image suivante comparait avec la signature **demandée**, jugeait le graphe périmé, retentait
+     Vulkan, échouait, reconstruisait — à chaque image (20 refus en 5 s à 5 i/s, donc 24 à 60 par
+     seconde en lecture normale). Invisible de `--dump-frame` (une seule image) et de tous les
+     bancs : seule une **vraie lecture** le montre (`verif-hdr` §12c). Règle : après un repli, le
+     graphe de remplacement porte la signature de ce qui a été DEMANDÉ. Ajouté au passage : le
+     repli CPU borné (budget 62 Mpx/s mesuré, `docs/HDR.md`) et l'avis à l'écran.
+     **Piège voisin du banc** : `--dump-frame` à une position qui tombe exactement sur une image
+     (24 i/s, 500 ms) n'en décode qu'une, et `libplacebo` (une image de latence) n'a rien sorti :
+     la mire sortait non convertie même Vulkan intact. Choisir une cadence dont les images ne
+     tombent pas sur la position (25 i/s : 480 et 520 ms).
+
 ## 5. Reste à faire
 
 État au **2026-10-19, fin de session 32**. Chaque ligne dit *pourquoi* ce n'est pas fait,

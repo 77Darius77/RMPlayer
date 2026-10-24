@@ -6,11 +6,11 @@ le reste est du jugement, écrit à la main et tenu à jour à chaque session.
 
 <!-- AUTO:debut — bloc régénéré par tools/etat-court.sh, ne pas éditer à la main -->
 ```
-Généré le            2026-10-24 16:00
-Code                 25306 lignes, 19 modules (src/)
+Généré le            2026-10-24 17:19
+Code                 25503 lignes, 19 modules (src/)
 Bancs de contrôle    26 (tools/tout-verifier.sh)
-Dernière suite       2026-10-24 15:56 — 505 contrôles, 0 échec(s), 26 bancs
-Tests unitaires      133 (cargo test --release)
+Dernière suite       2026-10-24 17:19 — 509 contrôles, 0 échec(s), 26 bancs
+Tests unitaires      136 (cargo test --release)
 Avertissements       0 (cargo build --release)
 Dernière archive     kplayer-2026-10-24-session36.tar.gz — 87 fichiers, 628 Ko
 FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
@@ -20,8 +20,8 @@ FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
   HDR (libplacebo)   oui (Vulkan)
 ```
 <!-- AUTO:fin -->
-> **Tout est vérifié** : dernière suite complète **2026-10-24 15:56 — 505 contrôles,
-> 0 échec, 26 bancs** (lancée depuis un shell Wayland brut, voir piège 114), 133 tests
+> **Tout est vérifié** : dernière suite complète **2026-10-24 17:19 — 509 contrôles,
+> 0 échec, 26 bancs** (lancée depuis un shell Wayland brut, voir piège 114), 136 tests
 > unitaires, 0 avertissement. **Tout le plan PotPlayer est
 > fait** : les cinq chantiers (s.32-34), la finition des réglages (⑥→⑨) et le **HDR** (⑩,
 > s.35 : conversion tonale + détection d'écran par EDID). Le **passthrough HDR est branché
@@ -33,8 +33,8 @@ FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
 Lecteur vidéo **Rust + egui** (Linux), sans dépendance à un lecteur externe : FFmpeg lie
 directement (`ffmpeg-sys-next`, FFmpeg 7.1.3 de `/opt/ffmpeg-7.1`), audio par `cpal`,
 réglages en JSON. Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`. **Contrôle de version
-git depuis la session 36** (branche `main`, étiquette `session36` = l'état vérifié à 505
-contrôles ; pas de dépôt distant) ; les archives de `sauvegardes/` restent comme copies hors
+git depuis la session 36** (branche `main`, étiquettes `session36` = l'état à 505 contrôles et
+`session36-repli-hdr` = 509 contrôles, repli HDR borné ; pas de dépôt distant) ; les archives de `sauvegardes/` restent comme copies hors
 dépôt (non suivies par git).
 
 ## Les trois optimisations en place (mesurées, session 31)
@@ -56,7 +56,7 @@ Contreparties assumées, vérifiées : le filtre du pilote est plus doux que Lan
 | **Mémoire de la fenêtre** (s.32) | taille + état agrandi partout, **position sous X11** ; sous Wayland (Plasma 6.8, seule session) la position relève d'une règle KWin — `tools/regle-fenetre-kwin.sh` | `verif-fenetre` 9/9, `verif-fenetre-wayland` 12/12 |
 | **Association de fichiers** (s.33) | « Ouvrir avec », menu, icône ; **instance unique** (le fichier arrive dans la fenêtre ouverte) ; `--par-defaut` sur demande | `verif-association` 38/38 |
 | **Réglages** (s.34) | teinte, niveaux, adoucir (vidéo) ; interlettre et marges des sous-titres ; presets Cinéma/Podcast et équilibre de réverbération ; pause selon le focus | `verif-filtres` 20/20, `verif-soustitres` 7/7, `verif-audio` 34/34, `verif-focus` 6/6 |
-| **HDR** (s.35) | conversion tonale HDR→SDR (libplacebo/Vulkan ; moteur CPU seulement sur demande, **sans Vulkan l'image reste non convertie** — `docs/HDR.md`), tramage 10→8 bits, débanding GPU ; détecte PQ/HLG/BT.2020 **et la capacité de chaque écran par EDID** (passthrough branché mais impossible : fenêtre 8 bits — `docs/HDR.md`) | `verif-hdr` 29/29 |
+| **HDR** (s.35) | conversion tonale HDR→SDR (libplacebo/Vulkan ; **repli CPU borné** si Vulkan est refusé — ≤ 1080p30 converti par le CPU, au-delà image non convertie avec avis à l'écran, `docs/HDR.md`), tramage 10→8 bits, débanding GPU ; détecte PQ/HLG/BT.2020 **et la capacité de chaque écran par EDID** (passthrough branché mais impossible : fenêtre 8 bits — `docs/HDR.md`) | `verif-hdr` 29/29 |
 | **MPRIS** (s.34) | touches média et widget du bureau : `org.mpris.MediaPlayer2.kplayer`, état publié, Volume/Shuffle/LoopStatus/Rate réglables, commandes exécutées par l'interface (réveil même en pause) | `verif-mpris` 27/27 (module seul) + 8 contrôles d'intégration |
 | **Vignettes** (s.34) | survoler la barre de progression montre l'image de l'instant pointé (décodeur autonome, fil de travail, 320×180, 4 à 175 ms) | `verif-vignettes` 14/14 + 3 contrôles d'intégration |
 | **Playlist** (s.34) | lecture **aléatoire** (chaque élément une fois, `Ctrl+A`, 🔀, mémorisé) et **glisser-déposer** avec repère, ordre enregistré ; volet **borné** (300 px, max 420), lignes à interaction unique (clic = lire, glisser = déplacer), ✕ toujours visible, texte tronqué | `verif-playlist` 18/18 |
@@ -95,7 +95,7 @@ sous-titres, puis marque-pages.
 7. **Deux suites de vérification en parallèle rendent des résultats faux sans le dire** : un
    banc qui capture l'écran mesure la fenêtre de l'autre. `tout-verifier.sh` prend un verrou.
 
-Les **116 pièges**, avec le détail de chacun, sont en **§4 de `docs/AVANCEMENT.md`** — c'est la
+Les **117 pièges**, avec le détail de chacun, sont en **§4 de `docs/AVANCEMENT.md`** — c'est la
 seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 
 ## Où lire quoi (uniquement sur question précise)
@@ -116,12 +116,13 @@ seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 
 ```bash
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
-cargo test --release                    # 133 tests
+cargo test --release                    # 136 tests
 tools/verif-rapide.sh <sujet>           # module touché : hdr, playlist, vignettes, mpris, ui…
-tools/verif-hdr.sh                      # HDR seul (32 contrôles, mires en nits)
+tools/sante-hdr.sh                      # ≈ 10 s, après une mise à jour Mesa/pilote/noyau : Vulkan, libplacebo, VA-API
+tools/verif-hdr.sh                      # HDR seul (36 contrôles, mires en nits)
 tools/verif-mpris.sh                    # le module seul (27 contrôles, --mpris-test)
 tools/verif-vignettes.sh                # le module seul (14 contrôles, ~20 s)
-tools/tout-verifier.sh                  # 26 bancs, 505 contrôles, 0 échec attendu (~21 min)
+tools/tout-verifier.sh                  # 26 bancs, 509 contrôles, 0 échec attendu (~21 min)
 tools/etat-court.sh                     # remet cette fiche à jour (après la suite)
 tools/bench-optimisation.sh             # re-mesure les gains GPU et l'AV1
 ```

@@ -2248,6 +2248,13 @@ impl eframe::App for App {
             }
         }
 
+        // Avis HDR subi (Vulkan refusé : conversion par le CPU, ou image non convertie) :
+        // montré une fois à l'écran. Sans cela, un film qui devient délavé après une mise
+        // à jour du système n'a d'explication que dans le journal. Aucun `ctx.*` ici.
+        if let Some(avis) = self.player.take_hdr_avis() {
+            self.annonce(&avis);
+        }
+
         // Taille et position de la fenêtre : mémorisées pour le prochain lancement.
         self.memoriser_geometrie(ctx);
 
