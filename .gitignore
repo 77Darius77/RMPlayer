@@ -1,0 +1,12 @@
+# Artefacts de compilation
+/target/
+
+# Fichiers de travail locaux
+*.log
+*.tmp
+
+# Sauvegardes tar.gz (le dépôt git les remplace ; elles restent sur disque)
+/sauvegardes/
+
+# Image parasite à la racine (sortie d'un essai --bench-taille, 1920x1080)
+/--bench-taille

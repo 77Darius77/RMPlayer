@@ -1,0 +1,30 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=KPlayer
+Name[en]=KPlayer
+GenericName=Lecteur vidéo
+GenericName[en]=Video player
+Comment=Lecteur vidéo Rust + egui : décodage matériel VA-API, filtres FFmpeg, sous-titres ASS, reprise de lecture
+Comment[en]=Rust + egui video player: VA-API hardware decoding, FFmpeg filters, ASS subtitles, resume
+Exec=@EXEC@ %U
+TryExec=@EXEC_BIN@
+Icon=@ICON@
+Terminal=false
+Categories=AudioVideo;Video;Player;Qt;KDE;
+Keywords=vidéo;film;série;lecteur;player;media;mkv;mp4;
+StartupNotify=true
+StartupWMClass=kplayer
+# Quatre types ont été retirés après vérification (session 33) : video/x-m2ts,
+# video/x-divx, video/vnd.dlna.mpeg-tts et video/x-ms-vob ne figurent pas dans
+# shared-mime-info — les déclarer ne pouvait rien déclencher.
+MimeType=video/mp4;video/x-matroska;video/webm;video/quicktime;video/x-msvideo;video/mpeg;video/mp2t;video/x-flv;video/3gpp;video/3gpp2;video/ogg;video/x-ms-wmv;video/x-ms-asf;video/x-m4v;application/vnd.rn-realmedia;application/x-matroska;
+Actions=plein-ecran;logiciel;
+
+[Desktop Action plein-ecran]
+Name=Lire en plein écran
+Exec=@EXEC@ --fullscreen %U
+
+[Desktop Action logiciel]
+Name=Lire sans décodage matériel
+Exec=@EXEC@ --no-hwdec %U

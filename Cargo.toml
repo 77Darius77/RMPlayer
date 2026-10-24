@@ -1,0 +1,57 @@
+[package]
+name = "kplayer"
+version = "0.1.0"
+edition = "2021"
+description = "Lecteur vidéo professionnel Linux — qualité PotPlayer, 100% natif Rust"
+license = "MIT"
+
+[dependencies]
+# FFmpeg FFI bindings (compatible FFmpeg 7.x du système)
+ffmpeg-sys-next = { version = "7.1", features = ["avcodec", "avformat", "avfilter", "swscale", "swresample"] }
+
+# UI ImGUI (léger comme PotPlayer)
+egui = "0.33"
+eframe = { version = "0.33", features = ["default_fonts", "wayland", "x11"] }
+egui_extras = { version = "0.33", features = ["image"] }
+
+# MPRIS (touches média du bureau) : le bureau n'écoute que D-Bus. `blocking-api`
+# évite d'installer un exécuteur asynchrone dans le projet : le serveur vit dans
+# son propre fil et l'interface ne fait que déposer des demandes.
+zbus = { version = "5.19", default-features = false, features = ["async-io", "blocking-api"] }
+
+# Audio (PipeWire/PulseAudio natif)
+# rodio retiré : la sortie audio passe par cpal (src/audio.rs)
+cpal = "0.15"
+
+# Configuration & persistence
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+dirs = "6.0"
+
+# File dialog
+rfd = "0.15"
+
+# Captures d'écran PNG (encodeur pur Rust, sans dépendance système)
+png = "0.18"
+
+# X11 : uniquement pour « fenêtre toujours au-dessus » (voir src/x11.rs).
+# Pur Rust, aucune bibliothèque système requise. N'est utilisé que sur X11 ;
+# sur Wayland, la fonction se contente d'échouer proprement.
+x11rb = { version = "0.13", default-features = false, features = ["allow-unsafe-code"] }
+
+# Logging
+tracing = "0.1"
+libc = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+debug = "line-tables-only"
+strip = false
+
+[build-dependencies]
