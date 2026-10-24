@@ -1108,6 +1108,34 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      la mire sortait non convertie même Vulkan intact. Choisir une cadence dont les images ne
      tombent pas sur la position (25 i/s : 480 et 520 ms).
 
+118. 🔴 **La première mesure d'une séance est à froid.** `verif-systeme` §3 comptait les images
+     différentes montrées par seconde : 59 en lancement isolé, **46** en suite complète (premier
+     lancement de la séance : shaders et caches). La référence « sans limite » étant trop basse, la
+     comparaison avec « 120 i/s ne change rien » échouait sans que le lecteur soit en cause.
+     Règle : un banc qui compare à une référence mesurée **écarte une mesure à vide et prend le
+     meilleur de deux**. Vu seulement en suite complète — d'où l'intérêt de la rejouer en entier.
+
+119. 🔴 **Une décision déduite d'une grandeur qui change selon le chemin donne deux réponses pour
+     le même film.** La matrice de couleur « automatique » (lot 3) se décidait sur la taille de
+     l'image **à convertir** (réduite à l'affichage par `scale_vaapi`) et sur les balises de l'image
+     **filtrée** (que le graphe de filtres complète de son propre chef) : un film HD non balisé
+     sortait en BT.709 par la chaîne CPU et en BT.601 par la chaîne GPU. Trouvé par
+     `verif-personnalisation` (« inversion non mesurée »), pas par le banc de la fonction elle-même.
+     Règle : décider sur l'**origine** (balises et définition de l'image décodée), sauf conversion
+     HDR (alors l'image à convertir est du SDR balisé comme tel). Gardé par `verif-affichage` §6.
+
+120. 🔴 **Un réglage « fixé à zéro » dans un banc cache le défaut du réglage.** `verif-soustitres.sh`
+     mettait toujours l'épaisseur du contour à 0 : la couleur du contour (les galleys étaient posés
+     avec la couleur du texte, donc le contour se redessinait dans SA couleur) n'a jamais été
+     mesurée. Le nouveau banc de style mesure d'abord un contour rouge. Même famille que les pièges
+     2 et 115 : un contrôle qui ne varie pas la grandeur qu'il prétend vérifier.
+
+121. 🔴 **Lire un fichier « en UTF-8 strict » écarte la plupart des anciens sous-titres français.**
+     `read_to_string` refusait tout fichier en windows-1252 (« stream did not contain valid UTF-8 ») :
+     le sous-titre n'apparaissait pas, sans message à l'écran. Désormais BOM, puis UTF-8, puis
+     windows-1252 ; ou l'alphabet imposé (`subtitles.encoding`). Limite connue, non corrigée : une
+     réplique de piste **intégrée** commencée avant un saut n'est pas relue après le `seek`.
+
 ## 5. Reste à faire
 
 État au **2026-10-19, fin de session 32**. Chaque ligne dit *pourquoi* ce n'est pas fait,

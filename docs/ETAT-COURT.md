@@ -6,12 +6,12 @@ le reste est du jugement, écrit à la main et tenu à jour à chaque session.
 
 <!-- AUTO:debut — bloc régénéré par tools/etat-court.sh, ne pas éditer à la main -->
 ```
-Généré le            2026-10-24 17:19
-Code                 25503 lignes, 19 modules (src/)
-Bancs de contrôle    26 (tools/tout-verifier.sh)
-Dernière suite       2026-10-24 17:19 — 509 contrôles, 0 échec(s), 26 bancs
-Tests unitaires      136 (cargo test --release)
-Avertissements       0 (cargo build --release)
+Généré le            2026-10-24 23:31
+Code                 28252 lignes, 24 modules (src/)
+Bancs de contrôle    39 (tools/tout-verifier.sh)
+Dernière suite       2026-10-24 23:29 — 614 contrôles, 0 échec(s), 39 bancs
+Tests unitaires      161 (cargo test --release)
+Avertissements       1 (cargo build --release)
 Dernière archive     kplayer-2026-10-24-session36.tar.gz — 87 fichiers, 628 Ko
 FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
   AV1 logiciel       oui (libdav1d)
@@ -20,12 +20,21 @@ FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
   HDR (libplacebo)   oui (Vulkan)
 ```
 <!-- AUTO:fin -->
-> **Tout est vérifié** : dernière suite complète **2026-10-24 17:19 — 509 contrôles,
-> 0 échec, 26 bancs** (lancée depuis un shell Wayland brut, voir piège 114), 136 tests
-> unitaires, 0 avertissement. **Tout le plan PotPlayer est
-> fait** : les cinq chantiers (s.32-34), la finition des réglages (⑥→⑨) et le **HDR** (⑩,
-> s.35 : conversion tonale + détection d'écran par EDID). Le **passthrough HDR est branché
-> mais inatteignable** — la fenêtre est en 8 bits (`docs/HDR.md`).
+> **Tout est vérifié** : dernière suite complète **2026-10-24 23:29 — 614 contrôles,
+> 0 échec, 39 bancs** (lancée depuis un shell Wayland brut, voir piège 114), 161 tests
+> unitaires, 0 avertissement de code. **Session 37 : les lots 1 à 5 de
+> `docs/PROCHAINES-FONCTIONS.md` sont faits** (récents, boucle A-B, export/import, style des
+> sous-titres, langues, couleur, glisser, rogner, signets, souris, décodeur, icône de
+> notification, démarrage automatique, priorité, cadence) ainsi que, du lot 6, les thèmes
+> externes et l'alphabet des sous-titres. **Non faits, avec la raison ligne par ligne** : C4
+> (autres moniteurs, non mesurable sous Wayland), F2 (passthrough HDR), F3 (langue d'interface),
+> F6, le reste de F5. Le **passthrough HDR reste inatteignable** (`docs/HDR.md`).
+>
+> **⚠ Disque racine plein** (constaté s.37) : `/` est à 100 %, à cause d'un journal de debug Wine de
+> **39,6 Go** (`~/.var/app/com.valvesoftware.Steam/steam-*.log`), pas des bancs (qui écrivent dans
+> `/tmp`, en RAM). Tant que `/` est plein, cargo affiche « failed to save last-use data » et la
+> ligne « Avertissements » de la fiche compte **1 à tort** ; la relancer (`tools/etat-court.sh`)
+> après avoir libéré de la place.
 
 
 ## Le projet en trois lignes
@@ -33,8 +42,8 @@ FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
 Lecteur vidéo **Rust + egui** (Linux), sans dépendance à un lecteur externe : FFmpeg lie
 directement (`ffmpeg-sys-next`, FFmpeg 7.1.3 de `/opt/ffmpeg-7.1`), audio par `cpal`,
 réglages en JSON. Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`. **Contrôle de version
-git depuis la session 36** (branche `main`, étiquettes `session36` = l'état à 505 contrôles et
-`session36-repli-hdr` = 509 contrôles, repli HDR borné ; pas de dépôt distant) ; les archives de `sauvegardes/` restent comme copies hors
+git depuis la session 36** (branche `main`, étiquettes `session36` = l'état à 505 contrôles,
+`session36-repli-hdr` = 509 contrôles, repli HDR borné, et `session37` = 614 contrôles, lots 1 à 6 ; pas de dépôt distant) ; les archives de `sauvegardes/` restent comme copies hors
 dépôt (non suivies par git).
 
 ## Les trois optimisations en place (mesurées, session 31)
@@ -95,7 +104,7 @@ sous-titres, puis marque-pages.
 7. **Deux suites de vérification en parallèle rendent des résultats faux sans le dire** : un
    banc qui capture l'écran mesure la fenêtre de l'autre. `tout-verifier.sh` prend un verrou.
 
-Les **117 pièges**, avec le détail de chacun, sont en **§4 de `docs/AVANCEMENT.md`** — c'est la
+Les **121 pièges**, avec le détail de chacun, sont en **§4 de `docs/AVANCEMENT.md`** — c'est la
 seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 
 ## Où lire quoi (uniquement sur question précise)
@@ -116,13 +125,13 @@ seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 
 ```bash
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
-cargo test --release                    # 136 tests
+cargo test --release                    # 161 tests
 tools/verif-rapide.sh <sujet>           # module touché : hdr, playlist, vignettes, mpris, ui…
 tools/sante-hdr.sh                      # ≈ 10 s, après une mise à jour Mesa/pilote/noyau : Vulkan, libplacebo, VA-API
 tools/verif-hdr.sh                      # HDR seul (36 contrôles, mires en nits)
 tools/verif-mpris.sh                    # le module seul (27 contrôles, --mpris-test)
 tools/verif-vignettes.sh                # le module seul (14 contrôles, ~20 s)
-tools/tout-verifier.sh                  # 26 bancs, 509 contrôles, 0 échec attendu (~21 min)
+tools/tout-verifier.sh                  # 39 bancs, 614 contrôles, 0 échec attendu (~45 min)
 tools/etat-court.sh                     # remet cette fiche à jour (après la suite)
 tools/bench-optimisation.sh             # re-mesure les gains GPU et l'AV1
 ```
