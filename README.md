@@ -496,6 +496,19 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | — | **revue externe** : `docs/BRIEF-REVUE-EXTERNE.md` — ce qu'on demande à un relecteur extérieur, budget de lecture, six vérifications qui valent mieux que la lecture, deux pièges à faux positifs |
 | `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, moteur CPU forcé, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision, **Vulkan coupé** (repli CPU borné, avis, pas de reconstruction à chaque image) — 36 contrôles |
 | `verif-focus.sh [écran]` | **Pause selon le focus** : jamais / perte de focus / fenêtre réduite, reprise au retour, respect d'une pause volontaire — 11 contrôles, avec une seconde fenêtre réelle ; la pause est mesurée aussi sur l'image (deux captures identiques), avec un témoin en lecture. Non couvert : une vraie réduction (mode 2), qui exige un gestionnaire de fenêtres |
+| `verif-recents.sh [écran]` | **Fichiers récents** : `config.json` relu après de vraies ouvertures (ordre, doublon, borne de 10) — 7 contrôles |
+| `verif-config-io.sh` | **Export / import de la configuration** : aller-retour octet pour octet, refus sans écrasement — 12 contrôles |
+| `verif-boucle-ab.sh [écran]` | **Répétition A-B** : nombre de retours et pause, comptés sur la position MPRIS et au journal — 6 contrôles |
+| `verif-soustitres-style.sh [écran]` | **Style des sous-titres** : contour, marges haut/bas, interligne, ombre, second contour, échelle X/Y, fondu — pixels de la fenêtre — 9 contrôles |
+| `verif-soustitres-langues.sh [écran]` | **Langues par priorité, durées mini/maxi, piste mémorisée, alphabet** — 12 contrôles |
+| `verif-couleur.sh` | **Matrice et plage de couleur** : couleur RVB d'origine retrouvée (BT.601/709, limitée/complète) — 11 contrôles |
+| `verif-affichage.sh [écran]` | **Rogner et glisser**, et couleur identique par la chaîne GPU et la chaîne CPU — 7 contrôles |
+| `verif-signets.sh [écran]` | **Signets** par média : ajouter, suivant/précédent, supprimer, après redémarrage — 7 contrôles |
+| `verif-souris.sh [écran]` | **Souris avec Ctrl / Maj / Alt** : effets lus sur MPRIS — 4 contrôles |
+| `verif-decodeur.sh` | **Décodeur par codec** : décodeur réellement ouvert, repli sur le défaut — 7 contrôles |
+| `verif-systeme.sh [écran]` | **Démarrage automatique, priorité (nice de tous les fils), fréquence maximale** — 10 contrôles |
+| `verif-tray.sh [écran]` | **Icône de notification** (StatusNotifierItem) pilotée par D-Bus — 7 contrôles |
+| `verif-theme.sh [écran]` | **Thèmes externes** : pixel de la barre de menus, thème illisible refusé — 6 contrôles |
 | `verif-mpris.sh` | **MPRIS** (module seul, mode `--mpris-test`, sans fenêtre) : nom sur le bus, métadonnées en µs, commandes reçues, `SetPosition` filtré par piste, réglages Volume/Shuffle/LoopStatus/Rate, `PropertiesChanged`, nom rendu, absence de bus gérée — 27 contrôles |
 | `verif-vignettes.sh` | **Vignettes de la barre** (module seul, chemin `--vignette`) : taille, position réelle à une image près, deux positions → deux images, déterminisme, largeur bornée, coût, sortie réutilisée, largeur non multiple de 32, hors durée — 14 contrôles, sans écran |
 | `verif-playlist.sh [écran]` | **Playlist** : lecture aléatoire (quatre avances → quatre fichiers distincts, mode mémorisé), **glisser-déposer réel à la souris**, clic sur une ligne, ✕ qui retire, volet borné avec des noms longs — 18 contrôles ; les lignes sont visées depuis la géométrie journalisée, jamais devinée |
