@@ -30,6 +30,50 @@ pub enum ScalingMethod {
     Area,
 }
 
+/// Matrice de couleur de la conversion YUV → RVB.
+///
+/// « Automatique » suit ce que le flux déclare ; à défaut, la définition décide (HD → BT.709,
+/// SD → BT.601). Les autres valeurs l'imposent — utile pour un film mal étiqueté, dont les
+/// couleurs saturées sont légèrement fausses.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+pub enum ColorMatrix {
+    #[default]
+    Auto,
+    Bt601,
+    Bt709,
+    Bt2020,
+}
+
+impl ColorMatrix {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Auto => "Automatique",
+            Self::Bt601 => "BT.601 (SD)",
+            Self::Bt709 => "BT.709 (HD)",
+            Self::Bt2020 => "BT.2020 (UHD)",
+        }
+    }
+}
+
+/// Plage des niveaux du signal YUV : limitée (16–235, la norme vidéo) ou complète (0–255).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
+pub enum ColorRange {
+    #[default]
+    Auto,
+    Limited,
+    Full,
+}
+
+impl ColorRange {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Auto => "Automatique",
+            Self::Limited => "Limitée (16–235)",
+            Self::Full => "Complète (0–255)",
+        }
+    }
+}
+
 /// Rapport d'aspect imposé à l'affichage.
 ///
 /// « Automatique » utilise la résolution native du média (comportement d'origine).
@@ -49,6 +93,9 @@ pub enum AspectMode {
     Ratio235,
     /// Remplit la zone disponible sans conserver aucun rapport (étirement).
     Remplir,
+    /// Remplit la zone en **gardant** le rapport de l'image et en **rognant** ce qui dépasse
+    /// (pas de bandes noires, mais les bords de l'image sont perdus).
+    Rogner,
     /// Rapport personnalisé, en largeur pour une hauteur de 1 (`custom_aspect`).
     Personnalise,
 }
@@ -69,6 +116,7 @@ impl AspectMode {
             Self::Ratio185 => "1,85:1 (cinéma)",
             Self::Ratio235 => "2,35:1 (cinémascope)",
             Self::Remplir => "Remplir la fenêtre (étirer)",
+            Self::Rogner => "Remplir la fenêtre (rogner)",
             Self::Personnalise => "Personnalisé",
         }
     }
@@ -266,6 +314,17 @@ pub struct VideoSettings {
     /// Afficher la zone de recadrage par-dessus l'image (repère visuel).
     #[serde(default = "default_vrai")]
     pub crop_overlay: bool,
+    /// Matrice de couleur et plage de la conversion YUV → RVB (voir `ColorMatrix`).
+    #[serde(default)]
+    pub color_matrix: ColorMatrix,
+    #[serde(default)]
+    pub color_range: ColorRange,
+    /// Glisser : décalage de l'image dans la fenêtre, en pourcentage de sa largeur / hauteur
+    /// affichées (positif = vers la droite / le bas). Ce qui sort de la fenêtre est rogné.
+    #[serde(default)]
+    pub pan_x_percent: f32,
+    #[serde(default)]
+    pub pan_y_percent: f32,
     /// Rapport d'aspect imposé à l'affichage (déformation volontaire si ≠ natif).
     #[serde(default)]
     pub aspect: AspectMode,
@@ -403,6 +462,10 @@ impl VideoSettings {
         self.flip_h = false;
         self.zoom = default_zoom();
         self.aspect = AspectMode::default();
+        self.color_matrix = ColorMatrix::default();
+        self.color_range = ColorRange::default();
+        self.pan_x_percent = 0.0;
+        self.pan_y_percent = 0.0;
         self.crop_top = 0;
         self.crop_bottom = 0;
         self.crop_left = 0;
@@ -1360,6 +1423,10 @@ impl Default for VideoSettings {
             flip_h: false,
             crop_overlay: true,
             zoom: default_zoom(),
+            color_matrix: ColorMatrix::default(),
+            color_range: ColorRange::default(),
+            pan_x_percent: 0.0,
+            pan_y_percent: 0.0,
             aspect: AspectMode::default(),
             custom_aspect: default_custom_aspect(),
             crop_top: 0,
@@ -2411,6 +2478,23 @@ mod tests {
         let ancien: SubtitleSettings = serde_json::from_str("{}").unwrap();
         assert!(ancien.preferred_languages.is_empty() && !ancien.remember_track);
         assert_eq!((ancien.min_duration_ms, ancien.max_duration_ms), (0, 0));
+    }
+
+    #[test]
+    fn matrice_plage_et_glisser_se_relisent_et_se_remettent_a_zero() {
+        let mut video: VideoSettings = serde_json::from_str(
+            r#"{"color_matrix": "Bt709", "color_range": "Full", "pan_x_percent": 12.5, "aspect": "Rogner"}"#,
+        )
+        .unwrap();
+        assert_eq!((video.color_matrix, video.color_range), (ColorMatrix::Bt709, ColorRange::Full));
+        assert_eq!(video.pan_x_percent, 12.5);
+        assert_eq!(video.aspect, AspectMode::Rogner);
+        video.reset_filters();
+        assert_eq!((video.color_matrix, video.color_range), (ColorMatrix::Auto, ColorRange::Auto));
+        assert_eq!((video.pan_x_percent, video.pan_y_percent), (0.0, 0.0));
+        assert_eq!(video.aspect, AspectMode::Auto);
+        let ancienne: VideoSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!((ancienne.color_matrix, ancienne.color_range), (ColorMatrix::Auto, ColorRange::Auto));
     }
 
     #[test]

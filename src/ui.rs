@@ -856,6 +856,7 @@ impl App {
                     ("1.85", crate::config::AspectMode::Ratio185),
                     ("2.35", crate::config::AspectMode::Ratio235),
                     ("Remplir", crate::config::AspectMode::Remplir),
+                    ("Rogner", crate::config::AspectMode::Rogner),
                 ];
                 for (nom, mode) in modes {
                     let actif = self.config.video.aspect == mode;
@@ -1237,7 +1238,8 @@ impl App {
                     crate::config::AspectMode::Ratio4x3 => crate::config::AspectMode::Ratio185,
                     crate::config::AspectMode::Ratio185 => crate::config::AspectMode::Ratio235,
                     crate::config::AspectMode::Ratio235 => crate::config::AspectMode::Remplir,
-                    crate::config::AspectMode::Remplir => crate::config::AspectMode::Personnalise,
+                    crate::config::AspectMode::Remplir => crate::config::AspectMode::Rogner,
+                    crate::config::AspectMode::Rogner => crate::config::AspectMode::Personnalise,
                     crate::config::AspectMode::Personnalise => crate::config::AspectMode::Auto,
                 };
                 let _ = self.config.save();
@@ -3658,16 +3660,19 @@ impl eframe::App for App {
                                 // « Remplir » : on prend la forme de la zone disponible,
                                 // calculée juste en dessous.
                                 crate::config::AspectMode::Remplir => (0, 0),
+                                // « Rogner » : rapport du média, mais agrandi jusqu'à couvrir
+                                // la zone (`disp` dépasse alors la zone et le panneau rogne).
+                                crate::config::AspectMode::Rogner => native,
                             };
+                            let rogner = self.config.video.aspect == crate::config::AspectMode::Rogner;
                             ui.centered_and_justified(|ui| {
                                 let avail = ui.available_size();
                                 let disp = if native.0 == 0 || native.1 == 0 {
                                     // Mode « remplir » : toute la zone, sans rapport.
                                     avail
                                 } else {
-                                    let scale = (avail.x / native.0 as f32)
-                                        .min(avail.y / native.1 as f32)
-                                        .max(0.01);
+                                    let (sx, sy) = (avail.x / native.0 as f32, avail.y / native.1 as f32);
+                                    let scale = if rogner { sx.max(sy) } else { sx.min(sy) }.max(0.01);
                                     egui::vec2(native.0 as f32 * scale, native.1 as f32 * scale)
                                 };
 
@@ -3688,9 +3693,20 @@ impl eframe::App for App {
                                 // contextuel), ni le double-clic, ni le clic du milieu ne
                                 // parviennent à l'application (défaut constaté : le menu
                                 // contextuel ne s'ouvrait jamais).
-                                let response = ui.add(
-                                    egui::Image::new(sized_texture)
-                                        .sense(egui::Sense::click()),
+                                // Glisser : l'image est décalée d'un pourcentage de sa propre
+                                // taille ; la fenêtre rogne ce qui dépasse. Les sous-titres et le
+                                // repère de recadrage suivent (ils se calculent sur `response.rect`).
+                                let decalage = egui::vec2(
+                                    disp.x * self.config.video.pan_x_percent.clamp(-50.0, 50.0) / 100.0,
+                                    disp.y * self.config.video.pan_y_percent.clamp(-50.0, 50.0) / 100.0,
+                                );
+                                let zone_image = egui::Rect::from_center_size(
+                                    ui.max_rect().center() + decalage,
+                                    disp,
+                                );
+                                let response = ui.put(
+                                    zone_image,
+                                    egui::Image::new(sized_texture).sense(egui::Sense::click()),
                                 );
 
                                 // --- Souris : raccourcis personnalisables ---

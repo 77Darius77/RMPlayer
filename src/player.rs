@@ -239,6 +239,9 @@ struct VideoStream {
     scale_src_height: i32,
     scale_dst_width: i32,
     scale_dst_height: i32,
+    /// Matrice (`SWS_CS_*`) et plage source (0 limitée, 1 complète) du contexte swscale courant.
+    scale_coef: i32,
+    scale_plage: i32,
     /// Décodage matériel DEMANDÉ pour ce flux (décodeur ouvert avec le périphérique
     /// VA-API) — ce n'est pas encore une preuve d'usage.
     hw_requested: bool,
@@ -1933,6 +1936,8 @@ impl VideoPlayer {
                         scale_src_height: 0,
                         scale_dst_width: 0,
                         scale_dst_height: 0,
+                        scale_coef: -1,
+                        scale_plage: -1,
                         hw_requested,
                         hw_active: false,
                         hw_fallback_logged: false,
@@ -2453,9 +2458,10 @@ impl VideoPlayer {
                         let mut dims = self.last_frame_dims;
                         let target = self.display_target;
                         let method = self.scaling_method.clone();
+                        let couleur = (self.config_video.color_matrix, self.config_video.color_range);
                         if let Some(data) =
                             scale_frame_to_rgba(
-                                vs, frame, target, &method, &filters, chaine_gpu, &mut dims,
+                                vs, frame, target, &method, couleur, &filters, chaine_gpu, &mut dims,
                             )
                         {
                             self.last_frame_dims = dims;
@@ -2524,9 +2530,10 @@ impl VideoPlayer {
                     let mut dims = self.last_frame_dims;
                     let target = self.display_target;
                     let method = self.scaling_method.clone();
+                    let couleur = (self.config_video.color_matrix, self.config_video.color_range);
                     if let Some(data) =
                         scale_frame_to_rgba(
-                            vs, frame, target, &method, &filters, chaine_gpu, &mut dims,
+                            vs, frame, target, &method, couleur, &filters, chaine_gpu, &mut dims,
                         )
                     {
                         self.last_frame_dims = dims;
@@ -6343,11 +6350,58 @@ unsafe fn construire_chaine_gpu(
     })
 }
 
+/// Matrice (`SWS_CS_*`) et plage source (0 limitée, 1 complète) à utiliser pour cette image.
+unsafe fn couleur_effective(
+    source: *mut AVFrame,
+    choix: (crate::config::ColorMatrix, crate::config::ColorRange),
+    largeur: i32,
+    hauteur: i32,
+    format: AVPixelFormat,
+) -> (i32, i32) {
+    use crate::config::{ColorMatrix, ColorRange};
+    // Valeurs de `SWS_CS_*` (libswscale/swscale.h) : ITU709 = 1, ITU601 = 5, BT2020 = 9.
+    const ITU709: i32 = 1;
+    const ITU601: i32 = 5;
+    const BT2020: i32 = 9;
+    let coef = match choix.0 {
+        ColorMatrix::Bt601 => ITU601,
+        ColorMatrix::Bt709 => ITU709,
+        ColorMatrix::Bt2020 => BT2020,
+        ColorMatrix::Auto => match (*source).colorspace {
+            AVColorSpace::AVCOL_SPC_BT709 => ITU709,
+            AVColorSpace::AVCOL_SPC_BT470BG
+            | AVColorSpace::AVCOL_SPC_SMPTE170M
+            | AVColorSpace::AVCOL_SPC_FCC => ITU601,
+            AVColorSpace::AVCOL_SPC_BT2020_NCL | AVColorSpace::AVCOL_SPC_BT2020_CL => BT2020,
+            // Non déclarée : la définition décide (convention des lecteurs).
+            _ if largeur >= 1280 || hauteur >= 720 => ITU709,
+            _ => ITU601,
+        },
+    };
+    let plage = match choix.1 {
+        ColorRange::Limited => 0,
+        ColorRange::Full => 1,
+        ColorRange::Auto => match (*source).color_range {
+            ffmpeg_sys_next::AVColorRange::AVCOL_RANGE_JPEG => 1,
+            ffmpeg_sys_next::AVColorRange::AVCOL_RANGE_MPEG => 0,
+            _ => match format {
+                AVPixelFormat::AV_PIX_FMT_YUVJ420P
+                | AVPixelFormat::AV_PIX_FMT_YUVJ422P
+                | AVPixelFormat::AV_PIX_FMT_YUVJ444P
+                | AVPixelFormat::AV_PIX_FMT_YUVJ440P => 1,
+                _ => 0,
+            },
+        },
+    };
+    (coef, plage)
+}
+
 unsafe fn scale_frame_to_rgba(
     vs: &mut VideoStream,
     frame: *mut AVFrame,
     target: (u32, u32),
     method: &crate::config::ScalingMethod,
+    couleur: (crate::config::ColorMatrix, crate::config::ColorRange),
     filters_description: &str,
     gpu_filters: Option<&str>,
     dims_out: &mut (u32, u32),
@@ -6511,6 +6565,12 @@ unsafe fn scale_frame_to_rgba(
 
     let src_format: AVPixelFormat = std::mem::transmute::<c_int, AVPixelFormat>((*source).format);
 
+    // Matrice et plage effectives : celles imposées, sinon celles que déclare le flux, sinon
+    // la définition décide. **Sans ce réglage explicite, swscale lit tout en BT.601** : un film
+    // HD en BT.709 voyait ses couleurs saturées déplacées (mesuré : rouge (200,50,40) rendu
+    // (185,34,40)).
+    let (coef, plage_src) = couleur_effective(source, couleur, width, height, src_format);
+
     // Le format d'entrée peut changer en cours de flux (ou être NV12 après un
     // rapatriement matériel) et la taille d'affichage varie avec la fenêtre :
     // dans ce cas le contexte swscale est reconstruit.
@@ -6520,7 +6580,9 @@ unsafe fn scale_frame_to_rgba(
             || vs.scale_src_width != width
             || vs.scale_src_height != height
             || vs.scale_dst_width != dw
-            || vs.scale_dst_height != dh)
+            || vs.scale_dst_height != dh
+            || vs.scale_coef != coef
+            || vs.scale_plage != plage_src)
     {
         sws_freeContext(vs.scale_context);
         vs.scale_context = std::ptr::null_mut();
@@ -6539,6 +6601,13 @@ unsafe fn scale_frame_to_rgba(
             std::ptr::null_mut(),
             std::ptr::null(),
         );
+        if !vs.scale_context.is_null() {
+            // RVB en sortie : plage complète. Sans effet (retour négatif) sur une source déjà RVB.
+            let table = sws_getCoefficients(coef);
+            sws_setColorspaceDetails(vs.scale_context, table, plage_src, table, 1, 0, 1 << 16, 1 << 16);
+        }
+        vs.scale_coef = coef;
+        vs.scale_plage = plage_src;
         vs.scale_format = src_format;
         vs.scale_method = method.clone();
         vs.scale_src_width = width;
