@@ -478,7 +478,7 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-profils.sh [écran]` | **Profils** : application réelle, persistance, robustesse (fichier corrompu, doublons) — 17 contrôles |
 | `verif-regles.sh [écran]` | **Profils par règle** : chemin / extension / résolution mesurés sur l'image et le son, ordre, règles orphelines, ajout et suppression par l'interface — 24 contrôles |
 | `etat-court.sh [--check]` | **Régénère la fiche de reprise** `docs/ETAT-COURT.md` : lignes de code, bancs, dernier résultat de la suite, tests, avertissements, archive, capacités du FFmpeg installé |
-| `tout-verifier.sh` | Démarre l'écran virtuel si besoin, prend un **verrou** (une seule suite à la fois), enchaîne les 39 bancs et imprime le total (614 contrôles). Pose d'abord l'environnement des bancs (`env-bancs.sh` : Python avec numpy/PIL, session X11, écran virtuel 1500×900) |
+| `tout-verifier.sh` | Démarre l'écran virtuel si besoin, prend un **verrou** (une seule suite à la fois), enchaîne les 41 bancs et imprime le total (629 contrôles). Pose d'abord l'environnement des bancs (`env-bancs.sh` : Python avec numpy/PIL, session X11, écran virtuel 1500×900) |
 | `verif-cadrage.sh [écran]` | **Cadrage et sous-titres** : recadrage, détection des bandes, chapitres, couleur/position/taille/délai du texte, rapport d'aspect — 10 contrôles |
 | `verif-pistes.sh [écran]` | **Pistes embarquées** : inventaire, changement de piste audio mesuré en fréquence, sous-titres (texte, minutages, affichage) — 16 contrôles |
 | `capture-lecteur.sh <fichier> <image.png> [attente_s] [touches…]` | Lecture sur un écran X virtuel et capture PNG (validation visuelle) |
@@ -509,6 +509,8 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-systeme.sh [écran]` | **Démarrage automatique, priorité (nice de tous les fils), fréquence maximale** — 10 contrôles |
 | `verif-tray.sh [écran]` | **Icône de notification** (StatusNotifierItem) pilotée par D-Bus — 7 contrôles |
 | `verif-theme.sh [écran]` | **Thèmes externes** : pixel de la barre de menus, thème illisible refusé — 6 contrôles |
+| `verif-saut-pause.sh [écran]` | **Saut en pause** : l'image (teinte qui dit l'instant) et la réplique intégrée suivent un saut, le pas à pas change l'image — 5 contrôles |
+| `verif-audio-pistes.sh [écran]` | **Pistes audio** : langues par priorité, commentaires écartés, piste par défaut, source mono, mémoire par film — mesuré au son — 11 contrôles |
 | `verif-mpris.sh` | **MPRIS** (module seul, mode `--mpris-test`, sans fenêtre) : nom sur le bus, métadonnées en µs, commandes reçues, `SetPosition` filtré par piste, réglages Volume/Shuffle/LoopStatus/Rate, `PropertiesChanged`, nom rendu, absence de bus gérée — 27 contrôles |
 | `verif-vignettes.sh` | **Vignettes de la barre** (module seul, chemin `--vignette`) : taille, position réelle à une image près, deux positions → deux images, déterminisme, largeur bornée, coût, sortie réutilisée, largeur non multiple de 32, hors durée — 14 contrôles, sans écran |
 | `verif-playlist.sh [écran]` | **Playlist** : lecture aléatoire (quatre avances → quatre fichiers distincts, mode mémorisé), **glisser-déposer réel à la souris**, clic sur une ligne, ✕ qui retire, volet borné avec des noms longs — 18 contrôles ; les lignes sont visées depuis la géométrie journalisée, jamais devinée |

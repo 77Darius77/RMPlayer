@@ -1136,6 +1136,22 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      windows-1252 ; ou l'alphabet imposé (`subtitles.encoding`). Limite connue, non corrigée : une
      réplique de piste **intégrée** commencée avant un saut n'est pas relue après le `seek`.
 
+122. 🔴 **Un saut en pause ne rafraîchissait pas l'image.** Le bloc de `update()` qui décode et
+     affiche une image n'était exécuté que dans l'état « lecture » : en pause, la barre de
+     progression, ±5 s, les signets, les chapitres, MPRIS et le pas à pas changeaient la position
+     mais l'écran gardait l'ancienne image (écart mesuré 0,0), et une réplique de piste intégrée
+     n'était pas relue (c'était le « défaut des sous-titres intégrés après un saut » : la cause
+     était plus large que son symptôme). Corrigé : en pause, **une** image est décodée quand un saut
+     vient d'avoir lieu (`pending_immediate`). Gardé par `verif-saut-pause` (film dont la teinte
+     dit l'instant). **Piège de l'instrument** : la teinte HSV reste à 120° près du vert pur (couleur
+     écrêtée) — le pas à pas se mesure par l'écart d'image, pas par la teinte.
+
+123. 🔴 **L'en-tête du WAV de `--dump-audio` mentait pour une source mono.** Il déclarait le nombre
+     de canaux du FICHIER (1) alors que les échantillons sortent du convertisseur dans la disposition
+     de SORTIE (stéréo) : fréquence mesurée moitié trop basse, durée doublée. Même famille que le
+     défaut du taux d'échantillonnage déjà corrigé. Tous les benches audio utilisaient des sources
+     stéréo, donc personne ne l'avait vu. Corrigé et gardé par `verif-audio-pistes` §5b.
+
 ## 5. Reste à faire
 
 État au **2026-10-19, fin de session 32**. Chaque ligne dit *pourquoi* ce n'est pas fait,

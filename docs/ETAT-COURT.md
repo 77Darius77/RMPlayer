@@ -20,8 +20,8 @@ FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
   HDR (libplacebo)   oui (Vulkan)
 ```
 <!-- AUTO:fin -->
-> **Tout est vérifié** : dernière suite complète **2026-10-24 23:29 — 614 contrôles,
-> 0 échec, 39 bancs** (lancée depuis un shell Wayland brut, voir piège 114), 161 tests
+> **Tout est vérifié** : dernière suite complète **2026-10-25 01:18 — 629 contrôles,
+> 0 échec, 41 bancs** (lancée depuis un shell Wayland brut, voir piège 114), 164 tests
 > unitaires, 0 avertissement de code. **Session 37 : les lots 1 à 5 de
 > `docs/PROCHAINES-FONCTIONS.md` sont faits** (récents, boucle A-B, export/import, style des
 > sous-titres, langues, couleur, glisser, rogner, signets, souris, décodeur, icône de
@@ -44,7 +44,7 @@ Lecteur vidéo **Rust + egui** (Linux), sans dépendance à un lecteur externe :
 directement (`ffmpeg-sys-next`, FFmpeg 7.1.3 de `/opt/ffmpeg-7.1`), audio par `cpal`,
 réglages en JSON. Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`. **Contrôle de version
 git depuis la session 36** (branche `main`, étiquettes `session36` = l'état à 505 contrôles,
-`session36-repli-hdr` = 509 contrôles, repli HDR borné, et `session37` = 614 contrôles, lots 1 à 6 ; pas de dépôt distant) ; les archives de `sauvegardes/` restent comme copies hors
+`session36-repli-hdr` = 509 contrôles, repli HDR borné, et `session37` = 629 contrôles, lots 1 à 6 + saut en pause + pistes audio ; pas de dépôt distant) ; les archives de `sauvegardes/` restent comme copies hors
 dépôt (non suivies par git).
 
 ## Les trois optimisations en place (mesurées, session 31)
@@ -105,7 +105,7 @@ sous-titres, puis marque-pages.
 7. **Deux suites de vérification en parallèle rendent des résultats faux sans le dire** : un
    banc qui capture l'écran mesure la fenêtre de l'autre. `tout-verifier.sh` prend un verrou.
 
-Les **121 pièges**, avec le détail de chacun, sont en **§4 de `docs/AVANCEMENT.md`** — c'est la
+Les **123 pièges**, avec le détail de chacun, sont en **§4 de `docs/AVANCEMENT.md`** — c'est la
 seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 
 ## Où lire quoi (uniquement sur question précise)
@@ -126,13 +126,13 @@ seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 
 ```bash
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
-cargo test --release                    # 161 tests
+cargo test --release                    # 164 tests
 tools/verif-rapide.sh <sujet>           # module touché : hdr, playlist, vignettes, mpris, ui…
 tools/sante-hdr.sh                      # ≈ 10 s, après une mise à jour Mesa/pilote/noyau : Vulkan, libplacebo, VA-API
 tools/verif-hdr.sh                      # HDR seul (36 contrôles, mires en nits)
 tools/verif-mpris.sh                    # le module seul (27 contrôles, --mpris-test)
 tools/verif-vignettes.sh                # le module seul (14 contrôles, ~20 s)
-tools/tout-verifier.sh                  # 39 bancs, 614 contrôles, 0 échec attendu (~45 min)
+tools/tout-verifier.sh                  # 41 bancs, 629 contrôles, 0 échec attendu (~50 min)
 tools/etat-court.sh                     # remet cette fiche à jour (après la suite)
 tools/bench-optimisation.sh             # re-mesure les gains GPU et l'AV1
 ```
