@@ -27,6 +27,8 @@ mod vignettes;
 mod ui;
 mod settings;
 mod signets;
+mod systeme;
+mod tray;
 
 use std::path::PathBuf;
 
@@ -109,6 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "--hdr-info",
         "--export-config",
         "--import-config",
+        "--autostart",
     ];
     // **Options à deux valeurs** (`--dump-frame <pos> <image.png> <fichier>`,
     // `--vignette <pos> <image.png> <fichier>`) : le second argument est un chemin
@@ -169,6 +172,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let profils_disponibles = config::load_profiles();
 
     let args: Vec<String> = std::env::args().collect();
+
+    // --- Démarrage automatique : `--autostart on|off|status` ---
+    if let Some(pos) = args.iter().position(|a| a == "--autostart") {
+        match args.get(pos + 1).map(String::as_str) {
+            Some(v @ ("on" | "off")) => match systeme::regler_autostart(v == "on") {
+                Ok(()) => {
+                    println!("démarrage automatique : {}", if v == "on" { "activé" } else { "désactivé" });
+                    std::process::exit(0);
+                }
+                Err(e) => {
+                    eprintln!("--autostart : {e}");
+                    std::process::exit(1);
+                }
+            },
+            Some("status") => {
+                println!("démarrage automatique : {}", if systeme::autostart_actif() { "activé" } else { "désactivé" });
+                std::process::exit(0);
+            }
+            _ => {
+                eprintln!("usage : kplayer --autostart on|off|status");
+                std::process::exit(2);
+            }
+        }
+    }
 
     // --- Export / import de la configuration ---
     //
@@ -566,6 +593,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         if let Some(info) = player.media_info() {
             println!("vidéo : {} ({}x{}, {:.2} i/s)", info.video_codec, info.resolution.0, info.resolution.1, info.fps);
+            if let Some((nom, materiel)) = player.video_decoder() {
+                println!("décodeur : {} ({})", nom, if materiel { "matériel" } else { "logiciel" });
+            }
             for (i, p) in info.audio_tracks.iter().enumerate() {
                 let actif = if player.current_audio_stream() == Some(p.index) { "*" } else { " " };
                 println!("{} audio[{}] flux {} : {}", actif, i, p.index, p.label());
@@ -1134,6 +1164,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         viewport,
         ..Default::default()
     };
+
+    // Priorité du processus (préférences › Lecture) : posée avant la création de la fenêtre,
+    // pour que les fils créés ensuite en héritent.
+    match systeme::appliquer_priorite(config.playback.priority) {
+        Ok(()) if config.playback.priority != systeme::Priorite::Normale => {
+            tracing::info!("Priorité du processus : {}", config.playback.priority.label());
+        }
+        Ok(()) => {}
+        Err(e) => tracing::warn!("{e}"),
+    }
 
     // Lancer l'application eframe avec les fichiers CLI
     eframe::run_native(

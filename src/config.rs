@@ -314,6 +314,15 @@ pub struct VideoSettings {
     /// Afficher la zone de recadrage par-dessus l'image (repère visuel).
     #[serde(default = "default_vrai")]
     pub crop_overlay: bool,
+    /// Fréquence d'image maximale à l'affichage (0 = celle du film). Les images en trop sont
+    /// décodées mais non affichées : on économise le rendu, pas le décodage.
+    #[serde(default)]
+    pub max_fps: u32,
+    /// Décodeur imposé par codec : nom du codec FFmpeg → nom du décodeur (`"av1": "libdav1d"`).
+    /// Absent = le décodeur que FFmpeg propose. Un nom inconnu, ou un décodeur qui ne s'ouvre
+    /// pas, retombe sur le défaut (la lecture ne s'arrête jamais pour un réglage).
+    #[serde(default)]
+    pub decoders: std::collections::BTreeMap<String, String>,
     /// Matrice de couleur et plage de la conversion YUV → RVB (voir `ColorMatrix`).
     #[serde(default)]
     pub color_matrix: ColorMatrix,
@@ -1134,6 +1143,10 @@ pub struct InterfaceSettings {
     /// reprise (ils reviennent exprès pour relancer).
     #[serde(default = "default_vrai")]
     pub reprendre_sur_focus: bool,
+    /// Icône dans la zone de notification (StatusNotifierItem) : clic = afficher / masquer la
+    /// fenêtre, menu = lecture, suivant, précédent, quitter. Désactivée par défaut.
+    #[serde(default)]
+    pub tray_icon: bool,
     pub show_title: bool,
     /// Dossier d'enregistrement des captures d'écran (`~` accepté)
     #[serde(default = "default_screenshots_dir")]
@@ -1339,6 +1352,9 @@ pub struct PlaybackSettings {
     /// Répétition A-B : pause, en millisecondes, entre l'arrivée en B et le retour en A.
     #[serde(default)]
     pub ab_delay_ms: u64,
+    /// Priorité d'ordonnancement du processus (« Élevée » aide en 4K).
+    #[serde(default)]
+    pub priority: crate::systeme::Priorite,
 }
 
 /// Plafonds des deux réglages de la répétition A-B (un fichier édité à la main ne doit pas
@@ -1423,6 +1439,8 @@ impl Default for VideoSettings {
             flip_h: false,
             crop_overlay: true,
             zoom: default_zoom(),
+            max_fps: 0,
+            decoders: std::collections::BTreeMap::new(),
             color_matrix: ColorMatrix::default(),
             color_range: ColorRange::default(),
             pan_x_percent: 0.0,
@@ -1509,6 +1527,7 @@ impl Default for InterfaceSettings {
             controls_always_visible: false,
             pause_sur_perte_focus: 0,
             reprendre_sur_focus: true,
+            tray_icon: false,
             show_title: true,
             screenshots_dir: default_screenshots_dir(),
             // Aucune géométrie mémorisée : première taille connue, placement du
@@ -1529,6 +1548,7 @@ impl Default for PlaybackSettings {
             recent: Vec::new(),
             ab_repetitions: 0,
             ab_delay_ms: 0,
+            priority: crate::systeme::Priorite::default(),
         }
     }
 }
@@ -2495,6 +2515,20 @@ mod tests {
         assert_eq!(video.aspect, AspectMode::Auto);
         let ancienne: VideoSettings = serde_json::from_str("{}").unwrap();
         assert_eq!((ancienne.color_matrix, ancienne.color_range), (ColorMatrix::Auto, ColorRange::Auto));
+    }
+
+    #[test]
+    fn priorite_cadence_et_decodeurs_se_relisent_avec_des_defauts_neutres() {
+        let lecture: PlaybackSettings = serde_json::from_str(r#"{"priority": "Elevee"}"#).unwrap();
+        assert_eq!(lecture.priority, crate::systeme::Priorite::Elevee);
+        let video: VideoSettings =
+            serde_json::from_str(r#"{"max_fps": 30, "decoders": {"mpeg2video": "mpegvideo"}}"#).unwrap();
+        assert_eq!(video.max_fps, 30);
+        assert_eq!(video.decoders.get("mpeg2video").map(String::as_str), Some("mpegvideo"));
+        let ancien: VideoSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(ancien.max_fps, 0);
+        assert!(ancien.decoders.is_empty());
+        assert_eq!(PlaybackSettings::default().priority, crate::systeme::Priorite::Normale);
     }
 
     #[test]

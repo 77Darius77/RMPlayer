@@ -1125,6 +1125,67 @@ fn dessiner_video(app: &mut App, ui: &mut egui::Ui) {
         );
     });
 
+    sous_section(ui, "Fréquence d'image", |ui| {
+        let mut plafond = app.config.video.max_fps as f32;
+        ligne(ui, "grille_max_fps", "Maximum affiché", |ui| {
+            if ui
+                .add(
+                    egui::Slider::new(&mut plafond, 0.0..=120.0)
+                        .custom_formatter(|v, _| if v < 1.0 { "celle du film".to_string() } else { format!("{:.0} i/s", v) }),
+                )
+                .on_hover_text("Réduit le travail de rendu : les images en trop sont décodées mais non affichées")
+                .changed()
+            {
+                app.config.video.max_fps = plafond as u32;
+                geometrie_modifiee = true;
+            }
+        });
+    });
+
+    sous_section(ui, "Décodeur par codec", |ui| {
+        // Pour chaque codec courant : « Automatique » (le choix de FFmpeg) ou l'un des décodeurs
+        // qu'il propose. Pris en compte à la prochaine ouverture d'un film.
+        for (codec, libelle) in [
+            ("h264", "H.264"),
+            ("hevc", "H.265 / HEVC"),
+            ("vp9", "VP9"),
+            ("av1", "AV1"),
+            ("mpeg2video", "MPEG-2"),
+            ("mpeg4", "MPEG-4"),
+        ] {
+            let disponibles = crate::player::decodeurs_pour(codec);
+            if disponibles.len() < 2 {
+                continue; // un seul décodeur : rien à choisir
+            }
+            let actuel = app.config.video.decoders.get(codec).cloned().unwrap_or_default();
+            let mut choix = actuel.clone();
+            ligne(ui, &format!("grille_decodeur_{codec}"), libelle, |ui| {
+                egui::ComboBox::from_id_salt(format!("choix_decodeur_{codec}"))
+                    .selected_text(if choix.is_empty() { "Automatique".to_string() } else { choix.clone() })
+                    .width(200.0)
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut choix, String::new(), "Automatique");
+                        for nom in &disponibles {
+                            ui.selectable_value(&mut choix, nom.clone(), nom);
+                        }
+                    });
+            });
+            if choix != actuel {
+                if choix.is_empty() {
+                    app.config.video.decoders.remove(codec);
+                } else {
+                    app.config.video.decoders.insert(codec.to_string(), choix);
+                }
+                geometrie_modifiee = true;
+            }
+        }
+        aide(
+            ui,
+            "Ne montre que les codecs qui ont plusieurs décodeurs. S'il ne s'ouvre pas, le décodeur \
+             choisi est remplacé par l'automatique. Pris en compte à la prochaine ouverture.",
+        );
+    });
+
     sous_section(ui, "Conversion des couleurs", |ui| {
         let mut matrice = app.config.video.color_matrix;
         ligne(ui, "grille_matrice", "Matrice", |ui| {
@@ -2830,6 +2891,50 @@ fn dessiner_lecture(app: &mut App, ui: &mut egui::Ui) {
         );
     });
 
+    sous_section(ui, "Système", |ui| {
+        let mut auto = crate::systeme::autostart_actif();
+        if ui
+            .checkbox(&mut auto, "Lancer KPlayer à l'ouverture de session")
+            .on_hover_text("Écrit (ou retire) ~/.config/autostart/kplayer.desktop")
+            .changed()
+        {
+            match crate::systeme::regler_autostart(auto) {
+                Ok(()) => app.annonce(if auto { "Démarrage automatique activé" } else { "Démarrage automatique désactivé" }),
+                Err(e) => app.error_message = Some(format!("Démarrage automatique : {e}")),
+            }
+        }
+        let mut zone = app.config.interface.tray_icon;
+        if ui
+            .checkbox(&mut zone, "Icône dans la zone de notification")
+            .on_hover_text("Clic : afficher / masquer la fenêtre ; menu : lecture, suivant, précédent, quitter")
+            .changed()
+        {
+            app.config.interface.tray_icon = zone;
+            let _ = app.config.save();
+        }
+        let mut priorite = app.config.playback.priority;
+        ligne(ui, "grille_priorite", "Priorité du processus", |ui| {
+            egui::ComboBox::from_id_salt("choix_priorite")
+                .selected_text(priorite.label())
+                .width(140.0)
+                .show_ui(ui, |ui| {
+                    use crate::systeme::Priorite;
+                    for choix in [Priorite::Basse, Priorite::Normale, Priorite::Elevee] {
+                        ui.selectable_value(&mut priorite, choix, choix.label());
+                    }
+                });
+        });
+        if priorite != app.config.playback.priority {
+            app.config.playback.priority = priorite;
+            let _ = app.config.save();
+            match crate::systeme::appliquer_priorite(priorite) {
+                Ok(()) => app.annonce(&format!("Priorité : {}", priorite.label())),
+                Err(e) => app.error_message = Some(e),
+            }
+        }
+        aide(ui, "« Élevée » aide en 4K quand le processeur est chargé ; « Basse » laisse la main aux autres programmes.");
+    });
+
     sous_section(ui, "Répétition A-B", |ui| {
         // Touches A et B : posent les deux points. Ici : combien de fois la boucle tourne,
         // et le temps de pause entre deux passages.
@@ -3014,6 +3119,8 @@ fn video_modifiee(app: &App) -> bool {
         || a.flip != d.flip
         || (a.zoom - d.zoom).abs() > 1e-3
         || a.aspect != d.aspect
+        || a.max_fps != d.max_fps
+        || a.decoders != d.decoders
         || a.color_matrix != d.color_matrix
         || a.color_range != d.color_range
         || a.pan_x_percent != d.pan_x_percent
@@ -3075,5 +3182,9 @@ fn sous_titres_modifies(app: &App) -> bool {
 fn lecture_modifiee(app: &App) -> bool {
     let d = Config::default().playback;
     let a = &app.config.playback;
-    a.resume != d.resume || a.ab_repetitions != d.ab_repetitions || a.ab_delay_ms != d.ab_delay_ms
+    a.resume != d.resume
+        || a.ab_repetitions != d.ab_repetitions
+        || a.ab_delay_ms != d.ab_delay_ms
+        || a.priority != d.priority
+        || crate::systeme::autostart_actif()
 }

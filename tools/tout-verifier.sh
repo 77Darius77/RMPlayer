@@ -91,6 +91,7 @@ run verif-profils tools/verif-profils.sh "$DISP"
 run verif-pistes tools/verif-pistes.sh "$DISP"
 run verif-filtres tools/verif-filtres.sh
 run verif-couleur tools/verif-couleur.sh
+run verif-decodeur tools/verif-decodeur.sh
 run verif-cadrage tools/verif-cadrage.sh "$DISP"
 run verif-affichage tools/verif-affichage.sh "$DISP"
 run verif-sousimages tools/verif-sousimages.sh "$DISP"
@@ -111,6 +112,9 @@ run verif-association tools/verif-association.sh "$DISP"
 run verif-playlist tools/verif-playlist.sh "$DISP"
 run verif-recents tools/verif-recents.sh "$DISP"
 run verif-signets tools/verif-signets.sh "$DISP"
+run verif-souris tools/verif-souris.sh "$DISP"
+run verif-systeme tools/verif-systeme.sh "$DISP"
+run verif-tray tools/verif-tray.sh "$DISP"
 run verif-config-io tools/verif-config-io.sh
 run verif-boucle-ab tools/verif-boucle-ab.sh "$DISP"
 run verif-vignettes tools/verif-vignettes.sh
