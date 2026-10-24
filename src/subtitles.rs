@@ -41,6 +41,8 @@ pub struct SubtitleManager {
     /// Durées d'affichage minimale / maximale en ms (0 = pas de borne).
     duree_min_ms: u64,
     duree_max_ms: u64,
+    /// Alphabet (encodage) imposé aux fichiers chargés ; vide = détection automatique.
+    encodage: String,
 }
 
 impl SubtitleManager {
@@ -53,7 +55,14 @@ impl SubtitleManager {
             visible: true,
             duree_min_ms: 0,
             duree_max_ms: 0,
+            encodage: String::new(),
         }
+    }
+
+    /// Encodage à utiliser pour les prochains fichiers chargés (« windows-1251 », « gbk »… ;
+    /// vide = automatique).
+    pub fn set_encodage(&mut self, encodage: &str) {
+        self.encodage = encodage.trim().to_string();
     }
 
     /// Bornes d'affichage d'un sous-titre (0 = pas de borne) ; réglées à chaque image par
@@ -65,8 +74,11 @@ impl SubtitleManager {
     
     /// Charger un fichier de sous-titres (ASS/SSA ou SRT selon l'extension)
     pub fn load_subtitle(&mut self, path: PathBuf) -> Result<(), String> {
-        let content = std::fs::read_to_string(&path)
-            .map_err(|e| format!("Erreur lecture sous-titre: {}", e))?;
+        let octets = std::fs::read(&path).map_err(|e| format!("Erreur lecture sous-titre: {}", e))?;
+        let (content, encodage_utilise) = decoder_texte(&octets, &self.encodage);
+        if encodage_utilise != "UTF-8" {
+            tracing::info!("Sous-titre {} lu en {}", path.display(), encodage_utilise);
+        }
 
         let ext = path
             .extension()
@@ -533,6 +545,34 @@ impl SubtitleManager {
     }
 }
 
+/// Décode les octets d'un fichier de sous-titres. Retourne le texte et le nom de l'encodage
+/// utilisé.
+///
+/// Imposé (`impose` = nom reconnu par `encoding_rs` : « windows-1250 », « iso-8859-15 », « gbk »…) :
+/// il est appliqué tel quel. Automatique : BOM UTF-8 / UTF-16, puis UTF-8 s'il est valide, sinon
+/// **windows-1252** — l'encodage des fichiers d'Europe occidentale qui ne sont pas en UTF-8
+/// (la quasi-totalité des anciens sous-titres français, que `read_to_string` refusait d'ouvrir).
+pub fn decoder_texte(octets: &[u8], impose: &str) -> (String, &'static str) {
+    if !impose.trim().is_empty() {
+        if let Some(encodage) = encoding_rs::Encoding::for_label(impose.trim().as_bytes()) {
+            let (texte, _, _) = encodage.decode(octets);
+            return (texte.into_owned(), encodage.name());
+        }
+        tracing::warn!("Encodage « {} » inconnu — détection automatique", impose);
+    }
+    if let Some((encodage, _)) = encoding_rs::Encoding::for_bom(octets) {
+        let (texte, _, _) = encodage.decode(octets);
+        return (texte.into_owned(), encodage.name());
+    }
+    match std::str::from_utf8(octets) {
+        Ok(texte) => (texte.to_string(), "UTF-8"),
+        Err(_) => {
+            let (texte, _, _) = encoding_rs::WINDOWS_1252.decode(octets);
+            (texte.into_owned(), "windows-1252")
+        }
+    }
+}
+
 /// Fin d'affichage d'un sous-titre une fois appliquées les durées minimale et maximale
 /// (0 = pas de borne). Le maximum l'emporte sur le minimum s'ils se contredisent.
 pub fn fin_effective(debut_ms: u64, fin_ms: u64, min_ms: u64, max_ms: u64) -> u64 {
@@ -562,6 +602,25 @@ pub fn opacite_fondu(position_ms: u64, debut_ms: u64, fin_ms: u64, fondu_ms: u32
 #[cfg(test)]
 mod tests_fondu {
     use super::{fin_effective, opacite_fondu};
+
+    #[test]
+    fn le_texte_se_decode_selon_l_encodage() {
+        use super::decoder_texte;
+        // UTF-8 valide : tel quel, avec ou sans BOM.
+        assert_eq!(decoder_texte("é à ç".as_bytes(), ""), ("é à ç".to_string(), "UTF-8"));
+        let mut avec_bom = vec![0xEF, 0xBB, 0xBF];
+        avec_bom.extend_from_slice("é".as_bytes());
+        assert_eq!(decoder_texte(&avec_bom, "").0, "é");
+        // Latin-1 / windows-1252 (« Éléphant à côté ») : automatique.
+        let latin1 = [0xC9, 0x6C, 0xE9, 0x70, 0x68, 0x61, 0x6E, 0x74, 0x20, 0xE0, 0x20, 0x63, 0xF4, 0x74, 0xE9];
+        assert_eq!(decoder_texte(&latin1, ""), ("Éléphant à côté".to_string(), "windows-1252"));
+        // Imposé : le même octet donne une lettre différente selon l'alphabet.
+        assert_eq!(decoder_texte(&[0xB3], "windows-1250").0, "ł");
+        assert_eq!(decoder_texte(&[0xB3], "iso-8859-15").0, "³");
+        assert_eq!(decoder_texte(&[0xCF, 0xF0, 0xE8], "windows-1251").0, "При");
+        // Encodage inconnu : retombe sur l'automatique.
+        assert_eq!(decoder_texte(&latin1, "pas-un-encodage").0, "Éléphant à côté");
+    }
 
     #[test]
     fn les_durees_mini_et_maxi_bornent_la_fin() {

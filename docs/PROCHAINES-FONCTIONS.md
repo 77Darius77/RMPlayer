@@ -74,16 +74,16 @@ doivent vivre avec la configuration, pas dans le cache.
 | E5 ✅ | **Priorité du processus** (fait s.37, `verif-systeme` : nice mesuré sur tous les fils ; les fils de shaders de Mesa restent à 19) | `setpriority` ; utile en 4K seulement | petit |
 | E6 ✅ | **Réduire la fréquence d'image** (fait s.37, `verif-systeme` : 59 → 15 / 30 images différentes par seconde mesurées sur la fenêtre) | usage marginal | petit |
 
-## Lot 6 — conditionnel, à décider (pas de recommandation de les faire)
+## Lot 6 — conditionnel (F1, F4 et l'alphabet de F5 faits s.37 ; le reste expliqué ligne par ligne)
 
 | # | Sujet | Pourquoi c'est à part |
 |---|---|---|
 | F1 | ~~**Repli HDR automatique vers le moteur CPU**~~ | **fait (s.36), borné** : l'étage CPU remplace l'étage GPU refusé si la source tient dans 62 Mpx/s (≤ 1080p30) ; au-delà, image non convertie et avis à l'écran. Budget et mesures dans `docs/HDR.md` ; `verif-hdr` §12 (36/36). Corrigé au passage : l'échec de Vulkan était rejoué à chaque image dès qu'un autre filtre était actif |
-| F2 | **Passthrough HDR / sortie 10 bits** (⑪) | bloqué par winit (aucune API de couleur) ; inatteignable ici : 3 écrans, tous SDR |
-| F3 | **Langue d'interface** (fluent / `.po`) | valeur faible pour un usage francophone |
-| F4 | **Thèmes externes** | aujourd'hui un thème sombre intégré |
-| F5 | **WarpSharp**, **mouvement flou**, **contour flou**, **ruby**, **alphabet** | plugin absent du FFmpeg compilé, ou coûteux, ou usage très marginal en France |
-| F6 | **Téléchargement de sous-titres en ligne**, **enregistrement / transcodage** | aucun code ; l'enregistrement est déclaré hors périmètre dans `INVENTAIRE-FONCTIONNALITES.md` |
+| F2 | **Passthrough HDR / sortie 10 bits** (⑪) | NON FAIT : bloqué par winit (aucune API de couleur) ; inatteignable ici : 3 écrans, tous SDR — rien à mesurer |
+| F3 | **Langue d'interface** (fluent / `.po`) | NON FAIT : traduire toute l'interface est un chantier à part, sans valeur pour un usage francophone ; aucune mesure honnête possible sans relire chaque libellé |
+| F4 ✅ | **Thèmes externes** | fait s.37, `verif-theme` 6/6 : fichiers JSON dans `~/.config/kplayer/themes/`, thème illisible refusé et réglage remis à « intégré » |
+| F5 | **WarpSharp**, **mouvement flou**, **contour flou**, **ruby**, **alphabet** | **alphabet : fait s.37** (`subtitles.encoding`, `verif-soustitres-langues` §6 — et correction d'un défaut : un fichier non UTF-8, soit la plupart des anciens sous-titres français, n'était pas chargé du tout). Le reste NON FAIT : WarpSharp absent du FFmpeg compilé, mouvement/contour flous coûteux et d'usage marginal |
+| F6 | **Téléchargement de sous-titres en ligne**, **enregistrement / transcodage** | NON FAIT : service tiers et clé d'API à choisir (décision qui vous revient), enregistrement déclaré hors périmètre dans `INVENTAIRE-FONCTIONNALITES.md` |
 
 ---
 

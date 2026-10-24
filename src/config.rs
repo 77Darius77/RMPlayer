@@ -1087,6 +1087,11 @@ pub struct SubtitleSettings {
     pub min_duration_ms: u32,
     #[serde(default)]
     pub max_duration_ms: u32,
+    /// Alphabet (encodage) des fichiers de sous-titres externes : nom reconnu par `encoding_rs`
+    /// (« windows-1250 », « windows-1251 », « iso-8859-15 », « gbk »…). Vide = automatique
+    /// (UTF-8, sinon windows-1252).
+    #[serde(default)]
+    pub encoding: String,
     /// Mémoriser, par média, la piste choisie à la main (fichier externe ou piste intégrée).
     #[serde(default)]
     pub remember_track: bool,
@@ -1121,6 +1126,9 @@ impl SubtitleSettings {
 #[serde(default)]
 pub struct InterfaceSettings {
     pub dark_theme: bool,
+    /// Nom d'un thème externe (`~/.config/kplayer/themes/<nom>.json`) ; vide = thème intégré.
+    #[serde(default)]
+    pub theme: String,
     /// Afficher l'OSD (bandeau d'informations temporaire)
     pub show_osd: bool,
     /// Durée d'affichage de l'OSD, en millisecondes
@@ -1512,6 +1520,7 @@ impl Default for SubtitleSettings {
             preferred_languages: Vec::new(),
             min_duration_ms: 0,
             max_duration_ms: 0,
+            encoding: String::new(),
             remember_track: false,
         }
     }
@@ -1521,6 +1530,7 @@ impl Default for InterfaceSettings {
     fn default() -> Self {
         Self {
             dark_theme: true,
+            theme: String::new(),
             show_osd: true,
             osd_duration: 3000,
             show_progress_bar: true,

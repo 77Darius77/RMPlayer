@@ -115,6 +115,7 @@ run verif-signets tools/verif-signets.sh "$DISP"
 run verif-souris tools/verif-souris.sh "$DISP"
 run verif-systeme tools/verif-systeme.sh "$DISP"
 run verif-tray tools/verif-tray.sh "$DISP"
+run verif-theme tools/verif-theme.sh "$DISP"
 run verif-config-io tools/verif-config-io.sh
 run verif-boucle-ab tools/verif-boucle-ab.sh "$DISP"
 run verif-vignettes tools/verif-vignettes.sh

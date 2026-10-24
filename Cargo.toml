@@ -19,6 +19,7 @@ egui_extras = { version = "0.33", features = ["image"] }
 # son propre fil et l'interface ne fait que déposer des demandes.
 zbus = { version = "5.19", default-features = false, features = ["async-io", "blocking-api"] }
 ksni = { version = "0.3", default-features = false, features = ["async-io", "blocking"] }
+encoding_rs = "0.8"
 
 # Audio (PipeWire/PulseAudio natif)
 # rodio retiré : la sortie audio passe par cpal (src/audio.rs)

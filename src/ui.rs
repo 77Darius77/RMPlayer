@@ -170,6 +170,8 @@ pub struct App {
     mpris_demande: bool,
     /// Icône de la zone de notification (si `interface.tray_icon`).
     pub(crate) tray: Option<crate::tray::Tray>,
+    /// Thème externe chargé : (nom, thème). Rechargé quand le réglage change.
+    theme_externe: Option<(String, crate::theme::Theme)>,
     /// La fenêtre est-elle affichée ? (bascule depuis l'icône de notification)
     fenetre_visible: bool,
     /// Vignettes de la barre de progression : générateur (fil de travail) et
@@ -664,6 +666,7 @@ impl App {
             mpris: None,
             mpris_demande: false,
             tray: None,
+            theme_externe: None,
             fenetre_visible: true,
             vignettes: None,
             vignette_affichee: None,
@@ -766,6 +769,7 @@ impl App {
         self.renderer.update_frame(vec![], 0, 0);
         if self.config.subtitles.auto_load {
             self.subtitles = SubtitleManager::new();
+            self.subtitles.set_encodage(&self.config.subtitles.encoding);
             self.subtitles.auto_load(path, &self.config.subtitles.langues_preferees());
             if self.subtitles.count() > 0 {
                 self.subtitles.set_visible(true);
@@ -1424,6 +1428,33 @@ impl App {
                     tracing::info!("Fenêtre {} depuis l'icône", if self.fenetre_visible { "affichée" } else { "masquée" });
                 }
                 CommandeTray::Quitter => ctx.send_viewport_cmd(egui::ViewportCommand::Close),
+            }
+        }
+    }
+
+    /// (Re)charge le thème externe quand le nom choisi change. Un thème illisible est refusé avec
+    /// un message et le réglage est remis à « intégré » : pas de relecture du fichier à chaque image.
+    fn actualiser_theme_externe(&mut self) {
+        let voulu = self.config.interface.theme.trim().to_string();
+        let actuel = self.theme_externe.as_ref().map(|(n, _)| n.clone()).unwrap_or_default();
+        if voulu == actuel {
+            return;
+        }
+        if voulu.is_empty() {
+            self.theme_externe = None;
+            return;
+        }
+        match crate::theme::Theme::charger(&voulu) {
+            Ok(theme) => {
+                tracing::info!("Thème externe chargé : {}", voulu);
+                self.theme_externe = Some((voulu, theme));
+            }
+            Err(e) => {
+                tracing::warn!("{}", e);
+                self.error_message = Some(e);
+                self.theme_externe = None;
+                self.config.interface.theme.clear();
+                let _ = self.config.save();
             }
         }
     }
@@ -2763,11 +2794,12 @@ impl eframe::App for App {
             });
         }
 
-        // Thème sombre (comme PotPlayer)
-        if self.config.interface.dark_theme {
-            ctx.set_visuals(egui::Visuals::dark());
-        } else {
-            ctx.set_visuals(egui::Visuals::light());
+        // Thème : externe s'il est choisi et lisible, sinon sombre (comme PotPlayer) ou clair.
+        self.actualiser_theme_externe();
+        match &self.theme_externe {
+            Some((_, theme)) => ctx.set_visuals(theme.visuals()),
+            None if self.config.interface.dark_theme => ctx.set_visuals(egui::Visuals::dark()),
+            None => ctx.set_visuals(egui::Visuals::light()),
         }
         
         // Drag & drop de fichiers — egui 0.33: files are in raw.dropped_files, not an Event variant
@@ -3718,6 +3750,7 @@ impl eframe::App for App {
                             if let Some(path) = self.player.current_path().cloned() {
                                 self.player.subtitles_visible = false;
                                 self.subtitles = SubtitleManager::new();
+                                self.subtitles.set_encodage(&self.config.subtitles.encoding);
                                 self.subtitles.auto_load(&path, &self.config.subtitles.langues_preferees());
                                 self.subtitles.set_visible(true);
                                 self.player.subtitles_visible = true;
@@ -3735,6 +3768,7 @@ impl eframe::App for App {
                             .add_filter("Sous-titres", &["srt", "ass", "ssa", "sub"])
                             .pick_file()
                         {
+                            self.subtitles.set_encodage(&self.config.subtitles.encoding);
                             match self.subtitles.load_subtitle(path) {
                                 Ok(()) => self.subtitles.set_visible(true),
                                 Err(e) => tracing::warn!("Sous-titre: {}", e),
