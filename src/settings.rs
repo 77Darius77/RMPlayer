@@ -155,6 +155,42 @@ fn sauvegarde_configuration(app: &mut App, ui: &mut egui::Ui) {
     });
 }
 
+/// Curseur d'un réglage de sous-titre ; retourne vrai s'il a changé (l'appelant enregistre).
+fn curseur_st(
+    ui: &mut egui::Ui,
+    grille: &str,
+    libelle: &str,
+    survol: &str,
+    valeur: &mut f32,
+    plage: std::ops::RangeInclusive<f32>,
+    suffixe: &str,
+    decimales: usize,
+) -> bool {
+    let mut change = false;
+    ligne(ui, grille, libelle, |ui| {
+        change = ui
+            .add(egui::Slider::new(valeur, plage).suffix(suffixe).fixed_decimals(decimales))
+            .on_hover_text(survol)
+            .changed();
+    });
+    change
+}
+
+/// Champ de couleur RRGGBB avec aperçu ; retourne vrai si le texte a changé.
+fn champ_couleur_st(ui: &mut egui::Ui, grille: &str, libelle: &str, valeur: &mut String) -> bool {
+    let mut change = false;
+    ligne(ui, grille, libelle, |ui| {
+        ui.horizontal(|ui| {
+            change = ui.add(egui::TextEdit::singleline(valeur).desired_width(70.0)).changed();
+            if let Some(c) = parse_couleur_ui(valeur) {
+                let (rect, _) = ui.allocate_exact_size(egui::vec2(22.0, 16.0), egui::Sense::hover());
+                ui.painter().rect_filled(rect, 2, c);
+            }
+        });
+    });
+    change
+}
+
 /// Vrai si un raccourci diffère de sa valeur par défaut.
 fn raccourcis_modifies(app: &App) -> bool {
     !app.config.raccourcis.is_empty()
@@ -2218,6 +2254,66 @@ fn dessiner_sous_titres(app: &mut App, ui: &mut egui::Ui) {
                 let _ = app.config.save();
             }
         });
+        // Langues par ordre de priorité (session 37) : « fre, eng » essaie fre, puis eng.
+        // Le texte en cours de frappe est gardé à part : le recomposer depuis la liste à
+        // chaque image effacerait la virgule qu'on vient de taper.
+        let id_saisie = egui::Id::new("saisie_langues_sous_titres");
+        let mut saisie: String = ui.memory_mut(|m| {
+            m.data
+                .get_temp_mut_or_insert_with(id_saisie, || {
+                    app.config.subtitles.preferred_languages.join(", ")
+                })
+                .clone()
+        });
+        ligne(ui, "grille_langues", "Langues (priorité)", |ui| {
+            if ui
+                .add(egui::TextEdit::singleline(&mut saisie).hint_text("fre, eng"))
+                .on_hover_text(
+                    "Plusieurs langues séparées par des virgules, la plus voulue d'abord. \
+                     Vide = seulement la langue préférée ci-dessus.",
+                )
+                .changed()
+            {
+                app.config.subtitles.preferred_languages = saisie
+                    .split(',')
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                let _ = app.config.save();
+                app.player.set_track_preferences(
+                    &app.config.audio.default_language,
+                    &app.config.subtitles.langues_preferees(),
+                    app.config.subtitles.use_embedded,
+                );
+            }
+        });
+        ui.memory_mut(|m| m.data.insert_temp(id_saisie, saisie));
+        if ui
+            .checkbox(
+                &mut app.config.subtitles.remember_track,
+                "Mémoriser la piste choisie pour chaque film",
+            )
+            .on_hover_text("La piste choisie à la main (touche J, menu Sous-titres) revient à la réouverture du même film")
+            .changed()
+        {
+            let _ = app.config.save();
+        }
+        let mut st = app.config.subtitles.clone();
+        let mut change = false;
+        let mut mini = st.min_duration_ms as f32;
+        let mut maxi = st.max_duration_ms as f32;
+        change |= curseur_st(ui, "grille_duree_min", "Durée minimale d'affichage",
+            "Un sous-titre trop bref reste affiché au moins ce temps (0 = durée du fichier)",
+            &mut mini, 0.0..=10_000.0, " ms", 0);
+        change |= curseur_st(ui, "grille_duree_max", "Durée maximale d'affichage",
+            "Un sous-titre trop long disparaît après ce temps (0 = durée du fichier)",
+            &mut maxi, 0.0..=20_000.0, " ms", 0);
+        if change {
+            st.min_duration_ms = mini as u32;
+            st.max_duration_ms = maxi as u32;
+            app.config.subtitles = st;
+            let _ = app.config.save();
+        }
     });
     sous_section(ui, "Apparence du texte", |ui| {
         let mut taille = app.config.subtitles.font_size;
@@ -2443,6 +2539,37 @@ fn dessiner_sous_titres(app: &mut App, ui: &mut egui::Ui) {
                 let _ = app.config.save();
             }
         });
+
+        // Mise en page et effets (session 37).
+        let mut st = app.config.subtitles.clone();
+        let mut change = false;
+        change |= curseur_st(ui, "grille_marge_h", "Marge haute", "Borne la zone verticale par le haut",
+            &mut st.margin_top_percent, 0.0..=40.0, " %", 0);
+        change |= curseur_st(ui, "grille_marge_b", "Marge basse", "Borne la zone verticale par le bas",
+            &mut st.margin_bottom_percent, 0.0..=40.0, " %", 0);
+        change |= curseur_st(ui, "grille_interligne", "Interligne", "1,25 = valeur d'origine",
+            &mut st.line_spacing, 0.8..=3.0, " ×", 2);
+        change |= curseur_st(ui, "grille_echelle_x", "Échelle horizontale", "Étire le texte en largeur",
+            &mut st.scale_x, 0.5..=2.0, " ×", 2);
+        change |= curseur_st(ui, "grille_echelle_y", "Échelle verticale", "Étire le texte en hauteur",
+            &mut st.scale_y, 0.5..=2.0, " ×", 2);
+        change |= curseur_st(ui, "grille_contour2_ep", "Second contour", "Épaisseur d'un contour autour du premier (0 = aucun)",
+            &mut st.outline2_width, 0.0..=6.0, " px", 1);
+        change |= champ_couleur_st(ui, "grille_contour2_coul", "Couleur du second contour", &mut st.outline2_color);
+        change |= curseur_st(ui, "grille_ombre", "Ombre", "Décalage vers le bas-droite (0 = pas d'ombre)",
+            &mut st.shadow_offset, 0.0..=12.0, " px", 1);
+        change |= champ_couleur_st(ui, "grille_ombre_coul", "Couleur de l'ombre", &mut st.shadow_color);
+        let mut fondu = st.fade_ms as f32;
+        if curseur_st(ui, "grille_fondu", "Fondu", "Durée d'apparition et de disparition (0 = coupe franche)",
+            &mut fondu, 0.0..=2000.0, " ms", 0)
+        {
+            st.fade_ms = fondu as u32;
+            change = true;
+        }
+        if change {
+            app.config.subtitles = st;
+            let _ = app.config.save();
+        }
 
         let mut align = app.config.subtitles.align;
         ligne(ui, "grille_align", "Alignement", |ui| {
@@ -2862,6 +2989,20 @@ fn sous_titres_modifies(app: &App) -> bool {
         || a.bold != d.bold
         || a.italic != d.italic
         || a.delay_ms != d.delay_ms
+        || a.margin_top_percent != d.margin_top_percent
+        || a.margin_bottom_percent != d.margin_bottom_percent
+        || a.line_spacing != d.line_spacing
+        || a.shadow_offset != d.shadow_offset
+        || a.shadow_color != d.shadow_color
+        || a.outline2_width != d.outline2_width
+        || a.outline2_color != d.outline2_color
+        || a.scale_x != d.scale_x
+        || a.scale_y != d.scale_y
+        || a.fade_ms != d.fade_ms
+        || a.preferred_languages != d.preferred_languages
+        || a.min_duration_ms != d.min_duration_ms
+        || a.max_duration_ms != d.max_duration_ms
+        || a.remember_track != d.remember_track
 }
 
 fn lecture_modifiee(app: &App) -> bool {
