@@ -274,6 +274,17 @@ struct VideoStream {
     hdr_etage: String,
     /// L'étage HDR a-t-il dû être abandonné (Vulkan absent, chaîne refusée) ?
     hdr_indisponible: bool,
+    /// Étage CPU (`zscale` + `tonemap`) du même plan, prêt à remplacer l'étage GPU si
+    /// Vulkan est refusé. Vide quand le plan nominal n'est pas GPU.
+    hdr_etage_cpu: String,
+    /// Vrai quand l'étage GPU a été refusé et que l'étage CPU l'a remplacé.
+    hdr_repli_cpu: bool,
+    /// Pourquoi le repli CPU a été refusé (source trop lourde) ; vide sinon.
+    hdr_repli_motif: String,
+    /// Cadence annoncée par le flux (i/s) : sert au budget du repli CPU.
+    fps_flux: f32,
+    /// Avis à afficher une fois à l'écran (changement d'état HDR subi par l'utilisateur).
+    hdr_avis: Option<String>,
 }
 
 /// Décodeur d'une piste de sous-titres du conteneur.
@@ -852,9 +863,26 @@ impl VideoPlayer {
             &video.hdr,
             &contexte,
         );
+        // L'étage CPU du même plan, gardé en réserve : si Vulkan est refusé à
+        // l'exécution (`apply_video_filters`), il remplace l'étage GPU sans refaire de
+        // calcul ni relire les réglages. Vide si le plan n'est pas GPU.
+        let etage_cpu = if plan.moteur == crate::hdr::Moteur::Gpu {
+            crate::hdr::plan_force(
+                self.video_stream.as_ref().and_then(|v| v.hdr_info.as_ref()),
+                &video.hdr,
+                &contexte,
+                Some("cpu"),
+            )
+            .etage
+        } else {
+            String::new()
+        };
         if let Some(vs) = self.video_stream.as_mut() {
             vs.hdr_etage = plan.etage.clone();
             vs.hdr_indisponible = false;
+            vs.hdr_etage_cpu = etage_cpu;
+            vs.hdr_repli_cpu = false;
+            vs.hdr_repli_motif.clear();
         }
         if !plan.etage.is_empty() {
             tracing::info!("HDR: {} — étage: {}", plan.explication, plan.etage);
@@ -870,12 +898,27 @@ impl VideoPlayer {
         let vs = self.video_stream.as_ref()?;
         let info = vs.hdr_info.as_ref()?;
         let mut texte = info.resume();
-        if vs.hdr_indisponible {
+        if vs.hdr_repli_cpu {
+            texte.push_str(
+                " — Vulkan indisponible : conversion par le processeur (qualité réduite : \
+                 opérateur Hable, crête fixe)",
+            );
+        } else if vs.hdr_indisponible {
             texte.push_str(" — étage HDR refusé par le système (Vulkan ?), image non convertie");
+            if !vs.hdr_repli_motif.is_empty() {
+                texte.push_str(&format!(" ; repli CPU refusé : {}", vs.hdr_repli_motif));
+            }
         } else if !vs.hdr_etage.is_empty() {
             texte.push_str(" — étage appliqué");
         }
         Some(texte)
+    }
+
+    /// Avis HDR à montrer **une fois** à l'utilisateur (Vulkan refusé : conversion par le
+    /// CPU, ou image non convertie). Retiré à la lecture : l'interface l'affiche et il ne
+    /// revient pas à l'image suivante.
+    pub fn take_hdr_avis(&mut self) -> Option<String> {
+        self.video_stream.as_mut()?.hdr_avis.take()
     }
 
     /// Ce que l'environnement permet : écran (EDID) et capacité de la sortie.
@@ -1877,6 +1920,11 @@ impl VideoPlayer {
                         hdr_info: video_hdr.clone(),
                         hdr_etage: String::new(),
                         hdr_indisponible: false,
+                        hdr_etage_cpu: String::new(),
+                        hdr_repli_cpu: false,
+                        hdr_repli_motif: String::new(),
+                        fps_flux: fps,
+                        hdr_avis: None,
                         time_base: stream.time_base,
                     });
                     if hw_requested {
@@ -5367,6 +5415,20 @@ pub(crate) fn decouper_etage_hdr(description: &str) -> Option<(String, String)> 
     Some((reste.clone(), reste))
 }
 
+/// Phrase affichée une fois quand l'étage HDR est retiré : l'image n'est PAS convertie,
+/// donc délavée sur un écran SDR. Si le repli CPU a été refusé, on en donne la raison.
+fn avis_hdr_non_converti(motif_repli: &str) -> String {
+    if motif_repli.is_empty() {
+        "HDR : Vulkan indisponible, image non convertie (couleurs délavées)".to_string()
+    } else {
+        format!(
+            "HDR : Vulkan indisponible et source trop lourde pour le processeur — image non \
+             convertie ({})",
+            motif_repli
+        )
+    }
+}
+
 /// Fait passer une frame décodée par la chaîne de filtres et renvoie la frame
 /// transformée (`None` = pas de sortie : la frame d'origine est alors utilisée).
 ///
@@ -5411,6 +5473,58 @@ unsafe fn apply_video_filters(
                 // insuffisante). Perdre **toute** la chaîne pour cela serait
                 // disproportionné : on réessaie une fois sans l'étage, et on le dit.
                 if let Some((sans_hdr, reste)) = decouper_etage_hdr(description) {
+                    // **Repli CPU borné.** Si c'est l'étage GPU (`libplacebo`) qui est
+                    // refusé, l'étage CPU du même plan (`zscale` + `tonemap`) peut le
+                    // remplacer — mais seulement si la source tient dans le budget mesuré
+                    // (`hdr::repli_cpu_possible` : 1080p30). Au-delà, une conversion
+                    // saccadée serait pire qu'une image non convertie : on s'abstient et
+                    // on le dit.
+                    if description.starts_with("libplacebo=") && !vs.hdr_etage_cpu.is_empty() {
+                        match crate::hdr::repli_cpu_possible(width, height, vs.fps_flux) {
+                            Ok(()) => {
+                                let cpu = if reste.is_empty() {
+                                    vs.hdr_etage_cpu.clone()
+                                } else {
+                                    format!("{},{}", vs.hdr_etage_cpu, reste)
+                                };
+                                tracing::warn!("Étage HDR refusé ({}) — repli CPU : {}", e, cpu);
+                                match build_filter_chain(&cpu, width, height, format, vs.time_base) {
+                                    Ok(mut chain) => {
+                                        // La signature DEMANDÉE, pas celle de la chaîne de
+                                        // repli : sinon chaque image la jugerait périmée
+                                        // et retenterait Vulkan, échouerait, reconstruirait.
+                                        chain.signature = signature.clone();
+                                        tracing::info!(
+                                            "Filtres vidéo actifs (repli CPU): {} ({}x{}, {})",
+                                            cpu,
+                                            width,
+                                            height,
+                                            pixfmt_name(format)
+                                        );
+                                        vs.filters = Some(Box::new(chain));
+                                        vs.filters_failed_signature = None;
+                                        vs.hdr_repli_cpu = true;
+                                        vs.hdr_avis = Some(
+                                            "HDR : Vulkan indisponible, conversion par le \
+                                             processeur (qualité réduite)"
+                                                .to_string(),
+                                        );
+                                        return appliquer_au_graphe(vs, frame);
+                                    }
+                                    Err(e_cpu) => {
+                                        tracing::warn!(
+                                            "Étage HDR : repli CPU impossible ({}) — étage retiré",
+                                            e_cpu
+                                        );
+                                    }
+                                }
+                            }
+                            Err(raison) => {
+                                tracing::warn!("Étage HDR : repli CPU refusé ({})", raison);
+                                vs.hdr_repli_motif = raison;
+                            }
+                        }
+                    }
                     // Sans étage, il ne reste parfois **aucun** filtre : il n'y a alors
                     // rien à construire (un graphe vide est refusé), la lecture
                     // continue simplement sans filtres.
@@ -5421,6 +5535,7 @@ unsafe fn apply_video_filters(
                         );
                         vs.filters_failed_signature = Some(signature);
                         vs.hdr_indisponible = true;
+                        vs.hdr_avis = Some(avis_hdr_non_converti(&vs.hdr_repli_motif));
                         return None;
                     }
                     tracing::warn!(
@@ -5429,7 +5544,11 @@ unsafe fn apply_video_filters(
                         if reste.is_empty() { "aucun filtre" } else { reste.as_str() }
                     );
                     match build_filter_chain(&sans_hdr, width, height, format, vs.time_base) {
-                        Ok(chain) => {
+                        Ok(mut chain) => {
+                            // La signature DEMANDÉE (voir le repli CPU plus haut) : sans cela,
+                            // l'échec de Vulkan était rejoué à chaque image dès qu'un autre
+                            // filtre était actif (mesuré : 20 refus en 5 s à 5 i/s).
+                            chain.signature = signature.clone();
                             tracing::info!(
                                 "Filtres vidéo actifs (étage HDR retiré): {} ({}x{}, {})",
                                 sans_hdr,
@@ -5440,6 +5559,7 @@ unsafe fn apply_video_filters(
                             vs.filters = Some(Box::new(chain));
                             vs.filters_failed_signature = None;
                             vs.hdr_indisponible = true;
+                            vs.hdr_avis = Some(avis_hdr_non_converti(&vs.hdr_repli_motif));
                             return appliquer_au_graphe(vs, frame);
                         }
                         Err(e2) => {

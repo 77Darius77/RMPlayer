@@ -146,10 +146,12 @@ applique une **conversion tonale** vers SDR :
 
 - **moteur GPU** (`libplacebo`, Vulkan) : BT.2390 par défaut, traitement du gamut, détection de
   crête dynamique, tramage, débanding — tout en une passe sur la carte ;
-- **moteur CPU** (`zscale` + `tonemap`), choisi **à la main** (`KPLAYER_HDR_MOTEUR=cpu`) : il
-  n'y a pas de bascule automatique. Si Vulkan est inutilisable, l'étage `libplacebo` est
-  retiré, la lecture continue et le refus est journalisé (« Étage HDR refusé ») — l'image HDR
-  est alors affichée **non convertie**, donc délavée sur un écran SDR (`verif-hdr`, section 12).
+- **repli CPU borné** (`zscale` + `tonemap`) : si Vulkan est refusé à l'exécution, l'étage CPU
+  prend le relais pour les sources qui tiennent dans le budget mesuré (≤ 1080p30, 720p60) ; au-delà
+  (1080p60, 1440p, 4K), une conversion saccadée serait pire qu'une image non convertie, donc
+  l'image est jouée **telle quelle** (délavée sur un écran SDR). Dans les deux cas le refus est
+  journalisé et un **avis s'affiche à l'écran** (`verif-hdr`, section 12). Le moteur CPU se force
+  aussi à la main (`KPLAYER_HDR_MOTEUR=cpu`), sans condition de budget.
 
 Réglages dans *Préférences ▸ Image — filtres ▸ HDR et 10 bits* : mode (auto / toujours / jamais),
 opérateur, gamut, détail des hautes lumières, tramage 10→8 bits, débanding GPU.
@@ -476,7 +478,7 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-profils.sh [écran]` | **Profils** : application réelle, persistance, robustesse (fichier corrompu, doublons) — 17 contrôles |
 | `verif-regles.sh [écran]` | **Profils par règle** : chemin / extension / résolution mesurés sur l'image et le son, ordre, règles orphelines, ajout et suppression par l'interface — 24 contrôles |
 | `etat-court.sh [--check]` | **Régénère la fiche de reprise** `docs/ETAT-COURT.md` : lignes de code, bancs, dernier résultat de la suite, tests, avertissements, archive, capacités du FFmpeg installé |
-| `tout-verifier.sh` | Démarre l'écran virtuel si besoin, prend un **verrou** (une seule suite à la fois), enchaîne les 26 bancs et imprime le total (505 contrôles). Pose d'abord l'environnement des bancs (`env-bancs.sh` : Python avec numpy/PIL, session X11, écran virtuel 1500×900) |
+| `tout-verifier.sh` | Démarre l'écran virtuel si besoin, prend un **verrou** (une seule suite à la fois), enchaîne les 26 bancs et imprime le total (509 contrôles). Pose d'abord l'environnement des bancs (`env-bancs.sh` : Python avec numpy/PIL, session X11, écran virtuel 1500×900) |
 | `verif-cadrage.sh [écran]` | **Cadrage et sous-titres** : recadrage, détection des bandes, chapitres, couleur/position/taille/délai du texte, rapport d'aspect — 10 contrôles |
 | `verif-pistes.sh [écran]` | **Pistes embarquées** : inventaire, changement de piste audio mesuré en fréquence, sous-titres (texte, minutages, affichage) — 16 contrôles |
 | `capture-lecteur.sh <fichier> <image.png> [attente_s] [touches…]` | Lecture sur un écran X virtuel et capture PNG (validation visuelle) |
@@ -492,7 +494,7 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-soustitres.sh [écran]` | **Style des sous-titres** : trois familles de police mesurées (largeurs 268/307/332 px), position horizontale 20/50/80 %, police inconnue, non-régression — 5 contrôles |
 | `installer-association.sh [--par-defaut] [--etat] [--retirer]` | **« Ouvrir avec » KPlayer** : lanceur `.desktop`, icône, cache des types MIME ; `--par-defaut` l'impose pour les formats qu'il gère |
 | — | **revue externe** : `docs/BRIEF-REVUE-EXTERNE.md` — ce qu'on demande à un relecteur extérieur, budget de lecture, six vérifications qui valent mieux que la lecture, deux pièges à faux positifs |
-| `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, repli CPU, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision — 29 contrôles |
+| `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, moteur CPU forcé, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision, **Vulkan coupé** (repli CPU borné, avis, pas de reconstruction à chaque image) — 36 contrôles |
 | `verif-focus.sh [écran]` | **Pause selon le focus** : jamais / perte de focus / fenêtre réduite, reprise au retour, respect d'une pause volontaire — 11 contrôles, avec une seconde fenêtre réelle ; la pause est mesurée aussi sur l'image (deux captures identiques), avec un témoin en lecture. Non couvert : une vraie réduction (mode 2), qui exige un gestionnaire de fenêtres |
 | `verif-mpris.sh` | **MPRIS** (module seul, mode `--mpris-test`, sans fenêtre) : nom sur le bus, métadonnées en µs, commandes reçues, `SetPosition` filtré par piste, réglages Volume/Shuffle/LoopStatus/Rate, `PropertiesChanged`, nom rendu, absence de bus gérée — 27 contrôles |
 | `verif-vignettes.sh` | **Vignettes de la barre** (module seul, chemin `--vignette`) : taille, position réelle à une image près, deux positions → deux images, déterminisme, largeur bornée, coût, sortie réutilisée, largeur non multiple de 32, hors durée — 14 contrôles, sans écran |

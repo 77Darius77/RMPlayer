@@ -54,15 +54,34 @@ branchement déjà testé fera le reste.
 
 ## Quand Vulkan est inutilisable (mesuré, `verif-hdr` section 12)
 
-**Il n'y a pas de repli automatique vers le CPU.** Le moteur est `Gpu` par défaut
-(`hdr.rs`, choix du moteur) ; le moteur `Cpu` (`zscale` + `tonemap`) n'est choisi que par
-`KPLAYER_HDR_MOTEUR=cpu`. Si `libplacebo` est refusé à l'exécution (pilote absent, session
-distante, mémoire GPU), `player.rs` retire l'étage, journalise « Étage HDR refusé » et poursuit :
-l'image HDR est affichée **non convertie** (mesuré : bandes à 61 / 98 / 190 au lieu de
-47 / 107 / 253), donc délavée sur un écran SDR. C'est un choix de robustesse (la lecture ne
-s'arrête jamais), pas une conversion de substitution.
+Si `libplacebo` est refusé à l'exécution (pilote absent, session distante, mémoire GPU, mise à
+jour de Mesa qui casse Vulkan), la lecture ne s'arrête jamais. Ce qui se passe dépend de la
+**source**, car le moteur CPU a un coût mesuré (voir plus bas) :
 
-### Ce que coûterait un repli CPU automatique (mesuré le 2026-10-24)
+| Source | Comportement | Journal | Avis à l'écran |
+|---|---|---|---|
+| **dans le budget** (≤ 1080p30, 720p60, plus petit) | l'étage CPU (`zscale` + `tonemap`) **remplace** l'étage GPU : l'image est convertie | « Étage HDR refusé (…) — repli CPU : … » | « Vulkan indisponible, conversion par le processeur (qualité réduite) » |
+| **au-delà** (1080p60, 1440p, 4K) | **aucune conversion** : l'image HDR est jouée telle quelle, donc délavée sur un écran SDR (mesuré : bandes à 61 / 98 / 190 au lieu de 47 / 107 / 253) | « Étage HDR : repli CPU refusé (source 3840x2160 à 25 i/s = 207 Mpx/s, au-delà des 62 Mpx/s …) » | « Vulkan indisponible et source trop lourde pour le processeur — image non convertie (…) » |
+
+**Le budget** est `hdr::BUDGET_REPLI_CPU_MPX_S` = 1920 × 1080 × 30 ≈ 62 Mpx/s, soit environ 26 %
+de la capacité CPU mesurée : le reste du processeur reste au décodage, à l'audio et à
+l'interface. Pourquoi refuser plutôt que tenter : une conversion saccadée en 4K est pire à
+regarder qu'une image fluide mais délavée.
+
+**Pourquoi pas « réduire d'abord, convertir ensuite »** (mesuré : 4K → 1080p avant le CPU passe
+de 28 à 77 i/s) : l'étage HDR est volontairement **en tête, sur les bits d'origine**, et le
+recadrage, le zoom et la rotation viennent après ; réduire avant décalerait ces réglages.
+
+**Défaut corrigé en même temps** (session 36) : avec Vulkan coupé et un **autre filtre actif**
+(contraste, etc.), le lecteur retentait Vulkan, échouait et reconstruisait le graphe à **chaque
+image** (20 refus en 5 s à 5 i/s ; 24 à 60 par seconde en lecture normale). La cause : le graphe
+de repli portait la signature de la chaîne réduite, pas celle demandée. `verif-hdr` §12c le
+vérifie sur une vraie lecture.
+
+Le moteur CPU peut toujours être **forcé** (`KPLAYER_HDR_MOTEUR=cpu`) sans condition de
+budget : c'est un outil de diagnostic.
+
+### Ce que coûte le moteur CPU (mesuré le 2026-10-24) — origine du budget
 
 Poste : Ryzen 7 5800X (8 cœurs / 16 fils), AMD RX 6700 XT (Vulkan RADV), Mesa 25.3. Chaînes
 exactes de `hdr.rs`, appliquées par `ffmpeg` (FFmpeg 7.1.3 de `/opt`) à 288 images d'une
@@ -86,7 +105,8 @@ pas de secours : avec lui seul, `libplacebo` répond « Found no suitable device
 ## Vérifier
 
 ```bash
-tools/verif-hdr.sh          # 32 contrôles, mires calibrées en nits, VA-API vs logiciel, EDID, Vulkan coupé
+tools/verif-hdr.sh          # 36 contrôles, mires calibrées en nits, VA-API vs logiciel, EDID, Vulkan coupé
+tools/sante-hdr.sh         # ≈ 10 s : le GPU sert-il encore au HDR ? À lancer après une mise à jour de Mesa / pilote / noyau
 tools/etat-court.sh         # affiche « HDR (libplacebo) oui/non »
 kplayer --hdr-info film.mkv # métadonnées du flux + écrans lus + décision + explication
 ```

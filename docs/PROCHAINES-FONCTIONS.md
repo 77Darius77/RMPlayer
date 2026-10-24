@@ -78,7 +78,7 @@ doivent vivre avec la configuration, pas dans le cache.
 
 | # | Sujet | Pourquoi c'est à part |
 |---|---|---|
-| F1 | **Repli HDR automatique vers le moteur CPU** quand Vulkan est inutilisable | décision en attente : aujourd'hui l'image reste non convertie (`docs/HDR.md`, `verif-hdr` §12). Changement de comportement dans `player.rs`. **Mesuré : le CPU tient le 1080p (114 i/s) mais pas le 4K (26 i/s pour 9 cœurs)** ; un repli sans borne dégraderait le 4K. Si fait : borné par la résolution + message visible |
+| F1 | ~~**Repli HDR automatique vers le moteur CPU**~~ | **fait (s.36), borné** : l'étage CPU remplace l'étage GPU refusé si la source tient dans 62 Mpx/s (≤ 1080p30) ; au-delà, image non convertie et avis à l'écran. Budget et mesures dans `docs/HDR.md` ; `verif-hdr` §12 (36/36). Corrigé au passage : l'échec de Vulkan était rejoué à chaque image dès qu'un autre filtre était actif |
 | F2 | **Passthrough HDR / sortie 10 bits** (⑪) | bloqué par winit (aucune API de couleur) ; inatteignable ici : 3 écrans, tous SDR |
 | F3 | **Langue d'interface** (fluent / `.po`) | valeur faible pour un usage francophone |
 | F4 | **Thèmes externes** | aujourd'hui un thème sombre intégré |
@@ -99,9 +99,8 @@ doivent vivre avec la configuration, pas dans le cache.
 4. **C1 puis C2** : deux lignes de filtre chacune, mais C1 touche la couleur — à mesurer avec
    les mires déjà utilisées par `verif-hdr.sh`.
 5. **B3, B4, B6, C3, C4** : plus longs ; à prendre quand les précédents sont rangés.
-6. **Lots 5 et 6** : seulement sur un besoin réel. F1 n'est **pas urgent** sur ce
-   poste (le GPU et Vulkan fonctionnent, vérifié) : c'est une assurance contre une mise à jour
-   qui casserait Vulkan, et son coût dépend de la résolution (voir `docs/HDR.md`).
+6. **Lots 5 et 6** : seulement sur un besoin réel. F1 (repli HDR) est fait ; il reste F2 à F6,
+   qui dépendent de matériel ou de choix de périmètre.
 
 ## Ce que ce document ne couvre pas
 
