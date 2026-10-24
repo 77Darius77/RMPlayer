@@ -6,13 +6,13 @@ le reste est du jugement, écrit à la main et tenu à jour à chaque session.
 
 <!-- AUTO:debut — bloc régénéré par tools/etat-court.sh, ne pas éditer à la main -->
 ```
-Généré le            2026-10-24 23:53
-Code                 28252 lignes, 24 modules (src/)
-Bancs de contrôle    39 (tools/tout-verifier.sh)
-Dernière suite       2026-10-24 23:29 — 614 contrôles, 0 échec(s), 39 bancs
-Tests unitaires      161 (cargo test --release)
+Généré le            2026-10-25 01:21
+Code                 28495 lignes, 24 modules (src/)
+Bancs de contrôle    41 (tools/tout-verifier.sh)
+Dernière suite       2026-10-25 01:18 — 629 contrôles, 0 échec(s), 41 bancs
+Tests unitaires      164 (cargo test --release)
 Avertissements       0 (cargo build --release)
-Dernière archive     kplayer-2026-10-24-session37.tar.gz — 108 fichiers, 704 Ko
+Dernière archive     kplayer-2026-10-25-session37b.tar.gz — 110 fichiers, 713 Ko
 FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
   AV1 logiciel       oui (libdav1d)
   scale_vaapi        oui
