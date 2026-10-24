@@ -28,6 +28,7 @@ mod ui;
 mod settings;
 mod signets;
 mod systeme;
+mod theme;
 mod tray;
 
 use std::path::PathBuf;

@@ -14,6 +14,9 @@
 #   4. durée maximale : un sous-titre de 5 s disparaît après 1 s ; sans maximum il est là ;
 #   5. piste mémorisée : on passe à l'autre piste avec J, on ferme, on rouvre — la piste choisie
 #      revient si la mémoire est activée, pas sinon (témoin).
+#   6. alphabet (encodage) : un fichier en windows-1252 (« Éléphant à côté ») s'affiche — il
+#      n'était même pas chargé avant (lecture en UTF-8 strict) ; imposer windows-1251 sur un
+#      fichier cyrillique change le texte affiché (largeur mesurée) par rapport à l'automatique.
 #
 # Usage : tools/verif-soustitres-langues.sh [écran]      (défaut : :99)
 set -u
@@ -189,6 +192,28 @@ rm -rf "$BASE/cache"/*
 r=$(tente false); echo "  mémoire désactivée : départ / après J / relance = $r"
 if [ "$r" = "large etroit large" ]; then ok "sans mémoire, la réouverture revient à la langue préférée (témoin)"
 else ko "mémoire désactivée : $r (attendu « large etroit large »)"; fi
+
+echo "=== 6. Alphabet des sous-titres ==="
+cp "$M/fond.mp4" "$M/latin.mp4"; cp "$M/fond.mp4" "$M/cyril.mp4"
+python3 - "$M" <<'FINPY'
+import sys
+m = sys.argv[1]
+open(f"{m}/latin.srt", "wb").write("1\n00:00:00,000 --> 00:00:14,000\nMMMMMMMMMM Éléphant à côté\n\n".encode("cp1252"))
+open(f"{m}/cyril.srt", "wb").write("1\n00:00:00,000 --> 00:00:14,000\nПРИВЕТ МИР ПРИВЕТ\n\n".encode("cp1251"))
+FINPY
+lance '{"default_language": "xx"}' latin.mp4; position 3000
+lat=$(largeur); ferme
+echo "  fichier windows-1252, détection automatique : largeur $lat px"
+if [ "$lat" -gt 250 ]; then ok "le fichier Latin-1 est chargé et affiché (largeur $lat px)"
+else ko "le fichier Latin-1 n'apparaît pas (largeur $lat px)"; fi
+lance '{"default_language": "xx"}' cyril.mp4; position 3000
+auto=$(largeur); ferme
+lance '{"default_language": "xx", "encoding": "windows-1251"}' cyril.mp4; position 3000
+force=$(largeur); ferme
+echo "  fichier cyrillique : automatique $auto px | windows-1251 imposé $force px"
+if python3 -c "import sys; a, f = $auto, $force; sys.exit(0 if a > 0 and f > 0 and abs(a - f) >= 0.04 * max(a, f) else 1)"; then
+    ok "imposer l'alphabet change le texte affiché (largeurs différentes)"
+else ko "l'alphabet imposé ne change pas le rendu ($auto / $force)"; fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="

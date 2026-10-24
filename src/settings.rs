@@ -903,6 +903,41 @@ fn dessiner_interface(app: &mut App, ui: &mut egui::Ui) {
         {
             let _ = app.config.save();
         }
+        // Thème externe : un fichier JSON par thème dans ~/.config/kplayer/themes/.
+        let themes = crate::theme::lister();
+        let mut choisi = app.config.interface.theme.clone();
+        ligne(ui, "grille_theme_externe", "Thème externe", |ui| {
+            egui::ComboBox::from_id_salt("choix_theme_externe")
+                .selected_text(if choisi.is_empty() { "Intégré".to_string() } else { choisi.clone() })
+                .width(200.0)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut choisi, String::new(), "Intégré");
+                    for nom in &themes {
+                        ui.selectable_value(&mut choisi, nom.clone(), nom);
+                    }
+                });
+        });
+        if choisi != app.config.interface.theme {
+            app.config.interface.theme = choisi;
+            let _ = app.config.save();
+        }
+        ui.horizontal(|ui| {
+            if ui.button("Créer un thème d'exemple").clicked() {
+                if let Some(dossier) = crate::theme::dossier() {
+                    let _ = std::fs::create_dir_all(&dossier);
+                    let chemin = dossier.join("exemple-nuit.json");
+                    match std::fs::write(&chemin, crate::theme::Theme::EXEMPLE) {
+                        Ok(()) => app.annonce(&format!("Thème d'exemple écrit : {}", chemin.display())),
+                        Err(e) => app.error_message = Some(format!("Thème d'exemple : {e}")),
+                    }
+                }
+            }
+        });
+        aide(
+            ui,
+            "Un thème est un fichier .json (base dark/light, couleurs fond, zone, texte, accent en RRGGBB) \
+             dans ~/.config/kplayer/themes/. Un thème illisible est refusé avec la raison.",
+        );
         if ui
             .checkbox(
                 &mut app.config.interface.show_title,
@@ -2378,6 +2413,18 @@ fn dessiner_sous_titres(app: &mut App, ui: &mut egui::Ui) {
                 let _ = app.config.save();
             }
         });
+        ligne(ui, "grille_alphabet", "Alphabet (encodage)", |ui| {
+            if ui
+                .add(egui::TextEdit::singleline(&mut app.config.subtitles.encoding).hint_text("automatique"))
+                .on_hover_text(
+                    "Vide = automatique (UTF-8, sinon windows-1252). Sinon un nom d'encodage : \
+                     windows-1250 (Europe centrale), windows-1251 (cyrillique), iso-8859-15, gbk, shift_jis…",
+                )
+                .changed()
+            {
+                let _ = app.config.save();
+            }
+        });
         // Langues par ordre de priorité (session 37) : « fre, eng » essaie fre, puis eng.
         // Le texte en cours de frappe est gardé à part : le recomposer depuis la liste à
         // chaque image effacerait la virgule qu'on vient de taper.
@@ -3100,6 +3147,7 @@ fn interface_modifiee(app: &App) -> bool {
     let d = Config::default().interface;
     let a = &app.config.interface;
     a.dark_theme != d.dark_theme
+        || a.theme != d.theme
         || a.show_title != d.show_title
         || a.show_progress_bar != d.show_progress_bar
         || a.controls_always_visible != d.controls_always_visible
@@ -3174,6 +3222,7 @@ fn sous_titres_modifies(app: &App) -> bool {
         || a.scale_y != d.scale_y
         || a.fade_ms != d.fade_ms
         || a.preferred_languages != d.preferred_languages
+        || a.encoding != d.encoding
         || a.min_duration_ms != d.min_duration_ms
         || a.max_duration_ms != d.max_duration_ms
         || a.remember_track != d.remember_track
