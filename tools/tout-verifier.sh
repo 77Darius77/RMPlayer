@@ -110,6 +110,7 @@ run verif-fenetre-wayland env WAYLAND_DISPLAY="$KP_ENV_ORIG_WAYLAND_DISPLAY" \
 run verif-association tools/verif-association.sh "$DISP"
 run verif-playlist tools/verif-playlist.sh "$DISP"
 run verif-recents tools/verif-recents.sh "$DISP"
+run verif-signets tools/verif-signets.sh "$DISP"
 run verif-config-io tools/verif-config-io.sh
 run verif-boucle-ab tools/verif-boucle-ab.sh "$DISP"
 run verif-vignettes tools/verif-vignettes.sh

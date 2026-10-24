@@ -37,6 +37,11 @@ pub enum Action {
     Reprise,
     PointA,
     PointB,
+    /// Marque-pages : poser, aller au suivant / précédent, supprimer celui de la position courante.
+    SignetAjouter,
+    SignetSuivant,
+    SignetPrecedent,
+    SignetSupprimer,
     VitesseMoins,
     VitessePlus,
     VitesseNormale,
@@ -81,6 +86,10 @@ impl Action {
         Action::Reprise,
         Action::PointA,
         Action::PointB,
+        Action::SignetAjouter,
+        Action::SignetSuivant,
+        Action::SignetPrecedent,
+        Action::SignetSupprimer,
         Action::VitesseMoins,
         Action::VitessePlus,
         Action::VitesseNormale,
@@ -132,6 +141,10 @@ impl Action {
             Action::Reprise => "lecture.reprise",
             Action::PointA => "lecture.point_a",
             Action::PointB => "lecture.point_b",
+            Action::SignetAjouter => "signets.ajouter",
+            Action::SignetSuivant => "signets.suivant",
+            Action::SignetPrecedent => "signets.precedent",
+            Action::SignetSupprimer => "signets.supprimer",
             Action::VitesseMoins => "vitesse.moins",
             Action::VitessePlus => "vitesse.plus",
             Action::VitesseNormale => "vitesse.normale",
@@ -180,6 +193,10 @@ impl Action {
             Action::Reprise => "Reprise à la position quittée",
             Action::PointA => "Répétition A-B : point A",
             Action::PointB => "Répétition A-B : point B",
+            Action::SignetAjouter => "Signet : ajouter à la position",
+            Action::SignetSuivant => "Signet : aller au suivant",
+            Action::SignetPrecedent => "Signet : aller au précédent",
+            Action::SignetSupprimer => "Signet : supprimer celui de la position",
             Action::VitesseMoins => "Vitesse −0,1",
             Action::VitessePlus => "Vitesse +0,1",
             Action::VitesseNormale => "Vitesse normale (1,0×)",
@@ -218,7 +235,11 @@ impl Action {
             | Action::Aleatoire
             | Action::Reprise
             | Action::PointA
-            | Action::PointB => "Lecture",
+            | Action::PointB
+            | Action::SignetAjouter
+            | Action::SignetSuivant
+            | Action::SignetPrecedent
+            | Action::SignetSupprimer => "Lecture",
             Action::Reculer5s
             | Action::Reculer1s
             | Action::Reculer30s
@@ -270,6 +291,10 @@ impl Action {
             Action::Reprise => "Ctrl+R",
             Action::PointA => "A",
             Action::PointB => "B",
+            Action::SignetAjouter => "Ctrl+B",
+            Action::SignetSuivant => "Ctrl+Maj+Droite",
+            Action::SignetPrecedent => "Ctrl+Maj+Gauche",
+            Action::SignetSupprimer => "Ctrl+Maj+B",
             Action::VitesseMoins => "[",
             Action::VitessePlus => "]",
             Action::VitesseNormale => "\\",

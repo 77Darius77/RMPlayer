@@ -51,11 +51,11 @@ document ne couvre pas »).
 | C3 ✅ | **Étendre à l'écran / rogner** (fait s.37 : aspect « Rogner », `verif-affichage` 5/5) (aujourd'hui : recadrage seulement) | cadrage dans `player.rs` / `ui.rs` | moyen |
 | C4 ⛔ | **Plein écran : autres moniteurs en noir** — NON FAIT, volontairement : sous Wayland (la seule session de cette machine) un client ne peut ni placer ni lister ses fenêtres sur un autre écran, et Xvfb ne reproduit pas ce cas ; une fonction qu'on ne peut pas mesurer ici ne serait pas une fonction (recette §1) | fenêtres noires, `main.rs` / `x11.rs` | moyen (piège Wayland : pas de positionnement client) |
 
-## Lot 4 — fonction PotPlayer hors du catalogue des réglages
+## Lot 4 — fonction PotPlayer hors du catalogue des réglages (FAIT s.37)
 
 | # | Fonction | Où | Effort |
 |---|---|---|---|
-| D1 | **Marque-pages (signets)** : ajouter / aller à / supprimer, par média, persistés | `positions.rs` comme modèle de mécanisme (JSON relu au chargement, écrit à la fermeture) ; raccourci + menu | moyen |
+| D1 ✅ | **Marque-pages (signets)** (fait s.37, `verif-signets` 7/7 : Ctrl+B ajouter, Ctrl+Maj+Droite/Gauche naviguer, Ctrl+Maj+B supprimer, menu Lecture → Signets ; `signets.json` dans le dossier de configuration) : ajouter / aller à / supprimer, par média, persistés | `positions.rs` comme modèle de mécanisme (JSON relu au chargement, écrit à la fermeture) ; raccourci + menu | moyen |
 
 Confirmé absent dans le code : aucun terme `bookmark`, `signet` ou `favori` dans `src/`.
 **Deux différences avec `positions.rs`** à ne pas copier : il stocke **une** position par
@@ -120,3 +120,8 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Sous-titre intégré commencé avant un saut** : après un `seek`, une réplique de piste intégrée
   commencée avant la position visée n'est pas relue (les cues sont vidés au saut et le paquet n'est
   pas relu). Non corrigé ; le banc des langues mesure en lecture continue pour l'éviter.
+- **Matrice de couleur « automatique » (lot 3)** : première version déduite de la taille de l'image
+  *réduite* et des balises de l'image *filtrée* — BT.601 par la chaîne GPU, BT.709 par la chaîne CPU
+  pour le même film. Trouvé par `verif-personnalisation` (inversion non mesurée), corrigé : la décision
+  se prend sur les balises et la définition de l'image d'ORIGINE (`couleur_effective`), gardé par
+  `verif-affichage` §6 (clip 1080p sans balise, chaîne GPU `scale_vaapi` réellement active).

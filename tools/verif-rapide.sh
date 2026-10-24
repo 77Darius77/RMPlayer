@@ -41,6 +41,7 @@ bancs_pour() {
         boucle)     echo "verif-boucle-ab" ;;
         couleur)    echo "verif-couleur verif-filtres verif-hdr" ;;
         affichage)  echo "verif-affichage verif-cadrage" ;;
+        signets)    echo "verif-signets verif-playlist" ;;
         configuration) echo "verif-config-io verif-recents" ;;
         *)          echo "" ;;
     esac
@@ -48,7 +49,7 @@ bancs_pour() {
 
 if [ $# -eq 0 ] || [ "$1" = "--liste" ]; then
     echo "Sujets disponibles :"
-    for sujet in playlist vignettes mpris focus hdr soustitres ui fenetre association filtres audio reseau recents configuration boucle couleur affichage; do
+    for sujet in playlist vignettes mpris focus hdr soustitres ui fenetre association filtres audio reseau recents configuration boucle couleur affichage signets; do
         echo "  $sujet → $(bancs_pour "$sujet")"
     done
     exit 0
@@ -102,7 +103,7 @@ for nom in $CIBLES; do
     echo "### $nom"
     case "$nom" in
         audit-ui)            sortie=$("$script" "$M1" "$M2" "$DISP" 2>&1) ;;
-        audit-menus|audit-prefs|verif-playlist|verif-recents|verif-boucle-ab|verif-soustitres-style|verif-soustitres-langues|verif-affichage) sortie=$("$script" "$DISP" 2>&1) ;;
+        audit-menus|audit-prefs|verif-playlist|verif-recents|verif-boucle-ab|verif-soustitres-style|verif-soustitres-langues|verif-affichage|verif-signets) sortie=$("$script" "$DISP" 2>&1) ;;
         verif-fenetre)       sortie=$("$script" :98 2>&1) ;;   # son propre écran 1280×800
         verif-fenetre-wayland) sortie=$(env WAYLAND_DISPLAY="$KP_ENV_ORIG_WAYLAND_DISPLAY" \
                                    XDG_SESSION_TYPE="$KP_ENV_ORIG_XDG_SESSION_TYPE" "$script" 2>&1) ;;

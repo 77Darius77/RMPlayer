@@ -6351,47 +6351,62 @@ unsafe fn construire_chaine_gpu(
 }
 
 /// Matrice (`SWS_CS_*`) et plage source (0 limitée, 1 complète) à utiliser pour cette image.
+///
+/// **Les balises de l'image d'ORIGINE font foi**, pas celles de l'image à convertir : un graphe
+/// de filtres ou une réduction dans le GPU peut en inventer (mesuré : le même film non balisé
+/// sortait en BT.709 par la chaîne CPU et en BT.601 par la chaîne GPU), et la taille réduite
+/// d'une image affichée ne dit rien de sa définition. Exception : une source HDR convertie par
+/// l'étage HDR — l'image à convertir est alors du SDR BT.709 balisé comme tel.
 unsafe fn couleur_effective(
+    origine: *mut AVFrame,
     source: *mut AVFrame,
     choix: (crate::config::ColorMatrix, crate::config::ColorRange),
-    largeur: i32,
-    hauteur: i32,
-    format: AVPixelFormat,
 ) -> (i32, i32) {
     use crate::config::{ColorMatrix, ColorRange};
     // Valeurs de `SWS_CS_*` (libswscale/swscale.h) : ITU709 = 1, ITU601 = 5, BT2020 = 9.
     const ITU709: i32 = 1;
     const ITU601: i32 = 5;
     const BT2020: i32 = 9;
+    let (largeur, hauteur) = ((*origine).width, (*origine).height);
+    let hdr_origine = matches!(
+        (*origine).color_trc,
+        ffmpeg_sys_next::AVColorTransferCharacteristic::AVCOL_TRC_SMPTE2084
+            | ffmpeg_sys_next::AVColorTransferCharacteristic::AVCOL_TRC_ARIB_STD_B67
+    );
+    let reference = if hdr_origine { source } else { origine };
     let coef = match choix.0 {
         ColorMatrix::Bt601 => ITU601,
         ColorMatrix::Bt709 => ITU709,
         ColorMatrix::Bt2020 => BT2020,
-        ColorMatrix::Auto => match (*source).colorspace {
+        ColorMatrix::Auto => match (*reference).colorspace {
             AVColorSpace::AVCOL_SPC_BT709 => ITU709,
             AVColorSpace::AVCOL_SPC_BT470BG
             | AVColorSpace::AVCOL_SPC_SMPTE170M
             | AVColorSpace::AVCOL_SPC_FCC => ITU601,
             AVColorSpace::AVCOL_SPC_BT2020_NCL | AVColorSpace::AVCOL_SPC_BT2020_CL => BT2020,
-            // Non déclarée : la définition décide (convention des lecteurs).
+            // Non déclarée : la définition de la SOURCE décide (convention des lecteurs).
             _ if largeur >= 1280 || hauteur >= 720 => ITU709,
             _ => ITU601,
         },
     };
+    let est_yuvj = |f: c_int| {
+        f == AVPixelFormat::AV_PIX_FMT_YUVJ420P as c_int
+            || f == AVPixelFormat::AV_PIX_FMT_YUVJ422P as c_int
+            || f == AVPixelFormat::AV_PIX_FMT_YUVJ444P as c_int
+            || f == AVPixelFormat::AV_PIX_FMT_YUVJ440P as c_int
+    };
     let plage = match choix.1 {
         ColorRange::Limited => 0,
         ColorRange::Full => 1,
-        ColorRange::Auto => match (*source).color_range {
-            ffmpeg_sys_next::AVColorRange::AVCOL_RANGE_JPEG => 1,
-            ffmpeg_sys_next::AVColorRange::AVCOL_RANGE_MPEG => 0,
-            _ => match format {
-                AVPixelFormat::AV_PIX_FMT_YUVJ420P
-                | AVPixelFormat::AV_PIX_FMT_YUVJ422P
-                | AVPixelFormat::AV_PIX_FMT_YUVJ444P
-                | AVPixelFormat::AV_PIX_FMT_YUVJ440P => 1,
+        ColorRange::Auto => {
+            use ffmpeg_sys_next::AVColorRange::{AVCOL_RANGE_JPEG, AVCOL_RANGE_MPEG};
+            match ((*reference).color_range, (*source).color_range) {
+                (AVCOL_RANGE_JPEG, _) | (_, AVCOL_RANGE_JPEG) => 1,
+                (AVCOL_RANGE_MPEG, _) | (_, AVCOL_RANGE_MPEG) => 0,
+                _ if est_yuvj((*source).format) || est_yuvj((*origine).format) => 1,
                 _ => 0,
-            },
-        },
+            }
+        }
     };
     (coef, plage)
 }
@@ -6569,7 +6584,7 @@ unsafe fn scale_frame_to_rgba(
     // la définition décide. **Sans ce réglage explicite, swscale lit tout en BT.601** : un film
     // HD en BT.709 voyait ses couleurs saturées déplacées (mesuré : rouge (200,50,40) rendu
     // (185,34,40)).
-    let (coef, plage_src) = couleur_effective(source, couleur, width, height, src_format);
+    let (coef, plage_src) = couleur_effective(frame, source, couleur);
 
     // Le format d'entrée peut changer en cours de flux (ou être NV12 après un
     // rapatriement matériel) et la taille d'affichage varie avec la fenêtre :
@@ -6606,6 +6621,11 @@ unsafe fn scale_frame_to_rgba(
             let table = sws_getCoefficients(coef);
             sws_setColorspaceDetails(vs.scale_context, table, plage_src, table, 1, 0, 1 << 16, 1 << 16);
         }
+        tracing::info!(
+            "Conversion couleur : matrice SWS_CS {} / plage {} (origine : colorspace {:?}, plage {:?}, {}x{}, format converti {:?}, imposé : {:?}/{:?})",
+            coef, if plage_src == 1 { "complète" } else { "limitée" },
+            (*frame).colorspace, (*frame).color_range, (*frame).width, (*frame).height, src_format, couleur.0, couleur.1
+        );
         vs.scale_coef = coef;
         vs.scale_plage = plage_src;
         vs.scale_format = src_format;
