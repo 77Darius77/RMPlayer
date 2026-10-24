@@ -749,6 +749,31 @@ impl App {
         }
     }
 
+    /// Passe à la piste audio suivante (boucle sur les pistes du fichier) et la mémorise si le
+    /// réglage est actif. C'est le chemin du raccourci ; le menu Audio fait la même chose.
+    fn piste_audio_suivante(&mut self) {
+        let pistes = self
+            .player
+            .media_info()
+            .map(|i| i.audio_tracks.clone())
+            .unwrap_or_default();
+        if pistes.len() < 2 {
+            self.annonce("Une seule piste audio");
+            return;
+        }
+        let actuelle = self.player.current_audio_stream();
+        let rang = pistes.iter().position(|p| Some(p.index) == actuelle).unwrap_or(0);
+        let suivante = &pistes[(rang + 1) % pistes.len()];
+        match self.player.select_audio_stream(suivante.index) {
+            Ok(()) => {
+                self.player.memoriser_piste_audio(suivante.index);
+                tracing::info!(target: "kinterface", "piste audio suivante : flux {} — {}", suivante.index, suivante.label());
+                self.annonce(&format!("Audio : {}", suivante.label()));
+            }
+            Err(e) => self.annonce(&format!("Piste audio indisponible : {e}")),
+        }
+    }
+
     /// Note la piste que l'utilisateur vient de choisir, pour le média ouvert.
     fn memoriser_piste_choisie(&mut self, choix: crate::pistes::Choix) {
         if !self.config.subtitles.remember_track {
@@ -3196,6 +3221,8 @@ impl eframe::App for App {
                                 self.annonce(&format!("Piste de sous-titres : {}", nom));
                             }
                         }
+                        // Piste audio suivante : même chemin que le menu Audio.
+                        Action::PisteAudioSuivante => self.piste_audio_suivante(),
                         // Chapitres : comme PotPlayer (Page↑ / Page↓).
                         Action::ChapitrePrecedent => {
                             if self.player.previous_chapter().is_none() {
@@ -3596,6 +3623,7 @@ impl eframe::App for App {
                         if let Some((rang, index)) = choisie {
                             match self.player.select_audio_stream(index) {
                                 Ok(()) => {
+                                    self.player.memoriser_piste_audio(index);
                                     tracing::info!(
                                         target: "kinterface",
                                         "piste audio choisie : flux {} — {}",
@@ -3629,7 +3657,7 @@ impl eframe::App for App {
                         {
                             let _ = self.config.save();
                             self.player.set_track_preferences(
-                                &self.config.audio.default_language,
+                                &self.config.audio.langues_preferees(),
                                 &self.config.subtitles.langues_preferees(),
                                 self.config.subtitles.use_embedded,
                             );
@@ -3661,7 +3689,7 @@ impl eframe::App for App {
                     {
                         let _ = self.config.save();
                         self.player.set_track_preferences(
-                            &self.config.audio.default_language,
+                            &self.config.audio.langues_preferees(),
                             &self.config.subtitles.langues_preferees(),
                             self.config.subtitles.use_embedded,
                         );

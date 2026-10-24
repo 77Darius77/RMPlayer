@@ -46,6 +46,11 @@ pub struct TrackInfo {
     /// ne peut pas être affichée par le lecteur — l'interface le dit explicitement
     /// au lieu d'afficher un silence inexpliqué.
     pub bitmap: bool,
+    /// Piste marquée « par défaut » dans le conteneur.
+    pub defaut: bool,
+    /// Piste de commentaire, d'audiodescription ou de making-of (drapeau du conteneur ou mots du
+    /// titre) : jamais choisie automatiquement quand une autre piste de la langue existe.
+    pub commentaire: bool,
 }
 
 impl TrackInfo {
@@ -649,7 +654,10 @@ pub struct VideoPlayer {
     /// Événements de sous-titres **image** (PGS/DVD/DVB), même ordre.
     bitmap_cues: VecDeque<BitmapCue>,
     /// Langue audio demandée ("" = première piste, comportement historique).
-    audio_language: String,
+    audio_languages: Vec<String>,
+    /// Mémoriser la piste audio choisie à la main, par film.
+    audio_remember: bool,
+    pistes_audio: crate::pistes::PistesChoisies,
     /// Utiliser les sous-titres du conteneur quand il n'y a pas de fichier externe.
     prefer_embedded_subs: bool,
     /// Langue de sous-titres demandée ("" = première piste textuelle).
@@ -785,7 +793,9 @@ impl VideoPlayer {
             subtitle_decoder: None,
             embedded_cues: VecDeque::new(),
             bitmap_cues: VecDeque::new(),
-            audio_language: config.audio.default_language.clone(),
+            audio_languages: config.audio.langues_preferees(),
+            audio_remember: config.audio.remember_track,
+            pistes_audio: crate::pistes::PistesChoisies::load_audio(),
             prefer_embedded_subs: config.subtitles.use_embedded,
             subtitle_language: config.subtitles.langues_preferees(),
             audio_filters: None,
@@ -1185,11 +1195,11 @@ impl VideoPlayer {
     /// aucune n'est choisie.
     pub fn set_track_preferences(
         &mut self,
-        audio_language: &str,
+        audio_languages: &[String],
         subtitle_languages: &[String],
         prefer_embedded: bool,
     ) {
-        self.audio_language = audio_language.to_string();
+        self.audio_languages = audio_languages.to_vec();
         self.subtitle_language = subtitle_languages.to_vec();
         self.prefer_embedded_subs = prefer_embedded;
         if prefer_embedded && self.subtitle_decoder.is_none() {
@@ -1325,6 +1335,22 @@ impl VideoPlayer {
     }
 
     /// Piste audio actuellement ouverte (index dans le conteneur).
+    /// Note la piste audio que l'utilisateur vient de choisir, pour ce film (réglage
+    /// « mémoriser la piste audio »).
+    pub fn memoriser_piste_audio(&mut self, index: i32) {
+        if !self.audio_remember {
+            return;
+        }
+        if let Some(chemin) = self.current_path().cloned() {
+            self.pistes_audio.set(&chemin, &crate::pistes::Choix::Integree(index));
+        }
+    }
+
+    /// Active ou non la mémoire des pistes audio (préférences).
+    pub fn set_audio_remember(&mut self, actif: bool) {
+        self.audio_remember = actif;
+    }
+
     pub fn current_audio_stream(&self) -> Option<i32> {
         self.audio_stream.as_ref().map(|a| a.index)
     }
@@ -1836,6 +1862,8 @@ impl VideoPlayer {
                     channels: if genre == "audio" { codecpar.ch_layout.nb_channels } else { 0 },
                     sample_rate: if genre == "audio" { codecpar.sample_rate } else { 0 },
                     bitmap,
+                    defaut: (stream.disposition as u32) & (AV_DISPOSITION_DEFAULT as u32) != 0,
+                    commentaire: piste_de_commentaire(stream.disposition as u32, &titre),
                 };
                 if genre == "audio" {
                     tracing::info!("Piste audio {} : {}", audio_tracks.len(), info.label());
@@ -1848,15 +1876,25 @@ impl VideoPlayer {
 
             // Choix de la piste audio : langue préférée si elle existe, sinon la
             // première (comportement historique, jamais de régression).
-            if let Some(choisie) = choisir_piste(&audio_tracks, &self.audio_language) {
+            if let Some(choisie) = choisir_piste_audio(&audio_tracks, &self.audio_languages) {
                 if audio_index != choisie.index {
                     tracing::info!(
-                        "Langue audio « {} » demandée → piste {}",
-                        self.audio_language,
+                        "Langues audio {:?} → piste {}",
+                        self.audio_languages,
                         choisie.label()
                     );
                 }
                 audio_index = choisie.index;
+            }
+            // Piste choisie à la main lors d'une précédente ouverture de ce film (réglage
+            // « mémoriser la piste audio ») : elle l'emporte sur la langue préférée.
+            if self.audio_remember && !est_reseau {
+                if let Some(crate::pistes::Choix::Integree(i)) = self.pistes_audio.get(&path) {
+                    if audio_tracks.iter().any(|t| t.index == i) {
+                        tracing::info!("Piste audio rappelée : flux {}", i);
+                        audio_index = i;
+                    }
+                }
             }
 
             // Durée (en µs AV_TIME_BASE)
@@ -3293,7 +3331,12 @@ impl VideoPlayer {
                     (*st).codecpar.as_ref().map(|p| p.sample_rate).unwrap_or(48000) as u32
                 }
             };
-            (taux, canaux_fichier.max(1) as u16)
+            // Les échantillons sortent du convertisseur, donc dans la disposition de SORTIE (celle du
+            // périphérique, stéréo par défaut) : déclarer celle du fichier donnait, pour une source
+            // mono, un WAV de 1 canal rempli d'échantillons stéréo (fréquence et durée doublées) —
+            // même défaut que le taux d'échantillonnage corrigé plus haut.
+            let _ = canaux_fichier;
+            (taux, aus.out_layout.nb_channels.max(1) as u16)
         };
 
         // Ordre de lecture depuis le début.
@@ -4692,27 +4735,47 @@ fn choisir_piste_langues<'a>(pistes: &'a [TrackInfo], langues: &[String]) -> Opt
     pistes.first()
 }
 
-fn choisir_piste<'a>(pistes: &'a [TrackInfo], langue: &str) -> Option<&'a TrackInfo> {
-    if pistes.is_empty() {
-        return None;
+/// Vrai si une piste est un commentaire, une audiodescription ou un supplément : drapeau du
+/// conteneur (`comment`, `visual_impaired`, `descriptions`) ou mot du titre.
+fn piste_de_commentaire(disposition: u32, titre: &str) -> bool {
+    let drapeaux = (AV_DISPOSITION_COMMENT | AV_DISPOSITION_VISUAL_IMPAIRED | AV_DISPOSITION_DESCRIPTIONS) as u32;
+    if disposition & drapeaux != 0 {
+        return true;
     }
-    let demande = langue.trim().to_lowercase();
-    if !demande.is_empty() {
-        if let Some(t) = pistes
-            .iter()
-            .find(|t| t.language.to_lowercase() == demande)
-        {
-            return Some(t);
+    let t = titre.to_lowercase();
+    ["comment", "descri", "réalisateur", "realisateur", "director", "making of", "behind the scenes"]
+        .iter()
+        .any(|mot| t.contains(mot))
+}
+
+/// Piste audio à jouer. Pour chaque langue **dans l'ordre de priorité**, les pistes de cette langue
+/// (code exact ou deux premières lettres) ; parmi elles, hors commentaires (sauf s'il n'y a que
+/// ça), la piste « par défaut » du conteneur puis la première. Aucune langue ne correspond (ou
+/// aucune demandée) : même règle sur toutes les pistes.
+fn choisir_piste_audio<'a>(pistes: &'a [TrackInfo], langues: &[String]) -> Option<&'a TrackInfo> {
+    fn meilleure<'a>(candidates: Vec<&'a TrackInfo>) -> Option<&'a TrackInfo> {
+        let normales: Vec<&TrackInfo> = candidates.iter().copied().filter(|t| !t.commentaire).collect();
+        let pool = if normales.is_empty() { candidates } else { normales };
+        pool.iter().copied().find(|t| t.defaut).or_else(|| pool.first().copied())
+    }
+    for langue in langues {
+        let demande = langue.trim().to_lowercase();
+        if demande.is_empty() {
+            continue;
         }
         let court = &demande[..demande.len().min(2)];
-        if let Some(t) = pistes
-            .iter()
-            .find(|t| t.language.to_lowercase().starts_with(court))
-        {
+        let exactes: Vec<&TrackInfo> =
+            pistes.iter().filter(|t| t.language.to_lowercase() == demande).collect();
+        let candidates = if !exactes.is_empty() {
+            exactes
+        } else {
+            pistes.iter().filter(|t| t.language.to_lowercase().starts_with(court)).collect()
+        };
+        if let Some(t) = meilleure(candidates) {
             return Some(t);
         }
     }
-    pistes.first()
+    meilleure(pistes.iter().collect())
 }
 
 /// Traduit les réglages en une chaîne de filtres FFmpeg (libavfilter).
@@ -7266,7 +7329,44 @@ mod tests_langues {
             channels: 0,
             sample_rate: 0,
             bitmap: false,
+            defaut: false,
+            commentaire: false,
         }
+    }
+
+    fn piste_audio(index: i32, langue: &str, defaut: bool, commentaire: bool) -> TrackInfo {
+        TrackInfo { defaut, commentaire, ..piste(index, langue) }
+    }
+
+    #[test]
+    fn la_piste_audio_ecarte_les_commentaires_et_suit_le_defaut_du_fichier() {
+        let langues = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        // Audiodescription en premier, puis la VF (par défaut), puis la VO.
+        let pistes = [
+            piste_audio(1, "fre", false, true),
+            piste_audio(2, "fre", true, false),
+            piste_audio(3, "eng", false, false),
+        ];
+        assert_eq!(choisir_piste_audio(&pistes, &langues(&["fre"])).unwrap().index, 2, "commentaire écarté");
+        assert_eq!(choisir_piste_audio(&pistes, &langues(&["eng", "fre"])).unwrap().index, 3, "priorité");
+        assert_eq!(choisir_piste_audio(&pistes, &langues(&["ger", "fre"])).unwrap().index, 2, "ger absent");
+        assert_eq!(choisir_piste_audio(&pistes, &[]).unwrap().index, 2, "sans langue : le défaut du fichier");
+        // Aucune langue ne correspond : défaut du fichier, pas la première piste.
+        assert_eq!(choisir_piste_audio(&pistes, &langues(&["jpn"])).unwrap().index, 2);
+        // Un commentaire seul dans sa langue est joué quand même.
+        let seul = [piste_audio(1, "fre", false, true), piste_audio(2, "eng", false, false)];
+        assert_eq!(choisir_piste_audio(&seul, &langues(&["fre"])).unwrap().index, 1);
+        assert!(choisir_piste_audio(&[], &langues(&["fre"])).is_none());
+    }
+
+    #[test]
+    fn un_titre_ou_un_drapeau_designe_un_commentaire() {
+        assert!(piste_de_commentaire(0, "Commentaires du réalisateur"));
+        assert!(piste_de_commentaire(0, "Audio Description"));
+        assert!(piste_de_commentaire(AV_DISPOSITION_COMMENT as u32, ""));
+        assert!(piste_de_commentaire(AV_DISPOSITION_VISUAL_IMPAIRED as u32, "VF"));
+        assert!(!piste_de_commentaire(0, "VF 5.1"));
+        assert!(!piste_de_commentaire(AV_DISPOSITION_DEFAULT as u32, "VO"));
     }
 
     #[test]
