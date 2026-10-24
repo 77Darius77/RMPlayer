@@ -31,16 +31,16 @@ document ne couvre pas »).
 | A2 ✅ | **Boucle A-B : nombre de boucles et délai** (fait s.37, `verif-boucle-ab` 6/6, option `--boucle-ab A B`) | `Dialog(453)` | `loop_a_ms` / `loop_b_ms` dans `player.rs` ; 2 champs `playback.*` | N boucles puis arrêt (retours comptés au journal **et** par la position), délai mesuré entre deux passages | petit |
 | A3 ✅ | **Exporter / importer la configuration** (fait s.37, `verif-config-io` 12/12) | 2096 | bouton dans les préférences + `--export-config` / `--import-config` en ligne de commande | aller-retour : exporter, modifier, importer → fichier identique octet pour octet ; fichier invalide refusé sans écraser | petit |
 
-## Lot 2 — style des sous-titres (même méthode que `verif-soustitres.sh` : mesure sur les pixels)
+## Lot 2 — style des sous-titres (FAIT s.37 : `verif-soustitres-style` 9/9, `verif-soustitres-langues` 10/10) (même méthode que `verif-soustitres.sh` : mesure sur les pixels)
 
 | # | Fonction | PotPlayer | Où | Effort |
 |---|---|---|---|---|
-| B1 | **Marges haut et bas** réglables (aujourd'hui 12 px fixes + position en %) | marges, 2079-2081 | `subtitles.margin_top/bottom_percent`, à côté de `margin_left/right_percent` | petit |
-| B2 | **Interligne** réglable (aujourd'hui 1,25 × la taille, fixe) | interligne | `subtitles.line_spacing` | petit |
-| B3 | **Second contour** et **ombre** (couleur, transparence, décalage) | `Dialog` 383 | `subtitles.outline2_*`, `shadow_*` ; rendu dans `ui.rs` | moyen |
-| B4 | **Échelle X / Y** du texte | style police | `subtitles.scale_x/y` | moyen |
-| B5 | **Fondu** d'apparition et de disparition | fondu | `subtitles.fade_ms` ; alpha par image | petit |
-| B6 | **Langues préférées avec priorité**, durées mini/maxi d'affichage, **piste mémorisée** | 2079 | `subtitles.preferred_languages`, `min_duration_ms`, `max_duration_ms` ; seul `default_language` existe | moyen |
+| B1 ✅ | **Marges haut et bas** réglables (aujourd'hui 12 px fixes + position en %) | marges, 2079-2081 | `subtitles.margin_top/bottom_percent`, à côté de `margin_left/right_percent` | petit |
+| B2 ✅ | **Interligne** réglable (aujourd'hui 1,25 × la taille, fixe) | interligne | `subtitles.line_spacing` | petit |
+| B3 ✅ | **Second contour** et **ombre** (couleur, transparence, décalage) | `Dialog` 383 | `subtitles.outline2_*`, `shadow_*` ; rendu dans `ui.rs` | moyen |
+| B4 ✅ | **Échelle X / Y** du texte | style police | `subtitles.scale_x/y` | moyen |
+| B5 ✅ | **Fondu** d'apparition et de disparition | fondu | `subtitles.fade_ms` ; alpha par image | petit |
+| B6 ✅ | **Langues préférées avec priorité**, durées mini/maxi d'affichage, **piste mémorisée** | 2079 | `subtitles.preferred_languages`, `min_duration_ms`, `max_duration_ms` ; seul `default_language` existe | moyen |
 
 ## Lot 3 — vidéo par libavfilter (même méthode que `verif-filtres.sh`)
 
@@ -111,3 +111,12 @@ doivent vivre avec la configuration, pas dans le cache.
 - **La qualité de rendu** de chaque fonction, par rapport à PotPlayer, n'est pas comparée ; seul
   l'effet mesuré (pixels, son, position) l'est.
 - **Les efforts** sont des ordres de grandeur, pas des engagements.
+
+## Défauts constatés en s.37 (hors lots)
+
+- **Contour de sous-titre** : sa couleur était ignorée (le texte était redessiné dans sa propre
+  couleur). Corrigé et mesuré (`verif-soustitres-style` §1) ; `verif-soustitres.sh` ne le voyait pas
+  car il fixait l'épaisseur à 0.
+- **Sous-titre intégré commencé avant un saut** : après un `seek`, une réplique de piste intégrée
+  commencée avant la position visée n'est pas relue (les cues sont vidés au saut et le paquet n'est
+  pas relu). Non corrigé ; le banc des langues mesure en lecture continue pour l'éviter.

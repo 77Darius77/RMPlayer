@@ -971,6 +971,74 @@ pub struct SubtitleSettings {
     /// Corrige un fichier dont les temps sont décalés de quelques dixièmes.
     #[serde(default)]
     pub delay_ms: i32,
+
+    // ---- Mise en page et effets (lot 2, session 37) ----
+    /// Marges haute et basse, en pourcentage de la hauteur de l'image : elles bornent la
+    /// zone verticale où `position_percent` place le bloc (comme les marges latérales).
+    #[serde(default)]
+    pub margin_top_percent: f32,
+    #[serde(default)]
+    pub margin_bottom_percent: f32,
+    /// Interligne, en multiple de la taille de police (1,25 = comportement historique).
+    #[serde(default = "default_sub_line_spacing")]
+    pub line_spacing: f32,
+    /// Ombre portée : décalage en pixels vers le bas-droite (0 = pas d'ombre).
+    #[serde(default)]
+    pub shadow_offset: f32,
+    /// Couleur de l'ombre, RRGGBB.
+    #[serde(default = "default_sub_outline")]
+    pub shadow_color: String,
+    /// Opacité de l'ombre, 0–255.
+    #[serde(default = "default_sub_shadow_alpha")]
+    pub shadow_alpha: u8,
+    /// Second contour, **autour** du premier : épaisseur en pixels (0 = aucun) et couleur.
+    #[serde(default)]
+    pub outline2_width: f32,
+    #[serde(default = "default_sub_outline")]
+    pub outline2_color: String,
+    /// Échelle horizontale et verticale du texte (1,0 = taille normale).
+    #[serde(default = "default_sub_scale")]
+    pub scale_x: f32,
+    #[serde(default = "default_sub_scale")]
+    pub scale_y: f32,
+    /// Durée du fondu d'apparition et de disparition, en millisecondes (0 = coupe franche).
+    #[serde(default)]
+    pub fade_ms: u32,
+
+    // ---- Langues, durées, mémoire de piste (lot 2, session 37) ----
+    /// Langues préférées, **par ordre de priorité** (`["fre", "eng"]`). Vide = on n'utilise
+    /// que `default_language` (comportement historique).
+    #[serde(default)]
+    pub preferred_languages: Vec<String>,
+    /// Durée d'affichage minimale / maximale d'un sous-titre, en ms (0 = pas de borne).
+    #[serde(default)]
+    pub min_duration_ms: u32,
+    #[serde(default)]
+    pub max_duration_ms: u32,
+    /// Mémoriser, par média, la piste choisie à la main (fichier externe ou piste intégrée).
+    #[serde(default)]
+    pub remember_track: bool,
+}
+
+impl SubtitleSettings {
+    /// Langues à essayer, dans l'ordre : `preferred_languages` (nettoyées, sans doublon),
+    /// sinon `default_language` seule.
+    pub fn langues_preferees(&self) -> Vec<String> {
+        let mut liste: Vec<String> = Vec::new();
+        for l in &self.preferred_languages {
+            let l = l.trim().to_lowercase();
+            if !l.is_empty() && !liste.contains(&l) {
+                liste.push(l);
+            }
+        }
+        if liste.is_empty() {
+            let d = self.default_language.trim().to_lowercase();
+            if !d.is_empty() {
+                liste.push(d);
+            }
+        }
+        liste
+    }
 }
 
 /// Paramètres interface
@@ -1144,6 +1212,15 @@ fn default_sub_color() -> String {
 }
 fn default_sub_outline() -> String {
     "000000".to_string()
+}
+fn default_sub_line_spacing() -> f32 {
+    1.25
+}
+fn default_sub_shadow_alpha() -> u8 {
+    160
+}
+fn default_sub_scale() -> f32 {
+    1.0
 }
 fn default_sub_outline_width() -> f32 {
     2.0
@@ -1336,6 +1413,21 @@ impl Default for SubtitleSettings {
             bold: false,
             italic: false,
             delay_ms: 0,
+            margin_top_percent: 0.0,
+            margin_bottom_percent: 0.0,
+            line_spacing: default_sub_line_spacing(),
+            shadow_offset: 0.0,
+            shadow_color: default_sub_outline(),
+            shadow_alpha: default_sub_shadow_alpha(),
+            outline2_width: 0.0,
+            outline2_color: default_sub_outline(),
+            scale_x: 1.0,
+            scale_y: 1.0,
+            fade_ms: 0,
+            preferred_languages: Vec::new(),
+            min_duration_ms: 0,
+            max_duration_ms: 0,
+            remember_track: false,
         }
     }
 }
@@ -2282,6 +2374,43 @@ mod tests {
         assert_eq!((l.ab_repetitions, l.ab_delay_ms), (3, 1500));
         let ancienne: PlaybackSettings = serde_json::from_str("{}").unwrap();
         assert_eq!((ancienne.ab_repetitions, ancienne.ab_delay_ms), (0, 0), "0 = sans fin, sans pause");
+    }
+
+    #[test]
+    fn le_style_des_sous_titres_se_relit_et_un_ancien_fichier_garde_l_aspect() {
+        let st: SubtitleSettings = serde_json::from_str(
+            r#"{"margin_top_percent": 10.0, "line_spacing": 2.0, "shadow_offset": 4.0,
+                "outline2_width": 3.0, "scale_x": 1.5, "fade_ms": 500}"#,
+        )
+        .unwrap();
+        assert_eq!(st.margin_top_percent, 10.0);
+        assert_eq!(st.line_spacing, 2.0);
+        assert_eq!((st.shadow_offset, st.outline2_width), (4.0, 3.0));
+        assert_eq!((st.scale_x, st.scale_y, st.fade_ms), (1.5, 1.0, 500));
+        // Un fichier d'avant le lot : l'aspect est exactement l'ancien.
+        let ancien: SubtitleSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!(ancien.line_spacing, 1.25, "interligne historique");
+        assert_eq!((ancien.margin_top_percent, ancien.margin_bottom_percent), (0.0, 0.0));
+        assert_eq!((ancien.shadow_offset, ancien.outline2_width), (0.0, 0.0));
+        assert_eq!((ancien.scale_x, ancien.scale_y, ancien.fade_ms), (1.0, 1.0, 0));
+    }
+
+    #[test]
+    fn les_langues_preferees_gardent_leur_priorite_et_retombent_sur_la_langue_par_defaut() {
+        let mut st = SubtitleSettings::default();
+        st.default_language = "fre".into();
+        assert_eq!(st.langues_preferees(), ["fre"], "liste vide : la langue par défaut seule");
+        st.preferred_languages = vec![" ENG ".into(), "fre".into(), "eng".into(), "".into()];
+        assert_eq!(st.langues_preferees(), ["eng", "fre"], "ordre conservé, doublons et vides écartés");
+        let relu: SubtitleSettings = serde_json::from_str(
+            r#"{"preferred_languages": ["ger"], "min_duration_ms": 1500, "max_duration_ms": 6000, "remember_track": true}"#,
+        )
+        .unwrap();
+        assert_eq!(relu.langues_preferees(), ["ger"]);
+        assert_eq!((relu.min_duration_ms, relu.max_duration_ms, relu.remember_track), (1500, 6000, true));
+        let ancien: SubtitleSettings = serde_json::from_str("{}").unwrap();
+        assert!(ancien.preferred_languages.is_empty() && !ancien.remember_track);
+        assert_eq!((ancien.min_duration_ms, ancien.max_duration_ms), (0, 0));
     }
 
     #[test]

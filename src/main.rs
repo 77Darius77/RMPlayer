@@ -15,6 +15,7 @@ mod instance;
 mod mpris;
 mod crash;
 mod player;
+mod pistes;
 mod positions;
 mod raccourcis;
 mod x11;

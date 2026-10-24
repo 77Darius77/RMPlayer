@@ -648,7 +648,7 @@ pub struct VideoPlayer {
     /// Utiliser les sous-titres du conteneur quand il n'y a pas de fichier externe.
     prefer_embedded_subs: bool,
     /// Langue de sous-titres demandée ("" = première piste textuelle).
-    subtitle_language: String,
+    subtitle_language: Vec<String>,
     /// Chaîne de filtres audio (égaliseur). Créée à la première frame audio
     /// lorsque l'égaliseur est actif.
     audio_filters: Option<Box<AudioFilterChain>>,
@@ -781,7 +781,7 @@ impl VideoPlayer {
             bitmap_cues: VecDeque::new(),
             audio_language: config.audio.default_language.clone(),
             prefer_embedded_subs: config.subtitles.use_embedded,
-            subtitle_language: config.subtitles.default_language.clone(),
+            subtitle_language: config.subtitles.langues_preferees(),
             audio_filters: None,
             audio_filters_failed: None,
             audio_filters_description,
@@ -1180,15 +1180,15 @@ impl VideoPlayer {
     pub fn set_track_preferences(
         &mut self,
         audio_language: &str,
-        subtitle_language: &str,
+        subtitle_languages: &[String],
         prefer_embedded: bool,
     ) {
         self.audio_language = audio_language.to_string();
-        self.subtitle_language = subtitle_language.to_string();
+        self.subtitle_language = subtitle_languages.to_vec();
         self.prefer_embedded_subs = prefer_embedded;
         if prefer_embedded && self.subtitle_decoder.is_none() {
             if let Some(info) = self.media_info.as_ref() {
-                if let Some(piste) = choisir_piste(&info.subtitle_tracks, subtitle_language) {
+                if let Some(piste) = choisir_piste_langues(&info.subtitle_tracks, &self.subtitle_language) {
                     let index = piste.index;
                     if let Err(e) = self.select_subtitle_stream(index) {
                         tracing::warn!("Sous-titres embarqués indisponibles : {}", e);
@@ -1204,13 +1204,14 @@ impl VideoPlayer {
     }
 
     /// Texte du sous-titre embarqué à la position donnée.
-    pub fn embedded_text_at(&self, position_ms: u64) -> Option<String> {
+    pub fn embedded_text_at(&self, position_ms: u64, min_ms: u64, max_ms: u64) -> Option<String> {
         if self.subtitle_decoder.as_ref().map(|s| s.bitmap).unwrap_or(true) {
             return None;
         }
         let mut textes: Vec<&str> = Vec::new();
         for cue in &self.embedded_cues {
-            if position_ms >= cue.start_ms && position_ms < cue.end_ms {
+            let fin = crate::subtitles::fin_effective(cue.start_ms, cue.end_ms, min_ms, max_ms);
+            if position_ms >= cue.start_ms && position_ms < fin {
                 textes.push(&cue.text);
             }
         }
@@ -1219,6 +1220,21 @@ impl VideoPlayer {
         } else {
             Some(textes.join("\n"))
         }
+    }
+
+    /// Début et fin de l'ensemble des sous-titres texte intégrés affichés à cette position.
+    pub fn embedded_bounds_at(&self, position_ms: u64, min_ms: u64, max_ms: u64) -> Option<(u64, u64)> {
+        let mut bornes: Option<(u64, u64)> = None;
+        for cue in &self.embedded_cues {
+            let fin = crate::subtitles::fin_effective(cue.start_ms, cue.end_ms, min_ms, max_ms);
+            if position_ms >= cue.start_ms && position_ms < fin {
+                bornes = Some(match bornes {
+                    None => (cue.start_ms, fin),
+                    Some((d, f)) => (d.min(cue.start_ms), f.max(fin)),
+                });
+            }
+        }
+        bornes
     }
 
     /// Sous-titre **image** actif à la position donnée (PGS, DVD, DVB).
@@ -1970,7 +1986,7 @@ impl VideoPlayer {
                 // Toutes les pistes sont candidates : les pistes **image**
                 // (PGS des Blu-ray, sous-images DVD, DVB) sont rendues comme
                 // des bitmaps composés sur la vidéo depuis la session 23.
-                match choisir_piste(&subtitle_tracks, &self.subtitle_language) {
+                match choisir_piste_langues(&subtitle_tracks, &self.subtitle_language) {
                     Some(piste) => {
                         tracing::info!("Sous-titres embarqués retenus : {}", piste.label());
                         let index = piste.index;
@@ -4606,6 +4622,25 @@ unsafe fn stream_metadata(dict: *mut AVDictionary, cle: &str) -> String {
 ///     utilisent indifféremment les codes ISO 639-1 et 639-2 ;
 ///  3. sinon la première piste : un fichier sans métadonnée de langue doit rester
 ///     lisible exactement comme avant.
+/// Piste de sous-titres selon une liste de langues **par ordre de priorité** : la première
+/// langue qui a une piste l'emporte ; si aucune n'en a, la première piste du fichier.
+fn choisir_piste_langues<'a>(pistes: &'a [TrackInfo], langues: &[String]) -> Option<&'a TrackInfo> {
+    for langue in langues {
+        let demande = langue.trim().to_lowercase();
+        if demande.is_empty() {
+            continue;
+        }
+        let court = &demande[..demande.len().min(2)];
+        if let Some(t) = pistes.iter().find(|t| t.language.to_lowercase() == demande) {
+            return Some(t);
+        }
+        if let Some(t) = pistes.iter().find(|t| t.language.to_lowercase().starts_with(court)) {
+            return Some(t);
+        }
+    }
+    pistes.first()
+}
+
 fn choisir_piste<'a>(pistes: &'a [TrackInfo], langue: &str) -> Option<&'a TrackInfo> {
     if pistes.is_empty() {
         return None;
@@ -7023,5 +7058,36 @@ mod tests_aleatoire {
         std::thread::sleep(std::time::Duration::from_millis(2));
         let s2 = super::graine_aleatoire();
         assert_ne!(s1, s2, "la graine ne varie pas : parcours identique à chaque lancement");
+    }
+}
+
+#[cfg(test)]
+mod tests_langues {
+    use super::*;
+
+    fn piste(index: i32, langue: &str) -> TrackInfo {
+        TrackInfo {
+            index,
+            codec: "SubRip".into(),
+            language: langue.to_string(),
+            title: String::new(),
+            channels: 0,
+            sample_rate: 0,
+            bitmap: false,
+        }
+    }
+
+    #[test]
+    fn la_premiere_langue_qui_a_une_piste_l_emporte() {
+        let pistes = [piste(1, "eng"), piste(2, "fre")];
+        let langues = |l: &[&str]| l.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(choisir_piste_langues(&pistes, &langues(&["fre", "eng"])).unwrap().index, 2);
+        assert_eq!(choisir_piste_langues(&pistes, &langues(&["eng", "fre"])).unwrap().index, 1);
+        // Langue absente en tête : on passe à la suivante.
+        assert_eq!(choisir_piste_langues(&pistes, &langues(&["ger", "fre"])).unwrap().index, 2);
+        // Aucune ne convient : la première piste du fichier (comportement historique).
+        assert_eq!(choisir_piste_langues(&pistes, &langues(&["ger"])).unwrap().index, 1);
+        assert_eq!(choisir_piste_langues(&pistes, &[]).unwrap().index, 1);
+        assert!(choisir_piste_langues(&[], &langues(&["fre"])).is_none());
     }
 }

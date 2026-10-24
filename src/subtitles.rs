@@ -38,6 +38,9 @@ pub struct SubtitleManager {
     active_subtitle: Option<usize>,
     /// Visible
     visible: bool,
+    /// Durées d'affichage minimale / maximale en ms (0 = pas de borne).
+    duree_min_ms: u64,
+    duree_max_ms: u64,
 }
 
 impl SubtitleManager {
@@ -48,7 +51,16 @@ impl SubtitleManager {
             subtitles: Vec::new(),
             active_subtitle: None,
             visible: true,
+            duree_min_ms: 0,
+            duree_max_ms: 0,
         }
+    }
+
+    /// Bornes d'affichage d'un sous-titre (0 = pas de borne) ; réglées à chaque image par
+    /// l'interface, qui lit la configuration.
+    pub fn set_durees(&mut self, min_ms: u64, max_ms: u64) {
+        self.duree_min_ms = min_ms;
+        self.duree_max_ms = max_ms;
     }
     
     /// Charger un fichier de sous-titres (ASS/SSA ou SRT selon l'extension)
@@ -255,17 +267,22 @@ impl SubtitleManager {
     /// Charge automatiquement les sous-titres d'un média.
     ///
     /// Ordre de préférence (le premier chargé devient la piste active) :
-    ///   1. `<nom>.<langue>.<ext>`  — piste correspondant à la langue demandée
+    ///   1. `<nom>.<langue>.<ext>`  — une langue après l'autre, **dans l'ordre de priorité** de
+    ///      `langues` ; une langue sans fichier est simplement sautée
     ///   2. `<nom>.<ext>`           — piste homonyme sans suffixe de langue
     ///   3. fichiers des sous-dossiers (`subs/`, `subtitles/`, `sous-titres/`, `sub/`)
-    ///      contenant la langue demandée, puis les autres
-    pub fn auto_load(&mut self, video_path: &Path, preferred_language: &str) {
+    ///      contenant l'une des langues demandées (dans l'ordre), puis les autres
+    pub fn auto_load(&mut self, video_path: &Path, langues: &[String]) {
         let dir = video_path.parent().unwrap_or(Path::new(""));
         let stem = video_path
             .file_stem()
             .map(|s| s.to_string_lossy().to_string())
             .unwrap_or_default();
-        let lang = preferred_language.trim().to_lowercase();
+        let langues: Vec<String> = langues
+            .iter()
+            .map(|l| l.trim().to_lowercase())
+            .filter(|l| !l.is_empty())
+            .collect();
         let extensions = ["ass", "ssa", "srt", "sub"];
 
         let mut candidates: Vec<PathBuf> = Vec::new();
@@ -275,8 +292,8 @@ impl SubtitleManager {
             }
         };
 
-        // 1) homonymes avec suffixe de langue
-        if !lang.is_empty() {
+        // 1) homonymes avec suffixe de langue, langue par langue
+        for lang in &langues {
             for ext in &extensions {
                 push_unique(&mut candidates, dir.join(format!("{}.{}.{}", stem, lang, ext)));
             }
@@ -292,7 +309,8 @@ impl SubtitleManager {
                 .unwrap_or(false)
         };
         let subdirs = ["subs", "subtitles", "sous-titres", "sub"];
-        let mut preferred: Vec<PathBuf> = Vec::new();
+        // Fichiers de langue souhaitée, rangés par priorité de langue (0 = la plus voulue).
+        let mut preferred: Vec<(usize, PathBuf)> = Vec::new();
         let mut others: Vec<PathBuf> = Vec::new();
         for subdir in &subdirs {
             let sub_path = dir.join(subdir);
@@ -311,18 +329,19 @@ impl SubtitleManager {
                     .file_name()
                     .map(|n| n.to_string_lossy().to_lowercase())
                     .unwrap_or_default();
-                let matches_lang = !lang.is_empty()
-                    && (name.contains(&format!(".{}.", lang))
-                        || name.contains(&format!("{}.", lang))
-                        || name.starts_with(&stem));
-                if matches_lang {
-                    push_unique(&mut preferred, path);
-                } else {
-                    push_unique(&mut others, path);
+                let rang = langues.iter().position(|lang| {
+                    name.contains(&format!(".{}.", lang)) || name.contains(&format!("{}.", lang))
+                });
+                let homonyme = !langues.is_empty() && name.starts_with(&stem);
+                match rang {
+                    Some(r) => preferred.push((r, path)),
+                    None if homonyme => preferred.push((langues.len(), path)),
+                    None => push_unique(&mut others, path),
                 }
             }
         }
-        for path in preferred.into_iter().chain(others) {
+        preferred.sort_by_key(|(rang, _)| *rang);
+        for path in preferred.into_iter().map(|(_, p)| p).chain(others) {
             push_unique(&mut candidates, path);
         }
 
@@ -356,7 +375,8 @@ impl SubtitleManager {
         if let Some(idx) = self.active_subtitle {
             if let Some(subtitle) = self.subtitles.get(idx) {
                 for event in &subtitle.events {
-                    if time_ms >= event.start_ms && time_ms <= event.end_ms {
+                    let fin = fin_effective(event.start_ms, event.end_ms, self.duree_min_ms, self.duree_max_ms);
+                    if time_ms >= event.start_ms && time_ms <= fin {
                         // Nettoyer les codes de style ASS ({\pos(...)}, {\c...}, etc.)
                         let clean_text = Self::clean_ass_tags(&event.text);
                         result.push(clean_text);
@@ -414,6 +434,22 @@ impl SubtitleManager {
         clean
     }
     
+    /// Chemin du fichier de sous-titres actif.
+    pub fn active_path(&self) -> Option<PathBuf> {
+        self.subtitles.get(self.active_subtitle?).map(|s| s.path.clone())
+    }
+
+    /// Rend actif le fichier chargé qui porte ce chemin ; faux s'il n'est pas chargé.
+    pub fn select_path(&mut self, chemin: &Path) -> bool {
+        match self.subtitles.iter().position(|s| s.path == chemin) {
+            Some(i) => {
+                self.active_subtitle = Some(i);
+                true
+            }
+            None => false,
+        }
+    }
+
     /// Changer le sous-titre actif
     pub fn next_subtitle(&mut self) {
         if self.subtitles.is_empty() {
@@ -471,8 +507,85 @@ impl SubtitleManager {
         self.subtitles.get(i)?.ass.as_ref()
     }
 
+    /// Début le plus tôt et fin la plus tardive des événements affichés à cet instant :
+    /// c'est la fenêtre dans laquelle le fondu s'applique.
+    pub fn active_bounds(&self, time_ms: u64) -> Option<(u64, u64)> {
+        if !self.visible {
+            return None;
+        }
+        let subtitle = self.subtitles.get(self.active_subtitle?)?;
+        let mut bornes: Option<(u64, u64)> = None;
+        for e in &subtitle.events {
+            let fin = fin_effective(e.start_ms, e.end_ms, self.duree_min_ms, self.duree_max_ms);
+            if time_ms >= e.start_ms && time_ms <= fin {
+                bornes = Some(match bornes {
+                    None => (e.start_ms, fin),
+                    Some((d, f)) => (d.min(e.start_ms), f.max(fin)),
+                });
+            }
+        }
+        bornes
+    }
+
     pub fn render_active(&self, time_ms: u64) -> String {
         let subs = self.get_active_subtitles(time_ms);
         subs.join("\n")
+    }
+}
+
+/// Fin d'affichage d'un sous-titre une fois appliquées les durées minimale et maximale
+/// (0 = pas de borne). Le maximum l'emporte sur le minimum s'ils se contredisent.
+pub fn fin_effective(debut_ms: u64, fin_ms: u64, min_ms: u64, max_ms: u64) -> u64 {
+    let mut fin = fin_ms;
+    if min_ms > 0 {
+        fin = fin.max(debut_ms + min_ms);
+    }
+    if max_ms > 0 {
+        fin = fin.min(debut_ms + max_ms);
+    }
+    fin
+}
+
+/// Opacité (0–1) d'un sous-titre affiché de `debut_ms` à `fin_ms`, avec un fondu de
+/// `fondu_ms` à l'apparition et à la disparition. Sans fondu (0), toujours 1. Si le sous-titre
+/// est plus court que deux fondus, ils se rejoignent : l'opacité maximale est alors inférieure à 1.
+pub fn opacite_fondu(position_ms: u64, debut_ms: u64, fin_ms: u64, fondu_ms: u32) -> f32 {
+    if fondu_ms == 0 {
+        return 1.0;
+    }
+    let f = fondu_ms as f32;
+    let depuis_debut = position_ms.saturating_sub(debut_ms) as f32;
+    let avant_fin = fin_ms.saturating_sub(position_ms) as f32;
+    (depuis_debut / f).min(avant_fin / f).clamp(0.0, 1.0)
+}
+
+#[cfg(test)]
+mod tests_fondu {
+    use super::{fin_effective, opacite_fondu};
+
+    #[test]
+    fn les_durees_mini_et_maxi_bornent_la_fin() {
+        assert_eq!(fin_effective(2_000, 3_000, 0, 0), 3_000);
+        assert_eq!(fin_effective(2_000, 3_000, 3_000, 0), 5_000, "minimum : prolongé");
+        assert_eq!(fin_effective(6_000, 11_000, 0, 1_000), 7_000, "maximum : raccourci");
+        assert_eq!(fin_effective(0, 5_000, 4_000, 2_000), 2_000, "le maximum l'emporte");
+        assert_eq!(fin_effective(0, 5_000, 1_000, 9_000), 5_000, "déjà dans les bornes");
+    }
+
+    #[test]
+    fn le_fondu_monte_puis_descend() {
+        // Sous-titre de 2 s à 10 s, fondu d'1 s.
+        assert_eq!(opacite_fondu(2_000, 2_000, 10_000, 1_000), 0.0);
+        assert!((opacite_fondu(2_500, 2_000, 10_000, 1_000) - 0.5).abs() < 1e-6);
+        assert_eq!(opacite_fondu(6_000, 2_000, 10_000, 1_000), 1.0);
+        assert!((opacite_fondu(9_700, 2_000, 10_000, 1_000) - 0.3).abs() < 1e-6);
+        assert_eq!(opacite_fondu(10_000, 2_000, 10_000, 1_000), 0.0);
+    }
+
+    #[test]
+    fn sans_fondu_l_opacite_est_pleine_et_un_sous_titre_court_ne_depasse_pas_la_moitie() {
+        assert_eq!(opacite_fondu(2_000, 2_000, 10_000, 0), 1.0);
+        // 600 ms d'affichage avec un fondu d'1 s : au milieu, 0,3.
+        assert!((opacite_fondu(300, 0, 600, 1_000) - 0.3).abs() < 1e-6);
     }
 }

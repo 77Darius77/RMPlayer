@@ -96,6 +96,8 @@ run verif-regles tools/verif-regles.sh "$DISP"
 run verif-ass-clip tools/verif-ass-clip.sh "$DISP"
 run verif-precache tools/verif-precache.sh "$DISP"
 run verif-soustitres tools/verif-soustitres.sh "$DISP"
+run verif-soustitres-style tools/verif-soustitres-style.sh "$DISP"
+run verif-soustitres-langues tools/verif-soustitres-langues.sh "$DISP"
 # Son propre écran (:98, 1280×800) : le banc recentre la fenêtre en (240,200), calcul qui
 # suppose cette taille ; il démarre lui-même son Xvfb et le ferait échouer sur :99.
 run verif-fenetre tools/verif-fenetre.sh :98

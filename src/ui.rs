@@ -94,6 +94,8 @@ pub struct App {
     video_texture: Option<egui::TextureHandle>,
     /// Table des raccourcis effective (défauts + personnalisation).
     pub(crate) raccourcis: TableauRaccourcis,
+    /// Piste de sous-titres choisie à la main, par média (si `subtitles.remember_track`).
+    pistes_choisies: crate::pistes::PistesChoisies,
     /// Action en attente de capture (réglages : « appuyez sur une touche »).
     pub(crate) capture_raccourci: Option<Action>,
     /// Mode **réglage du recadrage** : l'image d'origine est affichée (recadrage
@@ -328,6 +330,76 @@ pub fn installer_police_sous_titre(ctx: &egui::Context, font_family: &str) {
 }
 
 /// `FontId` du texte des sous-titres : la famille choisie, ou la police par défaut.
+/// 16 directions unitaires pour dessiner un contour par copies décalées du texte.
+const DIRECTIONS_CONTOUR: [(f32, f32); 16] = [
+    (1.0, 0.0), (0.924, 0.383), (0.707, 0.707), (0.383, 0.924),
+    (0.0, 1.0), (-0.383, 0.924), (-0.707, 0.707), (-0.924, 0.383),
+    (-1.0, 0.0), (-0.924, -0.383), (-0.707, -0.707), (-0.383, -0.924),
+    (0.0, -1.0), (0.383, -0.924), (0.707, -0.707), (0.924, -0.383),
+];
+
+/// Rayons (en pixels) auxquels le texte est recopié pour former un contour plein de
+/// l'épaisseur demandée : un pas d'un pixel, jusqu'au rayon voulu.
+fn rayons_contour(epaisseur: f32) -> Vec<f32> {
+    if epaisseur <= 0.0 {
+        return Vec::new();
+    }
+    let mut rayons: Vec<f32> = (1..=epaisseur.floor() as u32).map(|r| r as f32).collect();
+    if rayons.last().copied().unwrap_or(0.0) < epaisseur {
+        rayons.push(epaisseur);
+    }
+    rayons
+}
+
+/// Applique une opacité (0–1) à une couleur de sous-titre.
+///
+/// Un contour ou une ombre sont faits de nombreuses copies superposées du texte : une
+/// opacité partielle se **cumulerait** (1 − (1 − a)^n) et le fondu ne se verrait pas sur
+/// elles. Pour ces copies (`copies = true`) on prend l'opacité qui, cumulée sur ≈ 6 copies
+/// qui se recouvrent, redonne l'opacité visée.
+fn avec_alpha(couleur: egui::Color32, opacite: f32, copies: bool) -> egui::Color32 {
+    let a = opacite.clamp(0.0, 1.0);
+    let par_copie = if copies && a < 1.0 { 1.0 - (1.0 - a).powf(1.0 / 6.0) } else { a };
+    couleur.gamma_multiply(par_copie)
+}
+
+/// Dessine un texte déjà mis en forme, à l'échelle `(sx, sy)` depuis son coin haut-gauche.
+///
+/// À l'échelle 1 c'est `Painter::galley`. Sinon les maillages des lignes sont recopiés avec
+/// leurs sommets étirés : egui ne sait pas étirer un texte d'un facteur différent en X et en Y.
+fn peindre_galley(
+    ctx: &egui::Context,
+    painter: &egui::Painter,
+    pos: egui::Pos2,
+    galley: &std::sync::Arc<egui::Galley>,
+    couleur: egui::Color32,
+    sx: f32,
+    sy: f32,
+) {
+    if (sx - 1.0).abs() < 0.005 && (sy - 1.0).abs() < 0.005 {
+        painter.galley(pos, galley.clone(), couleur);
+        return;
+    }
+    let [w, h] = ctx.fonts(|f| f.font_image_size());
+    let normalisation = egui::vec2(1.0 / w as f32, 1.0 / h as f32);
+    let mut maillage = egui::epaint::Mesh::default();
+    for ligne in &galley.rows {
+        let decalage = maillage.vertices.len() as u32;
+        maillage
+            .indices
+            .extend(ligne.row.visuals.mesh.indices.iter().map(|i| i + decalage));
+        for sommet in &ligne.row.visuals.mesh.vertices {
+            let local = ligne.pos.to_vec2() + sommet.pos.to_vec2();
+            maillage.vertices.push(egui::epaint::Vertex {
+                pos: pos + egui::vec2(local.x * sx, local.y * sy),
+                uv: (sommet.uv.to_vec2() * normalisation).to_pos2(),
+                color: if sommet.color == egui::Color32::PLACEHOLDER { couleur } else { sommet.color },
+            });
+        }
+    }
+    painter.add(egui::Shape::mesh(maillage));
+}
+
 fn police_sous_titre(taille: f32, famille: &str) -> egui::FontId {
     if famille.trim().is_empty() {
         egui::FontId::proportional(taille)
@@ -490,6 +562,7 @@ impl App {
             frame_counter: 0,
             video_texture: None,
             raccourcis,
+            pistes_choisies: crate::pistes::PistesChoisies::load(),
             capture_raccourci: None,
             crop_reglage: false,
             molette_accumulee: 0.0,
@@ -572,6 +645,37 @@ impl App {
         Some(nom)
     }
 
+    /// Rappelle la piste de sous-titres que l'utilisateur avait choisie pour ce média
+    /// (réglage « mémoriser la piste »). Sans mémoire pour ce média, rien ne change.
+    fn rappeler_piste_choisie(&mut self, media: &Path) {
+        if !self.config.subtitles.remember_track {
+            return;
+        }
+        match self.pistes_choisies.get(media) {
+            Some(crate::pistes::Choix::Externe(fichier)) => {
+                if self.subtitles.select_path(&fichier) {
+                    tracing::info!("Piste de sous-titres rappelée : {}", fichier.display());
+                }
+            }
+            Some(crate::pistes::Choix::Integree(index)) => {
+                if self.player.select_subtitle_stream(index).is_ok() {
+                    tracing::info!("Piste intégrée rappelée : {}", index);
+                }
+            }
+            None => {}
+        }
+    }
+
+    /// Note la piste que l'utilisateur vient de choisir, pour le média ouvert.
+    fn memoriser_piste_choisie(&mut self, choix: crate::pistes::Choix) {
+        if !self.config.subtitles.remember_track {
+            return;
+        }
+        if let Some(media) = self.player.current_path().cloned() {
+            self.pistes_choisies.set(&media, &choix);
+        }
+    }
+
     /// Travaux d'interface après l'ouverture d'un média (rendu + sous-titres).
     fn after_media_loaded(&mut self, path: &Path) {
         // Tous les chemins d'ouverture (fichier choisi, playlist, suivant, glisser-déposer,
@@ -582,11 +686,12 @@ impl App {
         self.renderer.update_frame(vec![], 0, 0);
         if self.config.subtitles.auto_load {
             self.subtitles = SubtitleManager::new();
-            self.subtitles.auto_load(path, &self.config.subtitles.default_language);
+            self.subtitles.auto_load(path, &self.config.subtitles.langues_preferees());
             if self.subtitles.count() > 0 {
                 self.subtitles.set_visible(true);
             }
         }
+        self.rappeler_piste_choisie(path);
     }
 
     /// Ouvre l'élément `index` de la playlist en mettant à jour l'index courant
@@ -2115,8 +2220,16 @@ impl App {
         // Priorité au fichier externe (choix explicite de l'utilisateur : il a
         // chargé un SRT, c'est celui-là qu'il veut voir). À défaut, la piste
         // embarquée du conteneur.
+        let (duree_min, duree_max) = (
+            self.config.subtitles.min_duration_ms as u64,
+            self.config.subtitles.max_duration_ms as u64,
+        );
+        self.subtitles.set_durees(duree_min, duree_max);
         let externe = self.subtitles.render_active(position);
+        // Fenêtre d'affichage du sous-titre courant : sert au fondu.
+        let mut bornes: Option<(u64, u64)> = None;
         let text = if !externe.trim().is_empty() {
+            bornes = self.subtitles.active_bounds(position);
             externe
         } else if self.config.subtitles.use_embedded {
             // Piste **image** (PGS des Blu-ray, sous-image DVD) : les pixels de la
@@ -2130,8 +2243,9 @@ impl App {
                     return;
                 }
             }
+            bornes = self.player.embedded_bounds_at(position, duree_min, duree_max);
             self.player
-                .embedded_text_at(position)
+                .embedded_text_at(position, duree_min, duree_max)
                 .unwrap_or_default()
         } else {
             String::new()
@@ -2139,6 +2253,15 @@ impl App {
         if text.trim().is_empty() {
             return;
         }
+        let opacite = match bornes {
+            Some((debut, fin)) => crate::subtitles::opacite_fondu(
+                position,
+                debut,
+                fin,
+                self.config.subtitles.fade_ms.min(5_000),
+            ),
+            None => 1.0,
+        };
 
         // On se limite à la zone RÉELLEMENT visible (l'image peut déborder et
         // être rognée par le panneau).
@@ -2149,15 +2272,20 @@ impl App {
         let painter = ui.painter();
 
         // --- Apparence : tous les paramètres viennent des préférences ---
-        // Aucun n'est décoratif : chacun modifie un pixel du rendu, et le banc
-        // d'essai (tools/verif-soustitres.sh) les vérifie un par un.
+        // Aucun n'est décoratif : chacun modifie un pixel du rendu, et les bancs d'essai
+        // (tools/verif-soustitres.sh, verif-soustitres-style.sh) les vérifient un par un.
         let st = &self.config.subtitles;
         let font_size = st.font_size.clamp(8.0, 160.0);
         let couleur_texte = parse_couleur(&st.color).unwrap_or(egui::Color32::WHITE);
         let couleur_contour = parse_couleur(&st.outline_color).unwrap_or(egui::Color32::BLACK);
         let epaisseur = st.outline_width.clamp(0.0, 6.0);
-        let alpha_fond = st.background_alpha;
-        let position = st.position_percent.clamp(0.0, 100.0) / 100.0;
+        let epaisseur2 = st.outline2_width.clamp(0.0, 6.0);
+        let couleur_contour2 = parse_couleur(&st.outline2_color).unwrap_or(egui::Color32::BLACK);
+        let decalage_ombre = st.shadow_offset.clamp(0.0, 12.0);
+        let couleur_ombre = parse_couleur(&st.shadow_color).unwrap_or(egui::Color32::BLACK);
+        let alpha_ombre = st.shadow_alpha as f32 / 255.0;
+        let alpha_fond = (st.background_alpha as f32 * opacite) as u8;
+        let position_v = st.position_percent.clamp(0.0, 100.0) / 100.0;
         let alignement = st.align.min(2);
         // Position horizontale libre : 50 % = centre (comportement historique).
         // `align` dit où est ancré le bloc par rapport à ce point.
@@ -2174,6 +2302,15 @@ impl App {
             egui::pos2(rect.left() + marge_g, rect.top()),
             egui::pos2((rect.right() - marge_d).max(rect.left() + marge_g + 20.0), rect.bottom()),
         );
+        // Marges haute et basse (session 37) : elles bornent la zone verticale où
+        // `position_percent` place le bloc, comme les marges latérales bornent l'horizontale.
+        let marge_haut = (st.margin_top_percent.clamp(0.0, 45.0) / 100.0) * rect.height();
+        let marge_bas = (st.margin_bottom_percent.clamp(0.0, 45.0) / 100.0) * rect.height();
+        let zone_haut = rect.top() + marge_haut;
+        let zone_bas = (rect.bottom() - marge_bas).max(zone_haut + 20.0);
+        let interligne = st.line_spacing.clamp(0.8, 3.0);
+        let echelle_x = st.scale_x.clamp(0.5, 2.0);
+        let echelle_y = st.scale_y.clamp(0.5, 2.0);
 
         // Le gras s'obtient en épaississant le rendu : egui n'a pas de graisse
         // « bold » pour la police par défaut, on redessine donc le texte avec un
@@ -2181,10 +2318,10 @@ impl App {
         let graisse = if st.bold { 0.7 } else { 0.0 };
 
         let lines: Vec<&str> = text.lines().collect();
-        let line_height = font_size * 1.25;
+        let line_height = font_size * interligne * echelle_y;
         let text_h = line_height * lines.len() as f32 + 12.0;
-        // Position verticale : `position` = 0 en haut, 1 en bas de l'image.
-        let haut_bande = rect.top() + (rect.height() - text_h) * position;
+        // Position verticale : `position_v` = 0 en haut, 1 en bas de la zone.
+        let haut_bande = zone_haut + (zone_bas - zone_haut - text_h) * position_v;
         let band = egui::Rect::from_min_max(
             egui::pos2(zone.left(), haut_bande),
             egui::pos2(zone.right(), haut_bande + text_h),
@@ -2196,12 +2333,17 @@ impl App {
                 egui::Color32::from_black_alpha(alpha_fond),
             );
         }
+        let ctx = ui.ctx().clone();
 
         let mut y = band.top() + 6.0;
         for line in lines {
+            // Les galleys sont posés avec la couleur « à remplir » (PLACEHOLDER) : c'est la
+            // couleur donnée à `peindre_galley` qui s'applique. Avec une couleur figée dans le
+            // galley, le contour était redessiné dans la couleur du TEXTE (défaut trouvé en
+            // session 37 : le contour ne changeait jamais de couleur).
             // Interlettre : `layout_no_wrap` ne l'expose pas, on passe donc par un
             // `LayoutJob` d'un seul bloc de texte. À zéro (défaut), le rendu est
-            // identique à avant — vérifié par le banc (aucune image ne change).
+            // identique à avant.
             let galley = if interlettre.abs() > 0.01 {
                 let mut job = egui::text::LayoutJob::default();
                 job.append(
@@ -2209,7 +2351,7 @@ impl App {
                     0.0,
                     egui::TextFormat {
                         font_id: police_sous_titre(font_size, &famille),
-                        color: couleur_texte,
+                        color: egui::Color32::PLACEHOLDER,
                         extra_letter_spacing: interlettre,
                         ..Default::default()
                     },
@@ -2219,44 +2361,59 @@ impl App {
                 painter.layout_no_wrap(
                     line.to_string(),
                     police_sous_titre(font_size, &famille),
-                    couleur_texte,
+                    egui::Color32::PLACEHOLDER,
                 )
             };
+            let largeur = galley.size().x * echelle_x;
             // Ancre horizontale : le pourcentage choisi, puis le bloc est posé
             // selon `align` (début / centre / fin sur cette ancre). Avec la valeur
             // par défaut (50 %, centre) on retrouve exactement l'ancien calcul.
             // L'ancre est prise **dans la zone bornée par les marges**.
             let ancre = zone.left() + zone.width() * position_h;
             let x = match alignement {
-                0 => ancre.clamp(zone.left(), (zone.right() - galley.size().x).max(zone.left())),
-                2 => (ancre - galley.size().x).clamp(zone.left(), (zone.right() - galley.size().x).max(zone.left())),
-                _ => (ancre - galley.size().x / 2.0)
-                    .clamp(zone.left(), (zone.right() - galley.size().x).max(zone.left())),
+                0 => ancre.clamp(zone.left(), (zone.right() - largeur).max(zone.left())),
+                2 => (ancre - largeur).clamp(zone.left(), (zone.right() - largeur).max(zone.left())),
+                _ => (ancre - largeur / 2.0)
+                    .clamp(zone.left(), (zone.right() - largeur).max(zone.left())),
             };
             let pos = egui::pos2(x, y);
-            // Contour : 8 directions dès que l'épaisseur dépasse 1 px (un contour
-            // à 4 directions laisse des trous sur les diagonales).
-            if epaisseur > 0.0 {
-                let directions: Vec<(f32, f32)> = if epaisseur > 1.0 {
-                    vec![
-                        (-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0),
-                        (-0.7, -0.7), (0.7, -0.7), (-0.7, 0.7), (0.7, 0.7),
-                    ]
-                } else {
-                    vec![(-1.0, 0.0), (1.0, 0.0), (0.0, -1.0), (0.0, 1.0)]
-                };
-                for (dx, dy) in directions {
-                    let d = egui::vec2(dx * epaisseur, dy * epaisseur);
-                    painter.galley(pos + d, galley.clone(), couleur_contour);
-                    if graisse > 0.0 {
-                        painter.galley(pos + d + egui::vec2(graisse, 0.0), galley.clone(), couleur_contour);
+            let rayon_ext = epaisseur + epaisseur2;
+            let peindre = |p: egui::Pos2, couleur: egui::Color32| {
+                peindre_galley(&ctx, painter, p, &galley, couleur, echelle_x, echelle_y);
+            };
+            // Ombre : la silhouette (texte + contours) décalée vers le bas-droite.
+            if decalage_ombre > 0.0 && alpha_ombre > 0.0 {
+                let decale = pos + egui::vec2(decalage_ombre, decalage_ombre);
+                let couleur = avec_alpha(couleur_ombre, alpha_ombre * opacite, true);
+                for rayon in rayons_contour(rayon_ext) {
+                    for (dx, dy) in DIRECTIONS_CONTOUR {
+                        peindre(decale + egui::vec2(dx * rayon, dy * rayon), couleur);
+                    }
+                }
+                peindre(decale, couleur);
+            }
+            // Contours, du plus large au plus proche du texte : second contour d'abord.
+            if epaisseur2 > 0.0 {
+                let couleur = avec_alpha(couleur_contour2, opacite, true);
+                for rayon in rayons_contour(rayon_ext) {
+                    for (dx, dy) in DIRECTIONS_CONTOUR {
+                        peindre(pos + egui::vec2(dx * rayon, dy * rayon), couleur);
                     }
                 }
             }
-            painter.galley(pos, galley.clone(), couleur_texte);
+            if epaisseur > 0.0 {
+                let couleur = avec_alpha(couleur_contour, opacite, true);
+                for rayon in rayons_contour(epaisseur) {
+                    for (dx, dy) in DIRECTIONS_CONTOUR {
+                        peindre(pos + egui::vec2(dx * rayon, dy * rayon), couleur);
+                    }
+                }
+            }
+            let couleur = avec_alpha(couleur_texte, opacite, false);
+            peindre(pos, couleur);
             if graisse > 0.0 {
                 // Faux gras : second passage décalé (même technique que le contour).
-                painter.galley(pos + egui::vec2(graisse, 0.0), galley, couleur_texte);
+                peindre(pos + egui::vec2(graisse, 0.0), couleur);
             }
             y += line_height;
         }
@@ -2775,6 +2932,9 @@ impl eframe::App for App {
                                 self.annonce("Aucune piste de sous-titres externe");
                             } else {
                                 self.subtitles.next_subtitle();
+                                if let Some(f) = self.subtitles.active_path() {
+                                    self.memoriser_piste_choisie(crate::pistes::Choix::Externe(f));
+                                }
                                 let nom = self.subtitles.active_name().unwrap_or_default();
                                 tracing::info!("Piste de sous-titres: {}", nom);
                                 self.annonce(&format!("Piste de sous-titres : {}", nom));
@@ -3178,7 +3338,7 @@ impl eframe::App for App {
                             let _ = self.config.save();
                             self.player.set_track_preferences(
                                 &self.config.audio.default_language,
-                                &self.config.subtitles.default_language,
+                                &self.config.subtitles.langues_preferees(),
                                 self.config.subtitles.use_embedded,
                             );
                         }
@@ -3210,7 +3370,7 @@ impl eframe::App for App {
                         let _ = self.config.save();
                         self.player.set_track_preferences(
                             &self.config.audio.default_language,
-                            &self.config.subtitles.default_language,
+                            &self.config.subtitles.langues_preferees(),
                             self.config.subtitles.use_embedded,
                         );
                         if !self.config.subtitles.use_embedded {
@@ -3255,6 +3415,9 @@ impl eframe::App for App {
                         if let Some(index) = choisie {
                             match self.player.select_subtitle_stream(index) {
                                 Ok(()) => {
+                                    if index >= 0 {
+                                        self.memoriser_piste_choisie(crate::pistes::Choix::Integree(index));
+                                    }
                                     self.subtitles.set_visible(index >= 0);
                                     self.player.subtitles_visible = index >= 0;
                                     self.annonce(if index >= 0 {
@@ -3304,13 +3467,16 @@ impl eframe::App for App {
                             if let Some(path) = self.player.current_path().cloned() {
                                 self.player.subtitles_visible = false;
                                 self.subtitles = SubtitleManager::new();
-                                self.subtitles.auto_load(&path, &self.config.subtitles.default_language);
+                                self.subtitles.auto_load(&path, &self.config.subtitles.langues_preferees());
                                 self.subtitles.set_visible(true);
                                 self.player.subtitles_visible = true;
                             }
                         }
                         if bouton_menu(ui, "⏭ Piste suivante").clicked() {
                             self.subtitles.next_subtitle();
+                            if let Some(f) = self.subtitles.active_path() {
+                                self.memoriser_piste_choisie(crate::pistes::Choix::Externe(f));
+                            }
                         }
                     }
                     if bouton_menu(ui, "📂 Charger un fichier…").clicked() {
