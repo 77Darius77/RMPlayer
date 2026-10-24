@@ -444,6 +444,7 @@ impl App {
         // à la session précédente). L'ordre est mélangé sur la playlist restaurée
         // juste après, donc on le refait une fois la liste en place.
         player.set_shuffle(config.playback.shuffle);
+        player.set_boucle_ab(config.playback.ab_repetitions, config.playback.ab_delay_ms);
         // Restaure la playlist enregistrée : elle était sauvegardée mais jamais
         // relue, si bien que la liste était vide à chaque démarrage.
         for path in &config.playlist {
@@ -573,6 +574,11 @@ impl App {
 
     /// Travaux d'interface après l'ouverture d'un média (rendu + sous-titres).
     fn after_media_loaded(&mut self, path: &Path) {
+        // Tous les chemins d'ouverture (fichier choisi, playlist, suivant, glisser-déposer,
+        // ligne de commande) passent ici : un seul endroit pour les fichiers récents.
+        if self.config.playback.noter_recent(path) {
+            let _ = self.config.save();
+        }
         self.renderer.update_frame(vec![], 0, 0);
         if self.config.subtitles.auto_load {
             self.subtitles = SubtitleManager::new();
@@ -604,6 +610,38 @@ impl App {
             Err(e) => {
                 self.error_message = Some(format!("Erreur: {}", e));
                 false
+            }
+        }
+    }
+
+    /// Remplace toute la configuration par celle d'un fichier validé (préférences →
+    /// « Importer une configuration »). Le moteur est ensuite resynchronisé comme pour
+    /// l'application d'un profil : filtres vidéo, chaîne audio, table des raccourcis.
+    pub(crate) fn importer_configuration(&mut self, fichier: &Path) {
+        let Some(destination) = crate::config::config_path() else {
+            self.error_message = Some("Import : répertoire de configuration introuvable".into());
+            return;
+        };
+        match crate::config::importer_config(fichier, &destination) {
+            Ok(mut config) => {
+                config.audio.sanitize();
+                // Les fichiers récents et la playlist décrivent cette machine, pas les
+                // réglages : ils suivent le fichier importé (c'est une sauvegarde complète).
+                self.config = config;
+                self.raccourcis = TableauRaccourcis::construire(&self.config.raccourcis);
+                self.player.set_audio_filters(&self.config.audio);
+                self.player.set_boucle_ab(
+                    self.config.playback.ab_repetitions,
+                    self.config.playback.ab_delay_ms,
+                );
+                self.appliquer_filtres();
+                self.profil_actif = None;
+                tracing::info!(target: "kinterface", "configuration importée : {:?}", fichier);
+                self.annonce("Configuration importée");
+            }
+            Err(e) => {
+                tracing::warn!("Import de configuration refusé : {}", e);
+                self.error_message = Some(format!("Import refusé : {}", e));
             }
         }
     }
@@ -2255,6 +2293,13 @@ impl eframe::App for App {
             self.annonce(&avis);
         }
 
+        // Pause de fin de boucle A-B : levée ici, car la lecture est en pause et le tour
+        // d'interface normal ne s'exécute pas. Le réveil est demandé à l'échéance.
+        self.player.tick_boucle_ab();
+        if let Some(fin) = self.player.ab_attente() {
+            ctx.request_repaint_after(fin.saturating_duration_since(std::time::Instant::now()));
+        }
+
         // Taille et position de la fenêtre : mémorisées pour le prochain lancement.
         self.memoriser_geometrie(ctx);
 
@@ -2887,6 +2932,39 @@ impl eframe::App for App {
                         }
                     }
                     
+                    // Fichiers récents : le plus récent d'abord ; la liste est écrite par
+                    // `after_media_loaded`. Le sous-menu est grisé tant qu'elle est vide.
+                    let recents = self.config.playback.recent.clone();
+                    let mut a_rouvrir: Option<PathBuf> = None;
+                    let mut effacer_recents = false;
+                    ui.add_enabled_ui(!recents.is_empty(), |ui| {
+                        ui.menu_button("🕘 Fichiers récents", |ui| {
+                            for chemin in &recents {
+                                let nom = chemin
+                                    .file_name()
+                                    .map(|n| n.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| chemin.display().to_string());
+                                if bouton_menu(ui, nom)
+                                    .on_hover_text(chemin.display().to_string())
+                                    .clicked()
+                                {
+                                    a_rouvrir = Some(chemin.clone());
+                                }
+                            }
+                            ui.separator();
+                            if bouton_menu(ui, "🗑 Effacer la liste").clicked() {
+                                effacer_recents = true;
+                            }
+                        });
+                    });
+                    if let Some(chemin) = a_rouvrir {
+                        self.load_media(&chemin);
+                    }
+                    if effacer_recents {
+                        self.config.playback.recent.clear();
+                        let _ = self.config.save();
+                    }
+
                     ui.separator();
                     if bouton_menu(ui, "✕ Fermer").clicked() {
                         // Fermer, c'est fermer le lecteur : l'ancienne action ne

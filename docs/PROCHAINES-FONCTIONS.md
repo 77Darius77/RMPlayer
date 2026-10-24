@@ -27,9 +27,9 @@ document ne couvre pas »).
 
 | # | Fonction | PotPlayer | Où | Comment le prouver | Effort |
 |---|---|---|---|---|---|
-| A1 | **Fichiers récents** : liste bornée, menu, « effacer » | `Dialog` 3127 | `playback.recent` ; menu dans `ui.rs` | ouvrir 3 fichiers : `config.json` contient 3 entrées, la plus récente d'abord, sans doublon ni dépassement de la borne | petit |
-| A2 | **Boucle A-B : nombre de boucles et délai** | `Dialog(453)` | `loop_a_ms` / `loop_b_ms` dans `player.rs` ; 2 champs `playback.*` | N boucles puis arrêt (retours comptés au journal **et** par la position), délai mesuré entre deux passages | petit |
-| A3 | **Exporter / importer la configuration** | 2096 | bouton dans les préférences + `--export-config` / `--import-config` en ligne de commande | aller-retour : exporter, modifier, importer → fichier identique octet pour octet ; fichier invalide refusé sans écraser | petit |
+| A1 ✅ | **Fichiers récents** (fait s.37, `verif-recents` 7/7) : liste bornée, menu, « effacer » | `Dialog` 3127 | `playback.recent` ; menu dans `ui.rs` | ouvrir 3 fichiers : `config.json` contient 3 entrées, la plus récente d'abord, sans doublon ni dépassement de la borne | petit |
+| A2 ✅ | **Boucle A-B : nombre de boucles et délai** (fait s.37, `verif-boucle-ab` 6/6, option `--boucle-ab A B`) | `Dialog(453)` | `loop_a_ms` / `loop_b_ms` dans `player.rs` ; 2 champs `playback.*` | N boucles puis arrêt (retours comptés au journal **et** par la position), délai mesuré entre deux passages | petit |
+| A3 ✅ | **Exporter / importer la configuration** (fait s.37, `verif-config-io` 12/12) | 2096 | bouton dans les préférences + `--export-config` / `--import-config` en ligne de commande | aller-retour : exporter, modifier, importer → fichier identique octet pour octet ; fichier invalide refusé sans écraser | petit |
 
 ## Lot 2 — style des sous-titres (même méthode que `verif-soustitres.sh` : mesure sur les pixels)
 

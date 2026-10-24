@@ -556,6 +556,14 @@ pub struct VideoPlayer {
     loop_a_ms: Option<u64>,
     /// Point B de la répétition A-B (ms)
     loop_b_ms: Option<u64>,
+    /// Répétition A-B : retours autorisés avant de lever la boucle (0 = sans fin).
+    ab_repetitions: u32,
+    /// Répétition A-B : pause (ms) entre l'arrivée en B et le retour en A.
+    ab_delay_ms: u64,
+    /// Retours déjà faits sur la boucle courante.
+    ab_retours: u32,
+    /// Instant où la pause de fin de boucle prend fin (le retour en A a déjà eu lieu).
+    ab_reprise_a: Option<std::time::Instant>,
     /// Reprise de lecture à la position quittée
     resume_enabled: bool,
     /// Positions mémorisées par média
@@ -727,6 +735,10 @@ impl VideoPlayer {
             video_decode_failures: 0,
             loop_a_ms: None,
             loop_b_ms: None,
+            ab_repetitions: config.playback.ab_repetitions.min(crate::config::AB_REPETITIONS_MAX),
+            ab_delay_ms: config.playback.ab_delay_ms.min(crate::config::AB_DELAI_MAX_MS),
+            ab_retours: 0,
+            ab_reprise_a: None,
             resume_enabled,
             positions: crate::positions::Positions::load(),
             display_target: (0, 0),
@@ -2571,6 +2583,7 @@ impl VideoPlayer {
             );
         }
         self.loop_b_ms = Some(b);
+        self.ab_retours = 0;
         tracing::info!("Répétition A-B: boucle de {} à {} ms", a, b);
         // On se replace au point A pour que la répétition démarre immédiatement
         let _ = self.seek(a);
@@ -2595,12 +2608,77 @@ impl VideoPlayer {
     fn accept_for_display(&mut self, pts_ms: u64) -> bool {
         if let (Some(a), Some(b)) = (self.loop_a_ms, self.loop_b_ms) {
             if pts_ms >= b {
-                tracing::info!("Répétition A-B: retour au point A ({} ms)", a);
+                if self.ab_repetitions > 0 && self.ab_retours >= self.ab_repetitions {
+                    // Les passages demandés sont faits : la boucle est levée et le film
+                    // continue au-delà de B (cette image est affichée normalement).
+                    tracing::info!(
+                        "Répétition A-B: {} retour(s) effectués, boucle levée",
+                        self.ab_retours
+                    );
+                    self.loop_a_ms = None;
+                    self.loop_b_ms = None;
+                    self.ab_retours = 0;
+                    return true;
+                }
+                self.ab_retours += 1;
+                tracing::info!(
+                    "Répétition A-B: retour au point A ({} ms), retour {}",
+                    a,
+                    self.ab_retours
+                );
                 let _ = self.seek(a);
+                if self.ab_delay_ms > 0 {
+                    // Pause réelle (image et son) ; `tick_boucle_ab` la lèvera.
+                    let _ = self.toggle_pause();
+                    self.ab_reprise_a =
+                        Some(std::time::Instant::now() + Duration::from_millis(self.ab_delay_ms));
+                }
                 return false;
             }
         }
         true
+    }
+
+    /// Règle la répétition A-B : nombre de retours (0 = sans fin) et pause entre deux passages.
+    pub fn set_boucle_ab(&mut self, retours: u32, delai_ms: u64) {
+        self.ab_repetitions = retours.min(crate::config::AB_REPETITIONS_MAX);
+        self.ab_delay_ms = delai_ms.min(crate::config::AB_DELAI_MAX_MS);
+        tracing::info!(
+            "Répétition A-B: {} retour(s), pause de {} ms",
+            self.ab_repetitions,
+            self.ab_delay_ms
+        );
+    }
+
+    /// Pose directement les deux points (ligne de commande `--boucle-ab`).
+    pub fn set_loop_points(&mut self, a_ms: u64, b_ms: u64) -> bool {
+        if b_ms <= a_ms {
+            return false;
+        }
+        self.loop_a_ms = Some(a_ms);
+        self.loop_b_ms = Some(b_ms);
+        self.ab_retours = 0;
+        true
+    }
+
+    /// Instant de fin de la pause de boucle, s'il y en a une en cours.
+    pub fn ab_attente(&self) -> Option<std::time::Instant> {
+        self.ab_reprise_a
+    }
+
+    /// À appeler à chaque tour de l'interface, **y compris en pause** : lève la pause de fin
+    /// de boucle quand le délai est écoulé. Si l'utilisateur a repris ou arrêté la lecture
+    /// entre-temps, l'attente est simplement oubliée.
+    pub fn tick_boucle_ab(&mut self) {
+        let Some(fin) = self.ab_reprise_a else { return };
+        if self.state != PlayerState::Paused {
+            self.ab_reprise_a = None;
+            return;
+        }
+        if std::time::Instant::now() >= fin {
+            self.ab_reprise_a = None;
+            let _ = self.toggle_pause();
+        }
     }
 
     /// Formatage court d'une position (mm:ss) pour les messages d'état.
@@ -3744,6 +3822,9 @@ impl VideoPlayer {
     }
 
     pub fn toggle_pause(&mut self) -> Result<(), String> {
+        // Une pause décidée par l'utilisateur ne doit pas être levée par la boucle A-B.
+        // (Le propre appel de la boucle repose `ab_reprise_a` juste après.)
+        self.ab_reprise_a = None;
         match self.state {
             PlayerState::Playing => {
                 self.state = PlayerState::Paused;
