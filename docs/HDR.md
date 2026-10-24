@@ -62,6 +62,27 @@ l'image HDR est affichée **non convertie** (mesuré : bandes à 61 / 98 / 190 a
 47 / 107 / 253), donc délavée sur un écran SDR. C'est un choix de robustesse (la lecture ne
 s'arrête jamais), pas une conversion de substitution.
 
+### Ce que coûterait un repli CPU automatique (mesuré le 2026-10-24)
+
+Poste : Ryzen 7 5800X (8 cœurs / 16 fils), AMD RX 6700 XT (Vulkan RADV), Mesa 25.3. Chaînes
+exactes de `hdr.rs`, appliquées par `ffmpeg` (FFmpeg 7.1.3 de `/opt`) à 288 images d'une
+mire PQ/BT.2020 10 bits, sortie jetée. **Source synthétique, sans décodage, sans sous-titres,
+sans affichage** : ordre de grandeur, pas un test de lecture réelle.
+
+| Résolution | Source seule | GPU `libplacebo` | CPU `zscale` + `tonemap` |
+|---|---|---|---|
+| 3840×2160 | 224 i/s | **85 i/s**, 0,5 cœur | **26 i/s**, 9,3 cœurs |
+| 1920×1080 | 951 i/s | **236 i/s**, 0,5 cœur | **114 i/s**, 10,2 cœurs |
+
+Lecture : en 4K, le CPU n'a que 8 % de marge sur du 24 i/s (aucune sur du 60) et occupe
+presque tout le processeur — auquel il faudrait ajouter le décodage, l'audio et l'interface.
+En 1080p il tient avec de la marge. Le moteur CPU est aussi **moins fidèle** : opérateur Hable,
+crête fixée à 1000 nits, pas de détection de crête dynamique.
+
+**Un Vulkan logiciel est installé** (`lavapipe` / `llvmpipe`, vu par `vulkaninfo`). Il ne sert
+pas de secours : avec lui seul, `libplacebo` répond « Found no suitable device » et refuse
+(donc même chemin que le Vulkan coupé de la section 12), il ne tourne pas lentement sur CPU.
+
 ## Vérifier
 
 ```bash
