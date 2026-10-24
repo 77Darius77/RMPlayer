@@ -42,14 +42,14 @@ document ne couvre pas »).
 | B5 ✅ | **Fondu** d'apparition et de disparition | fondu | `subtitles.fade_ms` ; alpha par image | petit |
 | B6 ✅ | **Langues préférées avec priorité**, durées mini/maxi d'affichage, **piste mémorisée** | 2079 | `subtitles.preferred_languages`, `min_duration_ms`, `max_duration_ms` ; seul `default_language` existe | moyen |
 
-## Lot 3 — vidéo par libavfilter (même méthode que `verif-filtres.sh`)
+## Lot 3 — vidéo (FAIT s.37 sauf C4) (même méthode que `verif-filtres.sh`)
 
 | # | Fonction | Où | Effort |
 |---|---|---|---|
-| C1 | **Matrice de couleur** (BT.601 / 709 / 2020) et **plage** 16-235 / 0-255 choisies à la main, au lieu de l'automatique | `scale=in_color_matrix=…:in_range=…` dans `filter_description` (`player.rs`) | petit |
-| C2 | **Glisser** (décalage de l'image) | `crop` + `pad` dans `filter_description` | petit |
-| C3 | **Étendre à l'écran / rogner** (aujourd'hui : recadrage seulement) | cadrage dans `player.rs` / `ui.rs` | moyen |
-| C4 | **Plein écran : autres moniteurs en noir** | fenêtres noires, `main.rs` / `x11.rs` | moyen (piège Wayland : pas de positionnement client) |
+| C1 ✅ | **Matrice de couleur** (fait s.37, `verif-couleur` 11/11 ; corrige aussi l'automatique : le BT.709 était lu en BT.601) (BT.601 / 709 / 2020) et **plage** 16-235 / 0-255 choisies à la main, au lieu de l'automatique | `scale=in_color_matrix=…:in_range=…` dans `filter_description` (`player.rs`) | petit |
+| C2 ✅ | **Glisser** (fait s.37, `verif-affichage` : fait à l'affichage, pas par filtre — `crop`+`pad` n'est pas exact sans connaître la taille) (décalage de l'image) | `crop` + `pad` dans `filter_description` | petit |
+| C3 ✅ | **Étendre à l'écran / rogner** (fait s.37 : aspect « Rogner », `verif-affichage` 5/5) (aujourd'hui : recadrage seulement) | cadrage dans `player.rs` / `ui.rs` | moyen |
+| C4 ⛔ | **Plein écran : autres moniteurs en noir** — NON FAIT, volontairement : sous Wayland (la seule session de cette machine) un client ne peut ni placer ni lister ses fenêtres sur un autre écran, et Xvfb ne reproduit pas ce cas ; une fonction qu'on ne peut pas mesurer ici ne serait pas une fonction (recette §1) | fenêtres noires, `main.rs` / `x11.rs` | moyen (piège Wayland : pas de positionnement client) |
 
 ## Lot 4 — fonction PotPlayer hors du catalogue des réglages
 

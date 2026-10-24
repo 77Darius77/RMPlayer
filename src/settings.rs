@@ -1088,6 +1088,7 @@ fn dessiner_video(app: &mut App, ui: &mut egui::Ui) {
                         AspectMode::Ratio185,
                         AspectMode::Ratio235,
                         AspectMode::Remplir,
+                        AspectMode::Rogner,
                         AspectMode::Personnalise,
                     ] {
                         if ui
@@ -1122,6 +1123,68 @@ fn dessiner_video(app: &mut App, ui: &mut egui::Ui) {
              volontairement l'image (corriger un encodage mal étiqueté, remplir l'écran). \
              Touche K pour faire défiler les modes.",
         );
+    });
+
+    sous_section(ui, "Conversion des couleurs", |ui| {
+        let mut matrice = app.config.video.color_matrix;
+        ligne(ui, "grille_matrice", "Matrice", |ui| {
+            egui::ComboBox::from_id_salt("choix_matrice")
+                .selected_text(matrice.label())
+                .width(200.0)
+                .show_ui(ui, |ui| {
+                    use crate::config::ColorMatrix;
+                    for choix in [ColorMatrix::Auto, ColorMatrix::Bt601, ColorMatrix::Bt709, ColorMatrix::Bt2020] {
+                        if ui.selectable_value(&mut matrice, choix, choix.label()).clicked() {
+                            app.config.video.color_matrix = choix;
+                            geometrie_modifiee = true;
+                        }
+                    }
+                });
+        });
+        let mut plage = app.config.video.color_range;
+        ligne(ui, "grille_plage", "Plage", |ui| {
+            egui::ComboBox::from_id_salt("choix_plage")
+                .selected_text(plage.label())
+                .width(200.0)
+                .show_ui(ui, |ui| {
+                    use crate::config::ColorRange;
+                    for choix in [ColorRange::Auto, ColorRange::Limited, ColorRange::Full] {
+                        if ui.selectable_value(&mut plage, choix, choix.label()).clicked() {
+                            app.config.video.color_range = choix;
+                            geometrie_modifiee = true;
+                        }
+                    }
+                });
+        });
+        aide(
+            ui,
+            "« Automatique » suit ce que déclare le film (à défaut : HD → BT.709, SD → BT.601). \
+             À changer seulement si les couleurs d'un film mal étiqueté sont fausses, ou si les \
+             noirs paraissent grisés (plage) ou écrasés.",
+        );
+    });
+
+    sous_section(ui, "Glisser l'image", |ui| {
+        let mut px = app.config.video.pan_x_percent;
+        let mut py = app.config.video.pan_y_percent;
+        let mut change = false;
+        ligne(ui, "grille_pan_x", "Horizontal", |ui| {
+            change |= ui
+                .add(egui::Slider::new(&mut px, -50.0..=50.0).suffix(" %").fixed_decimals(0))
+                .on_hover_text("Décale l'image vers la gauche (−) ou la droite (+) ; ce qui sort est rogné")
+                .changed();
+        });
+        ligne(ui, "grille_pan_y", "Vertical", |ui| {
+            change |= ui
+                .add(egui::Slider::new(&mut py, -50.0..=50.0).suffix(" %").fixed_decimals(0))
+                .on_hover_text("Décale l'image vers le haut (−) ou le bas (+)")
+                .changed();
+        });
+        if change {
+            app.config.video.pan_x_percent = px;
+            app.config.video.pan_y_percent = py;
+            let _ = app.config.save();
+        }
     });
 
     sous_section(ui, "Bandes noires", |ui| {
@@ -2951,6 +3014,10 @@ fn video_modifiee(app: &App) -> bool {
         || a.flip != d.flip
         || (a.zoom - d.zoom).abs() > 1e-3
         || a.aspect != d.aspect
+        || a.color_matrix != d.color_matrix
+        || a.color_range != d.color_range
+        || a.pan_x_percent != d.pan_x_percent
+        || a.pan_y_percent != d.pan_y_percent
         || a.crop_active()
 }
 

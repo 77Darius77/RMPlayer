@@ -90,7 +90,9 @@ run verif-ass tools/verif-ass.sh "$DISP"
 run verif-profils tools/verif-profils.sh "$DISP"
 run verif-pistes tools/verif-pistes.sh "$DISP"
 run verif-filtres tools/verif-filtres.sh
+run verif-couleur tools/verif-couleur.sh
 run verif-cadrage tools/verif-cadrage.sh "$DISP"
+run verif-affichage tools/verif-affichage.sh "$DISP"
 run verif-sousimages tools/verif-sousimages.sh "$DISP"
 run verif-regles tools/verif-regles.sh "$DISP"
 run verif-ass-clip tools/verif-ass-clip.sh "$DISP"
