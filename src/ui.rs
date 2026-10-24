@@ -2742,21 +2742,30 @@ impl eframe::App for App {
             self.last_frame_pts_ms = 0;
         }
 
-        if self.player.state() == PlayerState::Playing {
+        // En lecture : une image à chaque échéance. **En pause : une seule image, et seulement
+        // après un saut** (`pending_immediate` : barre de progression, ±5 s, signet, chapitre,
+        // MPRIS, pas à pas). Sans cela le saut changeait la position mais l'écran gardait l'ancienne
+        // image, et les répliques intégrées n'étaient pas relues (piège 122).
+        let etat = self.player.state();
+        let en_lecture = etat == PlayerState::Playing;
+        if en_lecture || (etat == PlayerState::Paused && self.pending_immediate) {
             // Alimente le tampon audio et surveille l'horloge (carte son maître)
             // AVANT de décider si une image est due : sans cela, l'horloge audio
             // pourrait s'arrêter faute de données et figerait l'image avec elle.
-            self.player.tick_audio();
+            if en_lecture {
+                self.player.tick_audio();
+            }
             let due = self.pending_immediate
-                || self.player.next_frame_delay(self.last_frame_pts_ms).is_none();
+                || (en_lecture && self.player.next_frame_delay(self.last_frame_pts_ms).is_none());
             if due {
                 let was_immediate = self.pending_immediate;
                 if let Some(f) = self.player.pump_video_frame() {
                     let dims = (f.width, f.height);
                     let pts = f.pts_ms;
                     // Après un load/seek, on recale l'horloge sur la 1re frame réelle
-                    // (supprime le décalage constant dû au délai de démarrage).
-                    if was_immediate {
+                    // (supprime le décalage constant dû au délai de démarrage). Pas en pause :
+                    // la reprise réancre elle-même l'horloge.
+                    if was_immediate && en_lecture {
                         self.player.sync_clock_to(pts);
                     }
                     self.renderer.update_frame(f.data, dims.0, dims.1);
