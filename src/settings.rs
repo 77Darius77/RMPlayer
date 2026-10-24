@@ -118,6 +118,43 @@ pub const SECTIONS: &[Section] = &[
     },
 ];
 
+/// Exporter / importer **toute** la configuration (réglages, raccourcis, règles, fichiers
+/// récents) : mêmes fonctions que `--export-config` / `--import-config`, donc mêmes
+/// vérifications. Les profils ont leur propre export (boutons ci-dessus).
+fn sauvegarde_configuration(app: &mut App, ui: &mut egui::Ui) {
+    aide(
+        ui,
+        "Exporter écrit un fichier .json qu'on peut copier sur une autre machine ; importer \
+         remplace tous les réglages par ceux du fichier (refusé sans rien changer s'il n'est \
+         pas une configuration de KPlayer).",
+    );
+    ui.horizontal(|ui| {
+        if ui.button("⬆ Exporter la configuration…").clicked() {
+            if let Some(chemin) = rfd::FileDialog::new()
+                .set_file_name("kplayer-configuration.json")
+                .add_filter("Configuration KPlayer", &["json"])
+                .save_file()
+            {
+                match crate::config::exporter_config(&app.config, &chemin) {
+                    Ok(()) => {
+                        tracing::info!(target: "kinterface", "configuration exportée : {:?}", chemin);
+                        app.annonce("Configuration exportée");
+                    }
+                    Err(e) => app.error_message = Some(format!("Export : {}", e)),
+                }
+            }
+        }
+        if ui.button("⬇ Importer une configuration…").clicked() {
+            if let Some(chemin) = rfd::FileDialog::new()
+                .add_filter("Configuration KPlayer", &["json"])
+                .pick_file()
+            {
+                app.importer_configuration(&chemin);
+            }
+        }
+    });
+}
+
 /// Vrai si un raccourci diffère de sa valeur par défaut.
 fn raccourcis_modifies(app: &App) -> bool {
     !app.config.raccourcis.is_empty()
@@ -815,6 +852,10 @@ fn dessiner_profils(app: &mut App, ui: &mut egui::Ui) {
             }
         }
         aide(ui, "Un fichier exporté depuis KPlayer (JSON). Le nom du fichier est libre.");
+    });
+
+    sous_section(ui, "Sauvegarde de toute la configuration", |ui| {
+        sauvegarde_configuration(app, ui);
     });
 }
 
@@ -2599,6 +2640,37 @@ fn dessiner_lecture(app: &mut App, ui: &mut egui::Ui) {
         );
     });
 
+    sous_section(ui, "Répétition A-B", |ui| {
+        // Touches A et B : posent les deux points. Ici : combien de fois la boucle tourne,
+        // et le temps de pause entre deux passages.
+        let mut retours = app.config.playback.ab_repetitions;
+        let mut delai = app.config.playback.ab_delay_ms;
+        ligne(ui, "grille_ab_retours", "Retours", |ui| {
+            ui.add(
+                egui::Slider::new(&mut retours, 0..=crate::config::AB_REPETITIONS_MAX)
+                    .custom_formatter(|v, _| {
+                        if v < 1.0 { "sans fin".to_string() } else { format!("{:.0}", v) }
+                    }),
+            )
+            .on_hover_text("Nombre de retours au point A avant que le film reprenne son cours");
+        });
+        ligne(ui, "grille_ab_delai", "Pause entre deux passages", |ui| {
+            ui.add(
+                egui::Slider::new(&mut delai, 0..=crate::config::AB_DELAI_MAX_MS)
+                    .custom_formatter(|v, _| {
+                        if v < 1.0 { "aucune".to_string() } else { format!("{:.1} s", v / 1000.0) }
+                    }),
+            )
+            .on_hover_text("Temps d'arrêt en B avant de repartir de A");
+        });
+        if retours != app.config.playback.ab_repetitions || delai != app.config.playback.ab_delay_ms {
+            app.config.playback.ab_repetitions = retours;
+            app.config.playback.ab_delay_ms = delai;
+            app.player.set_boucle_ab(retours, delai);
+            let _ = app.config.save();
+        }
+    });
+
     sous_section(ui, "Vitesse", |ui| {
         let mut vitesse = app.player.get_speed();
         ligne(ui, "grille_vitesse", "Vitesse", |ui| {
@@ -2795,5 +2867,5 @@ fn sous_titres_modifies(app: &App) -> bool {
 fn lecture_modifiee(app: &App) -> bool {
     let d = Config::default().playback;
     let a = &app.config.playback;
-    a.resume != d.resume
+    a.resume != d.resume || a.ab_repetitions != d.ab_repetitions || a.ab_delay_ms != d.ab_delay_ms
 }

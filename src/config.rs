@@ -1187,6 +1187,40 @@ pub struct PlaybackSettings {
     /// veut pas la réactiver à chaque film).
     #[serde(default)]
     pub shuffle: bool,
+    /// **Fichiers récents**, le plus récent d'abord, sans doublon, bornés à
+    /// `RECENTS_MAX`. Écrits à chaque ouverture (`noter_recent`), proposés par le menu
+    /// Fichier → Récents.
+    #[serde(default)]
+    pub recent: Vec<PathBuf>,
+    /// Répétition A-B : nombre de **retours** au point A avant que la boucle soit levée et
+    /// que le film continue au-delà de B. `0` = sans fin (le comportement historique).
+    #[serde(default)]
+    pub ab_repetitions: u32,
+    /// Répétition A-B : pause, en millisecondes, entre l'arrivée en B et le retour en A.
+    #[serde(default)]
+    pub ab_delay_ms: u64,
+}
+
+/// Plafonds des deux réglages de la répétition A-B (un fichier édité à la main ne doit pas
+/// pouvoir demander une pause de plusieurs heures).
+pub const AB_REPETITIONS_MAX: u32 = 99;
+pub const AB_DELAI_MAX_MS: u64 = 30_000;
+
+/// Nombre maximal de fichiers récents conservés.
+pub const RECENTS_MAX: usize = 10;
+
+impl PlaybackSettings {
+    /// Note l'ouverture d'un média : il passe en tête, son ancienne place est libérée,
+    /// la liste est ramenée à `RECENTS_MAX`. Retourne `true` si la liste a changé.
+    pub fn noter_recent(&mut self, chemin: &Path) -> bool {
+        if self.recent.first().map(|p| p.as_path()) == Some(chemin) {
+            return false;
+        }
+        self.recent.retain(|p| p.as_path() != chemin);
+        self.recent.insert(0, chemin.to_path_buf());
+        self.recent.truncate(RECENTS_MAX);
+        true
+    }
 }
 
 /// Profondeur de pré-cache par défaut d'un flux réseau : 6 s.
@@ -1333,6 +1367,9 @@ impl Default for PlaybackSettings {
             resume: true,
             precache_ms: default_precache_ms(),
             shuffle: false,
+            recent: Vec::new(),
+            ab_repetitions: 0,
+            ab_delay_ms: 0,
         }
     }
 }
@@ -1750,6 +1787,62 @@ pub fn config_path() -> Option<PathBuf> {
     dirs::config_dir().map(|d| d.join("kplayer").join("config.json"))
 }
 
+/// Sections reconnues au premier niveau d'un fichier de configuration.
+const SECTIONS_CONFIG: &[&str] = &[
+    "video", "raccourcis", "audio", "subtitles", "interface", "playback", "playlist", "regles",
+];
+
+/// Vérifie qu'un texte est bien une configuration de KPlayer, sans rien écrire.
+///
+/// Un `{}` ou un JSON étranger se relirait « avec succès » (tous les champs ont une valeur
+/// par défaut) et **remettrait tous les réglages à zéro sans rien dire** : on exige donc au
+/// moins une section reconnue, et un contenu qui se relit comme `Config`.
+pub fn valider_config(texte: &str) -> Result<Config, String> {
+    let valeur: serde_json::Value =
+        serde_json::from_str(texte).map_err(|e| format!("JSON invalide : {e}"))?;
+    let Some(objet) = valeur.as_object() else {
+        return Err("ce n'est pas une configuration (objet JSON attendu)".to_string());
+    };
+    if !SECTIONS_CONFIG.iter().any(|s| objet.contains_key(*s)) {
+        return Err(format!(
+            "aucune section de KPlayer reconnue (attendu : {})",
+            SECTIONS_CONFIG.join(", ")
+        ));
+    }
+    serde_json::from_value::<Config>(valeur).map_err(|e| format!("réglage invalide : {e}"))
+}
+
+/// Écrit `config` dans `vers`, au format exact de `config.json` (relisible par `importer_config`).
+pub fn exporter_config(config: &Config, vers: &Path) -> Result<(), String> {
+    let contenu = serde_json::to_string_pretty(config)
+        .map_err(|e| format!("Erreur sérialisation config: {e}"))?;
+    std::fs::write(vers, contenu).map_err(|e| format!("Écriture de {} impossible : {e}", vers.display()))
+}
+
+/// Importe `depuis` vers `destination` (le `config.json` de l'utilisateur).
+///
+/// **Le fichier est validé d'abord ; s'il est refusé, `destination` n'est pas touchée.**
+/// Une fois accepté, ses octets sont copiés tels quels (écriture dans un fichier voisin puis
+/// renommage : une coupure ne laisse jamais une configuration à moitié écrite) — ce qu'on a
+/// importé est donc, octet pour octet, ce que le lecteur relira.
+pub fn importer_config(depuis: &Path, destination: &Path) -> Result<Config, String> {
+    let texte = std::fs::read_to_string(depuis)
+        .map_err(|e| format!("Lecture de {} impossible : {e}", depuis.display()))?;
+    let config = valider_config(&texte)?;
+    if let Some(dossier) = destination.parent() {
+        std::fs::create_dir_all(dossier)
+            .map_err(|e| format!("Erreur création répertoire config: {e}"))?;
+    }
+    let temporaire = destination.with_extension("json.import");
+    std::fs::write(&temporaire, texte.as_bytes())
+        .map_err(|e| format!("Écriture impossible : {e}"))?;
+    std::fs::rename(&temporaire, destination).map_err(|e| {
+        let _ = std::fs::remove_file(&temporaire);
+        format!("Remplacement de la configuration impossible : {e}")
+    })?;
+    Ok(config)
+}
+
 impl Config {
     /// Charger la configuration depuis le fichier utilisateur
     pub fn load() -> Result<Self, String> {
@@ -2127,6 +2220,105 @@ mod tests {
             geometrie_visible([2500.0, 100.0], [800.0, 450.0], [0.0, 0.0]),
             ([2500.0, 100.0], [800.0, 450.0])
         );
+    }
+
+    fn dossier_d_essai(nom: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("kp-test-{}-{}", nom, std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn une_configuration_exportee_se_reimporte_octet_pour_octet() {
+        let d = dossier_d_essai("export");
+        let mut config = Config::default();
+        config.video.brightness = 0.25;
+        config.playback.recent.push(PathBuf::from("/x/film.mkv"));
+        let export = d.join("export.json");
+        exporter_config(&config, &export).unwrap();
+        let destination = d.join("conf").join("config.json");
+        let relue = importer_config(&export, &destination).unwrap();
+        assert!((relue.video.brightness - 0.25).abs() < 1e-6);
+        assert_eq!(relue.playback.recent, config.playback.recent);
+        assert_eq!(
+            std::fs::read(&export).unwrap(),
+            std::fs::read(&destination).unwrap(),
+            "le fichier importé doit être identique à l'export, octet pour octet"
+        );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn un_fichier_refuse_n_ecrase_pas_la_configuration() {
+        let d = dossier_d_essai("refus");
+        let destination = d.join("config.json");
+        std::fs::write(&destination, "ORIGINAL").unwrap();
+        for (nom, contenu) in [
+            ("vide.json", ""),
+            ("texte.json", "pas du json"),
+            ("tableau.json", "[1, 2]"),
+            ("etranger.json", r#"{"foo": 1}"#),
+            ("objet-vide.json", "{}"),
+            ("type-faux.json", r#"{"video": {"brightness": "beaucoup"}}"#),
+        ] {
+            let source = d.join(nom);
+            std::fs::write(&source, contenu).unwrap();
+            assert!(importer_config(&source, &destination).is_err(), "{nom} aurait dû être refusé");
+            assert_eq!(
+                std::fs::read_to_string(&destination).unwrap(),
+                "ORIGINAL",
+                "{nom} : la configuration existante a été touchée"
+            );
+        }
+        assert!(importer_config(&d.join("absent.json"), &destination).is_err());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn la_boucle_a_b_se_relit_et_un_ancien_fichier_garde_la_boucle_historique() {
+        let l: PlaybackSettings =
+            serde_json::from_str(r#"{"ab_repetitions": 3, "ab_delay_ms": 1500}"#).unwrap();
+        assert_eq!((l.ab_repetitions, l.ab_delay_ms), (3, 1500));
+        let ancienne: PlaybackSettings = serde_json::from_str("{}").unwrap();
+        assert_eq!((ancienne.ab_repetitions, ancienne.ab_delay_ms), (0, 0), "0 = sans fin, sans pause");
+    }
+
+    #[test]
+    fn les_recents_sont_ordonnes_sans_doublon_et_bornes() {
+        let mut lecture = PlaybackSettings::default();
+        assert!(lecture.recent.is_empty());
+        for nom in ["a", "b", "c"] {
+            assert!(lecture.noter_recent(Path::new(nom)));
+        }
+        let noms = |l: &PlaybackSettings| -> Vec<String> {
+            l.recent.iter().map(|p| p.to_string_lossy().to_string()).collect()
+        };
+        assert_eq!(noms(&lecture), ["c", "b", "a"], "le plus récent d'abord");
+        // Rouvrir « a » : il remonte, rien n'est dupliqué.
+        assert!(lecture.noter_recent(Path::new("a")));
+        assert_eq!(noms(&lecture), ["a", "c", "b"]);
+        // Rouvrir la tête : rien à écrire.
+        assert!(!lecture.noter_recent(Path::new("a")));
+        // Au-delà de la borne, les plus anciens sortent.
+        for i in 0..(RECENTS_MAX + 5) {
+            lecture.noter_recent(Path::new(&format!("film-{i}")));
+        }
+        assert_eq!(lecture.recent.len(), RECENTS_MAX);
+        assert_eq!(lecture.recent[0], PathBuf::from(format!("film-{}", RECENTS_MAX + 4)));
+    }
+
+    #[test]
+    fn les_recents_se_relisent_et_un_ancien_fichier_reste_valide() {
+        let lecture: PlaybackSettings =
+            serde_json::from_str(r#"{"recent": ["/x/un.mkv", "/x/deux.mkv"]}"#).unwrap();
+        assert_eq!(lecture.recent.len(), 2);
+        assert_eq!(lecture.recent[0], PathBuf::from("/x/un.mkv"));
+        // Configuration antérieure (sans le champ) : liste vide, et le reste garde ses défauts.
+        let ancienne: PlaybackSettings = serde_json::from_str(r#"{"resume": false}"#).unwrap();
+        assert!(ancienne.recent.is_empty());
+        assert!(!ancienne.resume);
+        assert_eq!(ancienne.precache_ms, default_precache_ms());
     }
 
     #[test]

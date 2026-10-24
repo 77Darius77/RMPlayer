@@ -105,6 +105,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "--vignette-largeur",
         "--mpris-test",
         "--hdr-info",
+        "--export-config",
+        "--import-config",
     ];
     // **Options à deux valeurs** (`--dump-frame <pos> <image.png> <fichier>`,
     // `--vignette <pos> <image.png> <fichier>`) : le second argument est un chemin
@@ -118,7 +120,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // faisait sauter le chemin du média, donc la mesure des sous-titres image
     // (`verif-sousimages.sh`) ne produisait plus rien (régression de la s.34,
     // attrapée par la suite complète).
-    let options_a_deux_valeurs = ["--dump-frame", "--vignette"];
+    let options_a_deux_valeurs = ["--dump-frame", "--vignette", "--boucle-ab"];
     let mut valeurs_options: Vec<usize> = Vec::new();
     for (i, a) in args_bruts.iter().enumerate() {
         if options_a_valeur.contains(&a.as_str()) {
@@ -165,6 +167,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let profils_disponibles = config::load_profiles();
 
     let args: Vec<String> = std::env::args().collect();
+
+    // --- Export / import de la configuration ---
+    //
+    // `--export-config <fichier>` écrit la configuration courante ; `--import-config <fichier>`
+    // la remplace par un fichier validé (refusé sans rien écraser s'il n'est pas une
+    // configuration de KPlayer). À lancer **lecteur fermé** : une fenêtre ouverte réécrirait
+    // sa propre configuration à la fermeture.
+    for (option, importer) in [("--export-config", false), ("--import-config", true)] {
+        let Some(pos) = args.iter().position(|a| a == option) else { continue };
+        let Some(fichier) = args.get(pos + 1).filter(|a| !a.starts_with('-')) else {
+            eprintln!("{option} : indiquez un fichier");
+            std::process::exit(2);
+        };
+        let fichier = PathBuf::from(fichier);
+        let resultat = if importer {
+            match config::config_path() {
+                Some(destination) => config::importer_config(&fichier, &destination).map(|_| ()),
+                None => Err("répertoire de configuration introuvable".to_string()),
+            }
+        } else {
+            config::exporter_config(&config, &fichier)
+        };
+        match resultat {
+            Ok(()) => {
+                println!(
+                    "configuration {} : {}",
+                    if importer { "importée depuis" } else { "exportée vers" },
+                    fichier.display()
+                );
+                std::process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("{option} refusé : {e}");
+                std::process::exit(1);
+            }
+        }
+    }
 
     // Option --speed <facteur> : vitesse de départ (0,1 à 8). Utile pour mesurer la
     // correction de hauteur sans passer par l'interface.
@@ -213,6 +252,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 total += n * 60u64.pow((parties.len() - 1 - i) as u32);
             }
             Some(total * 1000)
+        });
+
+    // `--boucle-ab <A> <B>` (secondes, comme `--seek`) : répétition A-B active dès l'ouverture.
+    let boucle_ab_depart: Option<(u64, u64)> = args
+        .iter()
+        .position(|a| a == "--boucle-ab")
+        .and_then(|p| {
+            let a: f64 = args.get(p + 1)?.parse().ok()?;
+            let b: f64 = args.get(p + 2)?.parse().ok()?;
+            Some(((a * 1000.0) as u64, (b * 1000.0) as u64))
         });
 
     let piste_audio: Option<i32> = args
@@ -1016,6 +1065,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "--bench",
         "--list-profiles",
         "--list-regles",
+        "--export-config",
+        "--import-config",
         "--crash-test",
     ];
     let mode_mesure = args_bruts.iter().any(|a| options_sans_instance.contains(&a.as_str()));
@@ -1134,6 +1185,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if let Some(ms) = position_depart {
                 let _ = app.player.seek(ms);
                 tracing::info!("Démarrage à {} ms", ms);
+            }
+            // Boucle A-B posée dès le départ (`--boucle-ab 2 4` : de 2 s à 4 s).
+            if let Some((a, b)) = boucle_ab_depart {
+                if app.player.set_loop_points(a, b) {
+                    tracing::info!("Répétition A-B posée au départ : {} → {} ms", a, b);
+                } else {
+                    tracing::warn!("--boucle-ab : B doit suivre A ({} → {})", a, b);
+                }
             }
             // La playlist alimentée par la ligne de commande doit survivre à la
             // session : elle n'était auparavant jamais enregistrée.
