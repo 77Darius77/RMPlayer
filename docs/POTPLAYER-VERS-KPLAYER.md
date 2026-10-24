@@ -14,6 +14,13 @@ KPlayer : le code (`src/config.rs`, `src/settings.rs`, `src/player.rs`), les ban
 **Légende** : ✅ fait et vérifié · 🟡 partiel ou autrement fait · ❌ absent · ➖ sans objet
 sous Linux (DirectShow, DXVA, TV, Kakao).
 
+> **⚠ Les colonnes de statut des §1 à §9 datent de la session 31 et sont périmées.** Elles
+> marquent encore ❌ des fonctions faites depuis (teinte, niveaux, adoucir, association,
+> MPRIS, lecture aléatoire, perte de focus, mémoire de fenêtre, HDR, interlettre, marges
+> latérales, vignettes). Ce document reste la **référence des réglages de PotPlayer** (numéros
+> de `Dialog`, valeurs, façon de faire) ; l'**état réel et le reste à faire** sont dans
+> [`PROCHAINES-FONCTIONS.md`](PROCHAINES-FONCTIONS.md) (vérifié le 2026-10-24).
+
 ---
 
 ## 0. Ce qui a été appliqué dans cette session (et son effet mesuré)

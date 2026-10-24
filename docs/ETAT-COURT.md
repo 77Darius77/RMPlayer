@@ -32,8 +32,10 @@ FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
 
 Lecteur vidéo **Rust + egui** (Linux), sans dépendance à un lecteur externe : FFmpeg lie
 directement (`ffmpeg-sys-next`, FFmpeg 7.1.3 de `/opt/ffmpeg-7.1`), audio par `cpal`,
-réglages en JSON. Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`. **Aucun contrôle de
-version** : la sauvegarde, c'est l'archive horodatée de `sauvegardes/`.
+réglages en JSON. Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`. **Contrôle de version
+git depuis la session 36** (branche `main`, étiquette `session36` = l'état vérifié à 505
+contrôles ; pas de dépôt distant) ; les archives de `sauvegardes/` restent comme copies hors
+dépôt (non suivies par git).
 
 ## Les trois optimisations en place (mesurées, session 31)
 
@@ -72,6 +74,13 @@ tramage 10→8, débanding GPU). Il ne reste que l'**affichage sans rapatriement
 qui n'a de sens qu'avec une surface capable de HDR — la fenêtre est aujourd'hui en RGBA 8 bits
 SDR, et c'est dit dans `src/hdr.rs`. Voir **§11 de `docs/POTPLAYER-VERS-KPLAYER.md`**.
 
+**Pour de nouvelles fonctions « à la PotPlayer »** : le reste à faire réel (vérifié dans le
+code, la matrice de `POTPLAYER-VERS-KPLAYER.md` étant périmée) est dans
+**`docs/PROCHAINES-FONCTIONS.md`**, et la façon de les ajouter sans produire un faux « fait »
+dans **`docs/AJOUTER-UNE-FONCTION.md`**. Premiers candidats : fichiers récents, nombre de
+boucles A-B, export/import de la configuration, puis marges haut/bas et interligne des
+sous-titres, puis marque-pages.
+
 ## Les sept pièges qui coûtent une session si on les oublie
 
 1. **Un réglage enregistré n'est pas un réglage appliqué** : vérifier qu'un pixel change.
@@ -94,7 +103,9 @@ seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 | Question | Fichier |
 |---|---|
 | Ce qui marche / ce qui reste, par domaine | `docs/ETAT-DU-PROJET.md` |
-| Un réglage précis face à PotPlayer | `docs/POTPLAYER-VERS-KPLAYER.md` (chercher `Dialog(N)`) |
+| **Quelle fonction ajouter ensuite** (ce qui manque vraiment vs PotPlayer) | `docs/PROCHAINES-FONCTIONS.md` |
+| **Comment ajouter une fonction** (recette, pièges, bancs) | `docs/AJOUTER-UNE-FONCTION.md` |
+| Un réglage précis face à PotPlayer (colonnes de statut **périmées**, voir ci-dessus) | `docs/POTPLAYER-VERS-KPLAYER.md` (chercher `Dialog(N)`) |
 | Chiffres et plan d'optimisation | `docs/OPTIMISATION-COMPARATIF.md` |
 | API, structures, modules | `docs/ETAT-TECHNIQUE.md` |
 | Fonctionnalités et limites assumées | `docs/INVENTAIRE-FONCTIONNALITES.md` |
@@ -115,7 +126,8 @@ tools/etat-court.sh                     # remet cette fiche à jour (après la s
 tools/bench-optimisation.sh             # re-mesure les gains GPU et l'AV1
 ```
 
-Puis **archiver** : `tar czf sauvegardes/kplayer-<date>-session<N>.tar.gz src docs tools
+Puis **committer** (`git add -A && git commit`, et `git tag session<N>` en fin de session), et
+éventuellement **archiver** : `tar czf sauvegardes/kplayer-<date>-session<N>.tar.gz src docs tools
 assets icon.png Cargo.toml Cargo.lock .cargo run.sh README.md .gitignore`
 (`assets/` et `icon.png` servent à `installer-association.sh` : les oublier donne une archive qui ne reconstruit pas l'association de fichiers — omission constatée à la session 36), et **vérifier** par extraction
 comparée (`diff -r`), pas seulement `gzip -t`.
