@@ -96,6 +96,8 @@ pub struct App {
     pub(crate) raccourcis: TableauRaccourcis,
     /// Piste de sous-titres choisie à la main, par média (si `subtitles.remember_track`).
     pistes_choisies: crate::pistes::PistesChoisies,
+    /// Marque-pages par média (`signets.json`, dossier de configuration).
+    signets: crate::signets::Signets,
     /// Action en attente de capture (réglages : « appuyez sur une touche »).
     pub(crate) capture_raccourci: Option<Action>,
     /// Mode **réglage du recadrage** : l'image d'origine est affichée (recadrage
@@ -563,6 +565,7 @@ impl App {
             video_texture: None,
             raccourcis,
             pistes_choisies: crate::pistes::PistesChoisies::load(),
+            signets: crate::signets::Signets::load(),
             capture_raccourci: None,
             crop_reglage: false,
             molette_accumulee: 0.0,
@@ -1272,6 +1275,45 @@ impl App {
 
     /// Déplace la lecture de `delta_ms` (négatif pour reculer), sans dépasser
     /// les bornes du média.
+    /// Pose un signet à la position courante du média ouvert.
+    fn signet_ajouter(&mut self) {
+        let Some(media) = self.player.current_path().cloned() else {
+            self.annonce("Aucun média ouvert");
+            return;
+        };
+        let ms = self.player.current_position_ms();
+        if self.signets.ajouter(&media, ms) {
+            tracing::info!(target: "kinterface", "signet ajouté à {} ms", ms);
+            self.annonce(&format!("🔖 Signet ajouté à {}", crate::utils::format_time(ms)));
+        } else {
+            self.annonce("Il y a déjà un signet ici");
+        }
+    }
+
+    /// Saute au signet suivant (`avant = false`) ou précédent (`avant = true`).
+    fn signet_aller(&mut self, avant: bool) {
+        let Some(media) = self.player.current_path().cloned() else { return };
+        let pos = self.player.current_position_ms();
+        let cible = if avant { self.signets.precedent(&media, pos) } else { self.signets.suivant(&media, pos) };
+        match cible {
+            Some(ms) => {
+                let _ = self.player.seek(ms);
+                self.annonce(&format!("🔖 Signet à {}", crate::utils::format_time(ms)));
+            }
+            None => self.annonce(if avant { "Aucun signet précédent" } else { "Aucun signet suivant" }),
+        }
+    }
+
+    /// Supprime le signet de la position courante (à 1,5 s près).
+    fn signet_supprimer_ici(&mut self) {
+        let Some(media) = self.player.current_path().cloned() else { return };
+        let pos = self.player.current_position_ms();
+        match self.signets.index_proche(&media, pos) {
+            Some(i) if self.signets.supprimer(&media, i) => self.annonce("Signet supprimé"),
+            _ => self.annonce("Aucun signet à cette position"),
+        }
+    }
+
     fn decaler(&mut self, delta_ms: i64) {
         let pos = self.player.current_position_ms() as i64;
         let cible = (pos + delta_ms).max(0) as u64;
@@ -2927,6 +2969,10 @@ impl eframe::App for App {
                             let message = self.player.toggle_loop_point_b();
                             self.annonce(&message);
                         }
+                        Action::SignetAjouter => self.signet_ajouter(),
+                        Action::SignetSuivant => self.signet_aller(false),
+                        Action::SignetPrecedent => self.signet_aller(true),
+                        Action::SignetSupprimer => self.signet_supprimer_ici(),
                         // Piste de sous-titres suivante (fichiers externes)
                         Action::SousTitreSuivant => {
                             if self.subtitles.count() == 0 {
@@ -3207,6 +3253,42 @@ impl eframe::App for App {
                     }
 
                     ui.separator();
+                    let media_signets = self.player.current_path().cloned();
+                    let liste_signets: Vec<crate::signets::Signet> = media_signets
+                        .as_ref()
+                        .map(|m| self.signets.liste(m).to_vec())
+                        .unwrap_or_default();
+                    let mut aller_a: Option<u64> = None;
+                    let mut supprimer: Option<usize> = None;
+                    let mut ajouter = false;
+                    ui.menu_button("🔖 Signets", |ui| {
+                        if bouton_menu(ui, "➕ Ajouter à la position (Ctrl+B)").clicked() {
+                            ajouter = true;
+                        }
+                        ui.separator();
+                        if liste_signets.is_empty() {
+                            ui.label(egui::RichText::new("aucun signet pour ce film").weak());
+                        }
+                        for (i, signet) in liste_signets.iter().enumerate() {
+                            ui.horizontal(|ui| {
+                                if bouton_menu(ui, format!("{}  {}", crate::utils::format_time(signet.ms), signet.nom)).clicked() {
+                                    aller_a = Some(signet.ms);
+                                }
+                                if bouton_menu(ui, "🗑").clicked() {
+                                    supprimer = Some(i);
+                                }
+                            });
+                        }
+                    });
+                    if ajouter {
+                        self.signet_ajouter();
+                    }
+                    if let Some(ms) = aller_a {
+                        let _ = self.player.seek(ms);
+                    }
+                    if let (Some(i), Some(m)) = (supprimer, media_signets.as_ref()) {
+                        self.signets.supprimer(m, i);
+                    }
                     if bouton_menu(ui, "⏭ Suivant (N)").clicked() {
                         self.element_suivant();
                     }

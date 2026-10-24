@@ -26,6 +26,7 @@ mod utils;
 mod vignettes;
 mod ui;
 mod settings;
+mod signets;
 
 use std::path::PathBuf;
 

@@ -14,6 +14,10 @@
 #   4. glisser vertical +10 % : le bord haut se décale de ≈ 10 % de sa hauteur ;
 #   5. ancienne configuration : identique à la référence.
 #
+#   6. couleur : un film HD non balisé donne la MÊME couleur par la chaîne GPU (réduction dans
+#      VA-API) et par la chaîne CPU (filtre actif) — défaut trouvé en s.37 : la matrice était
+#      déduite de la taille de l'image réduite, donc 601 d'un côté et 709 de l'autre.
+#
 # Usage : tools/verif-affichage.sh [écran]      (défaut : :99)
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
@@ -133,6 +137,50 @@ else ko "glisser vertical : +$db px (attendu ≈ $(( hauteur / 10 )))"; fi
 echo "=== 5. Ancienne configuration ==="
 capture ancienne '{}'; A=$(mesure ancienne)
 if [ "$A" = "$REF" ]; then ok "sans les champs, l'affichage est celui de la référence"; else ko "ancienne : $A contre $REF"; fi
+
+echo "=== 6. Couleur identique par la chaîne GPU et par la chaîne CPU ==="
+# 1080p (donc réduit à l’affichage : la chaîne GPU entre en jeu), matrice 709, SANS balise : la couleur d'origine (200,50,40) doit revenir quel que soit le chemin.
+env -u LD_LIBRARY_PATH ffmpeg -hide_banner -loglevel error \
+    -f lavfi -i "color=c=0xC83228:s=1920x1080:r=10:d=10,format=rgb24,scale=in_range=full:out_range=tv:out_color_matrix=bt709,format=yuv420p" \
+    -c:v libx264 -crf 12 -x264-params colormatrix=undef:colorprim=undef:transfer=undef:fullrange=off -y "$BASE/hd-nu.mp4"
+pixel_centre() {  # pixel_centre <nom> '<json video>'
+    python3 - "$CONF" "$2" <<'FINPY'
+import json, sys
+video = {"scaling_method": "Lanczos"}
+video.update(json.loads(sys.argv[2]))
+json.dump({"video": video, "audio": {"device": "", "volume_max": 150},
+           "subtitles": {"auto_load": False},
+           "interface": {"show_osd": False, "screenshots_dir": "/tmp"},
+           "playback": {"resume": False}, "playlist": []}, open(sys.argv[1], "w"), indent=2)
+FINPY
+    arreter
+    "$KP" --fullscreen "$BASE/hd-nu.mp4" >"$BASE/$1.log" 2>&1 &
+    local pid=$!
+    sleep 4.5
+    xdotool mousemove 3 3 2>/dev/null || true; sleep 0.3
+    ffmpeg -hide_banner -loglevel error -f x11grab -video_size 1280x720 -i "$DISP+0,0" -frames:v 1 -y "$BASE/$1.png"
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; sleep 0.3
+    python3 -c "
+from PIL import Image
+im = Image.open('$BASE/$1.png').convert('RGB'); print(*im.getpixel((640, 360)))"
+}
+GPU=$(pixel_centre couleur-gpu '{"hardware_decoding": true, "gpu_scaling": true}')
+CPU=$(pixel_centre couleur-cpu '{"hardware_decoding": true, "gpu_scaling": true, "flip_h": true}')
+echo "  chaîne GPU : $GPU | chaîne CPU : $CPU | origine : 200 50 40"
+if sed 's/\x1b\[[0-9;]*m//g' "$BASE/couleur-gpu.log" | grep -q "scale_vaapi"; then
+    ok "la chaîne GPU (scale_vaapi) était bien active (le contrôle porte sur elle)"
+else
+    echo "  · chaîne GPU non utilisée ici (pas de VA-API) : seul le chemin CPU est mesuré"
+fi
+python3 - "$GPU" "$CPU" <<'FINPY'
+import sys
+o = (200, 50, 40)
+for nom, v in (("GPU", sys.argv[1]), ("CPU", sys.argv[2])):
+    p = tuple(map(int, v.split()))
+    if not all(abs(a - b) <= 7 for a, b in zip(p, o)):
+        print(f"    ✗ chaîne {nom} : {p} loin de {o}"); sys.exit(1)
+FINPY
+if [ $? -eq 0 ]; then ok "les deux chaînes restituent la couleur d'origine (±7)"; else ko "couleur différente selon la chaîne (GPU : $GPU, CPU : $CPU)"; fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
