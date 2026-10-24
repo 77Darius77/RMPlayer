@@ -138,7 +138,14 @@ mesure_fps() {  # mesure_fps <max_fps>
     xdotool mousemove 3 3 2>/dev/null; sleep 0.5
     distinctes_par_seconde
 }
-F0=$(mesure_fps 0); F15=$(mesure_fps 15); F30=$(mesure_fps 30); F120=$(mesure_fps 120)
+# La toute première mesure d'une séance est à froid (compilation des shaders, caches) : mesurée en
+# suite complète à 46 images/s au lieu de 59 (§ piège 118). Une mesure à vide l'écarte, et la
+# référence « sans limite » est le meilleur de deux lancements — un instrument qui sous-estime
+# la référence ferait échouer la comparaison sans que le lecteur soit en cause.
+mesure_fps 0 >/dev/null
+A=$(mesure_fps 0); B=$(mesure_fps 0)
+F0=$(python3 -c "print(max($A, $B))")
+F15=$(mesure_fps 15); F30=$(mesure_fps 30); F120=$(mesure_fps 120)
 echo "  images différentes par seconde : sans limite $F0 | 15 → $F15 | 30 → $F30 | 120 → $F120"
 python3 - "$F0" "$F15" "$F30" "$F120" <<'PY'
 import sys
