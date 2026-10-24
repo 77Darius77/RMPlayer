@@ -117,9 +117,13 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Contour de sous-titre** : sa couleur était ignorée (le texte était redessiné dans sa propre
   couleur). Corrigé et mesuré (`verif-soustitres-style` §1) ; `verif-soustitres.sh` ne le voyait pas
   car il fixait l'épaisseur à 0.
-- **Sous-titre intégré commencé avant un saut** : après un `seek`, une réplique de piste intégrée
-  commencée avant la position visée n'est pas relue (les cues sont vidés au saut et le paquet n'est
-  pas relu). Non corrigé ; le banc des langues mesure en lecture continue pour l'éviter.
+- **Sous-titre intégré après un saut — corrigé (s.37)** : la cause n'était pas la lecture des
+  paquets mais le fait qu'un saut **en pause** ne décodait aucune image (voir piège 122). Gardé par
+  `verif-saut-pause` 5/5.
+- **Pistes audio (s.37)** : langues par priorité, commentaires et audiodescriptions écartés, piste
+  « par défaut » du fichier, mémoire par film (Ctrl+J), `verif-audio-pistes` 11/11. Non fait :
+  piste audio **externe** (fichier `.mka`/`.ac3` à côté du film) et reprise après perte du
+  périphérique de sortie (sous PipeWire le serveur reroute le flux : rien à observer ici).
 - **Matrice de couleur « automatique » (lot 3)** : première version déduite de la taille de l'image
   *réduite* et des balises de l'image *filtrée* — BT.601 par la chaîne GPU, BT.709 par la chaîne CPU
   pour le même film. Trouvé par `verif-personnalisation` (inversion non mesurée), corrigé : la décision

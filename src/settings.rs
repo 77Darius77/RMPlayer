@@ -1972,6 +1972,52 @@ fn dessiner_image(app: &mut App, ui: &mut egui::Ui) {
 fn dessiner_audio(app: &mut App, ui: &mut egui::Ui) {
     let mut egaliseur_modifie = false;
 
+    sous_section(ui, "Piste audio du film", |ui| {
+        // Langues par priorité : « fre, eng » essaie fre, puis eng. Le texte en cours de frappe est
+        // gardé à part (voir la page des sous-titres : recomposer depuis la liste effacerait la
+        // virgule qu'on vient de taper).
+        let id_saisie = egui::Id::new("saisie_langues_audio");
+        let mut saisie: String = ui.memory_mut(|m| {
+            m.data
+                .get_temp_mut_or_insert_with(id_saisie, || {
+                    let a = &app.config.audio;
+                    if a.preferred_languages.is_empty() { a.default_language.clone() } else { a.preferred_languages.join(", ") }
+                })
+                .clone()
+        });
+        ligne(ui, "grille_langues_audio", "Langues (priorité)", |ui| {
+            if ui
+                .add(egui::TextEdit::singleline(&mut saisie).hint_text("fre, eng"))
+                .on_hover_text(
+                    "Plusieurs langues séparées par des virgules, la plus voulue d'abord. Les pistes de \
+                     commentaire ou d'audiodescription ne sont choisies qu'à défaut d'autre piste.",
+                )
+                .changed()
+            {
+                app.config.audio.preferred_languages = saisie
+                    .split(',')
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                let _ = app.config.save();
+                app.player.set_track_preferences(
+                    &app.config.audio.langues_preferees(),
+                    &app.config.subtitles.langues_preferees(),
+                    app.config.subtitles.use_embedded,
+                );
+            }
+        });
+        ui.memory_mut(|m| m.data.insert_temp(id_saisie, saisie));
+        if ui
+            .checkbox(&mut app.config.audio.remember_track, "Mémoriser la piste audio choisie pour chaque film")
+            .on_hover_text("La piste choisie à la main (Ctrl+J, menu Audio) revient à la réouverture du même film")
+            .changed()
+        {
+            app.player.set_audio_remember(app.config.audio.remember_track);
+            let _ = app.config.save();
+        }
+    });
+
     sous_section(ui, "Sortie", |ui| {
         let actuel = if app.config.audio.device.is_empty() {
             "Périphérique par défaut".to_string()
@@ -2452,7 +2498,7 @@ fn dessiner_sous_titres(app: &mut App, ui: &mut egui::Ui) {
                     .collect();
                 let _ = app.config.save();
                 app.player.set_track_preferences(
-                    &app.config.audio.default_language,
+                    &app.config.audio.langues_preferees(),
                     &app.config.subtitles.langues_preferees(),
                     app.config.subtitles.use_embedded,
                 );
@@ -3190,6 +3236,8 @@ fn audio_modifiee(app: &App) -> bool {
     let a = &app.config.audio;
     a.device != d.device
         || a.volume_max != d.volume_max
+        || a.preferred_languages != d.preferred_languages
+        || a.remember_track != d.remember_track
         || a.eq_enabled != d.eq_enabled
         || !a.eq_is_neutral()
         || a.processing_active()

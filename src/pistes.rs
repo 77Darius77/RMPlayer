@@ -40,7 +40,16 @@ pub struct PistesChoisies {
 impl PistesChoisies {
     /// Charge le fichier (silencieusement vide s'il n'existe pas ou s'il est illisible).
     pub fn load() -> Self {
-        let path = dirs::cache_dir().map(|d| d.join("kplayer").join("pistes.json"));
+        Self::load_fichier("pistes.json")
+    }
+
+    /// Mémoire des pistes **audio** choisies à la main (fichier distinct de celui des sous-titres).
+    pub fn load_audio() -> Self {
+        Self::load_fichier("pistes-audio.json")
+    }
+
+    fn load_fichier(nom: &str) -> Self {
+        let path = dirs::cache_dir().map(|d| d.join("kplayer").join(nom));
         let entries = path
             .as_ref()
             .and_then(|p| std::fs::read_to_string(p).ok())

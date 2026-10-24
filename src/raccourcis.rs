@@ -51,6 +51,8 @@ pub enum Action {
     ImagePrecedente,
     SousTitresVisibles,
     SousTitreSuivant,
+    /// Piste audio suivante (VO / VF / commentaire…), dans l'ordre du fichier.
+    PisteAudioSuivante,
     PleinEcran,
     Echap,
     Capture,
@@ -102,6 +104,7 @@ impl Action {
         Action::Muet,
         Action::SousTitresVisibles,
         Action::SousTitreSuivant,
+        Action::PisteAudioSuivante,
         Action::PleinEcran,
         Action::Echap,
         Action::Capture,
@@ -154,6 +157,7 @@ impl Action {
             Action::ImagePrecedente => "image.precedente",
             Action::SousTitresVisibles => "soustitres.visibles",
             Action::SousTitreSuivant => "soustitres.suivant",
+            Action::PisteAudioSuivante => "audio.piste_suivante",
             Action::PleinEcran => "affichage.plein_ecran",
             Action::Echap => "affichage.echap",
             Action::Capture => "image.capture",
@@ -206,6 +210,7 @@ impl Action {
             Action::ImagePrecedente => "Image précédente",
             Action::SousTitresVisibles => "Afficher / masquer les sous-titres",
             Action::SousTitreSuivant => "Piste de sous-titres suivante",
+            Action::PisteAudioSuivante => "Piste audio suivante",
             Action::PleinEcran => "Plein écran",
             Action::Echap => "Fermer la fenêtre / sortir du plein écran",
             Action::Capture => "Capture d'écran (PNG)",
@@ -253,7 +258,7 @@ impl Action {
             | Action::ChapitreSuivant
             | Action::ImageSuivante
             | Action::ImagePrecedente => "Vitesse et chapitres",
-            Action::VolumePlus | Action::VolumeMoins | Action::Muet => "Son",
+            Action::VolumePlus | Action::VolumeMoins | Action::Muet | Action::PisteAudioSuivante => "Son",
             Action::SousTitresVisibles | Action::SousTitreSuivant => "Sous-titres",
             Action::PleinEcran
             | Action::Echap
@@ -304,6 +309,7 @@ impl Action {
             Action::ImagePrecedente => ",",
             Action::SousTitresVisibles => "V, DoubleClic",
             Action::SousTitreSuivant => "J",
+            Action::PisteAudioSuivante => "Ctrl+J",
             Action::PleinEcran => "F, Entree, F11",
             Action::Echap => "Echap",
             Action::Capture => "S",

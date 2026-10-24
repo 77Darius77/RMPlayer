@@ -52,7 +52,7 @@ marche, limite, a été retiré), `docs/AVANCEMENT.md` (journal des sessions, bu
 | Mémoire de la fenêtre — Wayland | `tools/verif-fenetre-wayland.sh` — **12/12** (taille restituée, aucune position inventée, règle KWin appliquée puis retirée ; mesure par script KWin, fenêtre ciblée par PID) |
 | Comparaison des désentrelaceurs | `tools/bench-desentrelacement.sh` — `bwdif` 45,8 dB contre `yadif` 43,4 dB (image immobile), 11,2 contre 13,2 ms/image 1080p |
 | Suite complète | `tools/tout-verifier.sh` — démarre l'écran virtuel si besoin, **verrouille** (une seule suite à la fois), enchaîne les 26 bancs et imprime le total |
-| **Total** | **614 contrôles, 0 échec** (39 bancs), plus **161 tests unitaires** (`cargo test`) |
+| **Total** | **629 contrôles, 0 échec** (41 bancs), plus **164 tests unitaires** (`cargo test`) |
 
 ---
 

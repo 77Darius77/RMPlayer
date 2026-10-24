@@ -512,6 +512,13 @@ pub struct AudioSettings {
     /// Vide = prendre la première piste (comportement historique).
     #[serde(default)]
     pub default_language: String,
+    /// Langues audio préférées **par ordre de priorité** (`["fre", "eng"]`). Vide = seulement
+    /// `default_language`.
+    #[serde(default)]
+    pub preferred_languages: Vec<String>,
+    /// Mémoriser, par film, la piste audio choisie à la main (Ctrl+J, menu Audio).
+    #[serde(default)]
+    pub remember_track: bool,
     /// Normaliseur de volume (filtre `dynaudnorm`) : égalise le niveau perçu entre
     /// les scènes calmes et les passages forts. C'est le « Normalizer » de PotPlayer.
     #[serde(default)]
@@ -1097,6 +1104,27 @@ pub struct SubtitleSettings {
     pub remember_track: bool,
 }
 
+impl AudioSettings {
+    /// Langues à essayer, dans l'ordre : `preferred_languages` (nettoyées, sans doublon), sinon
+    /// `default_language` seule.
+    pub fn langues_preferees(&self) -> Vec<String> {
+        let mut liste: Vec<String> = Vec::new();
+        for l in &self.preferred_languages {
+            let l = l.trim().to_lowercase();
+            if !l.is_empty() && !liste.contains(&l) {
+                liste.push(l);
+            }
+        }
+        if liste.is_empty() {
+            let d = self.default_language.trim().to_lowercase();
+            if !d.is_empty() {
+                liste.push(d);
+            }
+        }
+        liste
+    }
+}
+
 impl SubtitleSettings {
     /// Langues à essayer, dans l'ordre : `preferred_languages` (nettoyées, sans doublon),
     /// sinon `default_language` seule.
@@ -1469,6 +1497,8 @@ impl Default for AudioSettings {
             device: String::new(),
             volume_max: 150,
             default_language: String::new(),
+            preferred_languages: Vec::new(),
+            remember_track: false,
             eq_enabled: false,
             eq_gains: default_eq_gains(),
             normalizer: false,
@@ -2539,6 +2569,19 @@ mod tests {
         assert_eq!(ancien.max_fps, 0);
         assert!(ancien.decoders.is_empty());
         assert_eq!(PlaybackSettings::default().priority, crate::systeme::Priorite::Normale);
+    }
+
+    #[test]
+    fn les_langues_audio_se_relisent_avec_priorite() {
+        let mut a = AudioSettings::default();
+        assert!(a.langues_preferees().is_empty(), "rien de configuré : aucune préférence");
+        a.default_language = "fre".into();
+        assert_eq!(a.langues_preferees(), ["fre"]);
+        let relu: AudioSettings =
+            serde_json::from_str(r#"{"preferred_languages": ["ENG", " fre ", "eng"], "remember_track": true}"#).unwrap();
+        assert_eq!(relu.langues_preferees(), ["eng", "fre"]);
+        assert!(relu.remember_track);
+        assert!(!AudioSettings::default().remember_track);
     }
 
     #[test]
