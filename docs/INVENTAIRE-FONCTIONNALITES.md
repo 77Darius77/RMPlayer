@@ -13,7 +13,7 @@ a été **retiré** parce que non implémentable dans le cadre du projet. Ne dé
    d'écran (`tools/capture-lecteur.sh`), mesures CPU (`tools/bench-hwdec.sh`), lecture des
    journaux et des fichiers produits (PNG, JSON de configuration et de positions).
 
-Dernière vérification : **2026-10-16 (session 9)**.
+Dernière vérification : **2026-10-25 (session 37)**. Les lignes des sessions 35 à 37 sont en tête du tableau ; chacune renvoie à son banc (`README.md`, § Outils).
 
 ---
 
@@ -21,6 +21,18 @@ Dernière vérification : **2026-10-16 (session 9)**.
 
 | Domaine | Vérification |
 |---|---|
+| **Sortie audio PipeWire** (session 37) | les vraies sorties par leur nom, changement en cours de lecture (menu, préférences, `Ctrl+Maj+J`), retour au défaut, ancien réglage ALSA, sortie disparue : le 440 Hz arrive sur la sortie choisie et nulle part ailleurs (`verif-peripheriques` 17/17) |
+| **Fenêtres détachables** (session 37) | Préférences, Statistiques, Aide, À propos en vraies fenêtres système : distinctes, déplacées hors du lecteur, contenu visible, rattachement, Échap, mémoire (`verif-fenetres-detachables` 24/24) |
+| **Pistes audio** (session 37) | langues par priorité, commentaires et audiodescriptions écartés, piste par défaut du fichier, mémoire par film, `Ctrl+J` — mesuré au son (`verif-audio-pistes` 11/11) |
+| **Saut en pause** (session 37) | l'image (teinte qui dit l'instant) et la réplique intégrée suivent un saut ; le pas à pas change l'image (`verif-saut-pause` 5/5) |
+| **Fichiers récents, répétition A-B réglable, export / import** (session 37) | liste bornée à 10 relue après de vraies ouvertures ; nombre de retours et pause comptés sur MPRIS ; aller-retour octet pour octet (`verif-recents` 7/7, `verif-boucle-ab` 6/6, `verif-config-io` 12/12) |
+| **Style des sous-titres, langues, durées, encodage** (session 37) | contour, ombre, interligne, marges, échelle, fondu mesurés en pixels ; langues par priorité ; alphabet imposé (`verif-soustitres-style` 9/9, `verif-soustitres-langues` 12/12) |
+| **Couleur, rogner / glisser, décodeur par codec, cadence maximale** (session 37) | couleur RVB d'origine retrouvée (BT.601/709, limitée/complète) et identique par la chaîne GPU et CPU ; décodeur réellement ouvert, repli sur le défaut (`verif-couleur` 11/11, `verif-affichage` 7/7, `verif-decodeur` 7/7) |
+| **Signets, souris avec Ctrl / Maj / Alt** (session 37) | ajouter, naviguer, supprimer, après redémarrage ; effets lus sur MPRIS (`verif-signets` 7/7, `verif-souris` 4/4) |
+| **Icône de notification, démarrage automatique, priorité** (session 37) | StatusNotifierItem piloté par D-Bus ; `.desktop` d'autostart ; nice de tous les fils (`verif-tray` 7/7, `verif-systeme` 10/10) |
+| **Thèmes externes** (session 37) | pixel de la barre de menus ; thème illisible refusé avec la raison (`verif-theme` 6/6) |
+| **Repli CPU borné du HDR** (session 36) | ≤ 1080p30 converti par le CPU, au-delà image non convertie avec avis à l'écran, pas de reconstruction à chaque image (`verif-hdr` 36/36) |
+| **Renommage RMPlayer et reprise des données** (session 37) | un vrai lancement relit les réglages, positions et thèmes de l'ancien dossier, copié sans jamais être supprimé (`verif-migration` 7/7) |
 | Ouverture média (MP4, MKV, AVI, MOV, WMV, FLV, WebM…) | lecture effective |
 | Décodage vidéo **matériel VA-API** + repli logiciel automatique | mode constaté affiché, §6.10 de `AVANCEMENT.md` |
 | **Méthode de mise à l'échelle** (Lanczos, Bicubique, Bilinéaire, Moyenne de zone, Plus proche voisin) | damier 4K réduit : écart-type 1,8 / 6,6 / 121 selon la méthode → **le réglage agit** |
@@ -50,7 +62,6 @@ Dernière vérification : **2026-10-16 (session 9)**.
 | Seek précis (vidéo **et** audio) | cible respectée, resynchronisation |
 | Fin de fichier + enchaînement de playlist | test à 2 médias |
 | Audio cpal, format du périphérique | 44 100 Hz, 2 canaux, F32 |
-| **Choix du périphérique de sortie** | liste cpal dans les préférences, appliqué (rechargement automatique) |
 | Volume, mute, **volume maximal** | plafond réellement appliqué (`set_volume_max`) |
 | **Vitesse de lecture** 0,1×–8× **avec audio** | hauteur conservée (`atempo`) : 440 Hz restent 440 Hz à 2× ; `--speed` pour la mesure |
 | **Animations ASS** (session 20) | `\move` (centre 23 % → 79 %), `\t` (4108 → 13249 px), karaoké balayé (798 → 1267 px) ; `verif-ass.sh` 17/17, 21 tests unitaires |
@@ -75,7 +86,6 @@ Dernière vérification : **2026-10-16 (session 9)**.
 | Glisser-déposer, « Ouvrir… », **« Ouvrir dossier… »** | le dossier devient une playlist et le **premier** fichier est lu |
 | Rapport de crash | `signal=11` détaillé, core préservé |
 | **Journaux FFmpeg** redirigés vers `tracing` | sortie d'erreur propre ; détails en `rmplayer=debug` |
-| **Refus explicite d'un codec matériel uniquement** | AV1 en logiciel : message actionnable au lieu d'une boucle d'erreurs |
 | **Filet de sécurité** | arrêt de la lecture après 120 paquets vidéo sans image produite |
 | Configuration persistante | uniquement des réglages réellement appliqués (voir §3) |
 
@@ -92,18 +102,18 @@ Dernière vérification : **2026-10-16 (session 9)**.
 | ~~**Correction de hauteur** à vitesse ≠ 1,0~~ | **faite en session 16** | `atempo` quand `pitch_preserved` est vrai (440 Hz restent 440,0 Hz à 2×) ; le rééchantillonnage simple reste possible en le désactivant |
 | ~~**Horloge de lecture**~~ | **faite en session 21** | la carte son est maître ; le temps mural ne sert que de repli (média muet, piste audio terminée, périphérique suspendu) |
 | **Enregistrement audio/vidéo, transcodage, extraction** | absent | hors du périmètre actuel (lecture) |
-| **Mappage tonal HDR** | **écarté volontairement** (session 16) : sans intérêt sur un écran SDR, et **mesuré comme dégradant** ici | `zscale` (libzimg) absent → aucune linéarisation de la courbe PQ/HLG ; `tonemap` seul applique la courbe sur un signal encore codé en PQ et produit une image plate (**mesure : luminance moyenne 43/1023 au lieu de 504, plage utile 19–66**). `colorspace` refuse `smpte2084` (« Unsupported input transfer characteristics »). Il faudrait zimg, ou une linéarisation écrite à la main |
-| **Rendu GPU type `gpu-next`** | absent — **chantier identifié** (voir §8 de `AVANCEMENT.md`) | le FFmpeg de `/opt` est compilé sans bibliothèque externe ; Vulkan et `libplacebo338` sont installés, mais il manque `libplacebo-dev` et les sources FFmpeg |
+| ~~**Mappage tonal HDR**~~ | **fait en session 35** (voir §1 : `libplacebo` + repli CPU borné) | reste le *passthrough*, impossible tant que la fenêtre est rendue en 8 bits (`docs/HDR.md`) |
+| **Rendu GPU type `gpu-next`** | **partiel** : `libplacebo` (Vulkan) sert à la conversion tonale HDR depuis la session 35 | l'**affichage sans rapatriement** (dmabuf/EGL, rendu `wgpu`) n'est pas fait : voir `docs/OPTIMISATION.md` §5 |
 | **AV1** | lisible **en matériel et en logiciel** (depuis la s.31 : `libdav1d` compilé) |
 | Élément retiré | Raison |
 |---|---|
-| `hdr_tonemapping`, `motion_interpolation`, `sync_mode` | exigent `zscale`/`libplacebo` (HDR) ou une interpolation de mouvement absente de ce build. → réglages sans effet, retirés |
+| `hdr_tonemapping`, `motion_interpolation`, `sync_mode` | exigent `zscale`/`libplacebo` (HDR) ou une interpolation de mouvement absente de ce build. → réglages sans effet, retirés (le HDR a été **réintroduit en session 35**, cette fois réellement branché : voir §1) |
 | *(le détramage `deband` a été **réintroduit en session 13**, cette fois réellement branché : voir §1)* |
 | Profil qualité (`MaxQuality`, `Balanced`, `Performance`, `Cinema`, `Gaming`) | n'était qu'un sélecteur sans effet : les profils dépendaient précisément des filtres ci-dessus |
 | *(ancien)* Égaliseur (`EqPreset`) | **réintroduit en session 15**, cette fois réellement branché (`superequalizer`) |
 | `normalize_downmix` | nécessite un traitement de dynamique non implémenté |
 | `AudioOutput` (PipeWire/PulseAudio/ALSA/Jack) | faux choix : cpal choisit le back-end ; remplacé par la **liste réelle des périphériques** |
-| `shortcuts` (table de raccourcis) | les touches sont câblées dans `ui.rs` ; un re-mappage complet demanderait une couche d'indirection. **On ne fait pas semblant** |
+| ~~`shortcuts` (table de raccourcis)~~ | **réintroduit en session 25** : table unique `src/raccourcis.rs`, personnalisable au clavier et à la souris (conflits signalés, aide `F1` vivante) |
 | `keep_open` | sans effet mesurable |
 | Capture d'écran **simulée** (`S`) | remplacée par une véritable écriture PNG |
 | OSD **non dessiné** (`O`) | remplacé par un vrai bandeau |
@@ -117,10 +127,8 @@ Dernière vérification : **2026-10-16 (session 9)**.
 
 1. ~~**Chaîne de filtres FFmpeg** (`avfilter`)~~ — **faite en session 13** : détramage
    (`deband`), débruitage (`hqdn3d`), désentrelacement (`yadif`), réglages d'image (`eq`),
-   chacun vérifié par une mesure (`tools/verif-filtres.sh`). **Reste** : le mappage tonal
-   HDR (bloqué par l'absence de `zscale`, voir §2) et l'**égaliseur audio**
-   (`firequalizer`/`superequalizer` opèrent sur l'audio, donc dans un second graphe
-   `abuffer → … → abuffersink`, non branché).
+   chacun vérifié par une mesure (`tools/verif-filtres.sh`). **Reste** : rien de bloquant (le mappage tonal HDR est fait depuis la session 35 ; l'égaliseur
+   audio `superequalizer` est branché depuis la session 15).
 2. ~~**Sous-titres embarqués** et **choix de piste**~~ — **fait en session 17**.
 3. ~~**Rendu ASS par événement**~~ et ~~**profils nommés**~~ — **faits en session 19**.
 4. ~~**Horloge audio maître**~~ — **faite en session 21** : la cadence suit les échantillons

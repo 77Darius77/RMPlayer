@@ -3,7 +3,7 @@
 > État d'ensemble et travail restant : [`ETAT-DU-PROJET.md`](ETAT-DU-PROJET.md).
 > Ce document décrit l'environnement, l'API du moteur et les procédures de diagnostic.
 
-**Date :** 2026-10-16  
+**Date :** 2026-10-25 (session 37)  
 **Binaire validé :** `target/release/rmplayer` (51 Mo, `debug = "line-tables-only"`)
 
 ---
@@ -14,10 +14,10 @@
 |---|---|
 | FFmpeg | 7.1.3 — `/opt/ffmpeg-7.1`, compilé avec `--enable-libdav1d --enable-libplacebo --enable-libzimg --enable-vulkan` (session 35). Ancienne installation (sans HDR) conservée dans `/opt/ffmpeg-7.1.avant-hdr` |
 | Bibliothèques | `LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib` |
-| Serveur audio | PipeWire 1.6 (`pipewire-pulse`), sinks : HDMI `alsa_output.pci-0000_0c_00.1.hdmi-stereo` + Bluetooth |
+| Serveur audio | PipeWire 1.6 (`pipewire-pulse`), sorties : HDMI `alsa_output.pci-0000_0c_00.1.hdmi-stereo` + enceinte Bluetooth. Outils utilisés par le lecteur : `pw-dump`, `pw-metadata` (sélection de la sortie) ; par les bancs : `pw-record`, `pactl` |
 | Format de sortie audio obtenu | `44100 Hz, 2 canaux (F32)` |
 | GPU / OpenGL | AMD Radeon RX 6700 XT, Mesa 25.3.6, OpenGL 4.6 (backend `glow`) |
-| Affichage | X11 (`DISPLAY=:0`), écran 2560×1080 |
+| Affichage | **Plasma 6.8 sous Wayland** (la session X11 a disparu), trois écrans SDR. Les bancs tournent sous **Xvfb** (écran virtuel 1500×900) |
 | Outils de diagnostic | `gdb`, `coredumpctl`, `zstd`, `addr2line`, `scrot`, `xdotool`, `vainfo` |
 | Décodage matériel | VA-API 1.20 (libva 2.12), `radeonsi_drv_video.so`, Mesa Gallium 25.3.6 |
 | Profils VA-API utiles | H.264 (hors `yuvj420p`), HEVC Main/Main10, VP9, **AV1**, MPEG-2, VC-1, MJPEG |
@@ -36,6 +36,11 @@
 | `tracing` / `tracing-subscriber` | 0.1 / 0.3 | Journalisation (`RUST_LOG=rmplayer=debug`) |
 | `libc` | 0.2 | Handler de signal de `crash.rs` |
 | `chrono` | 0.4 | Dates |
+| `zbus` | 5.19 | MPRIS (D-Bus, `blocking-api`, serveur dans son propre fil) |
+| `ksni` | 0.3 | Icône de zone de notification (StatusNotifierItem) |
+| `encoding_rs` | 0.8 | Encodages des sous-titres externes (alphabet imposé) |
+| `png` | 0.18 | Captures d'écran (encodeur pur Rust) |
+| `x11rb` | 0.13 | « Fenêtre toujours au-dessus » (X11 seulement) |
 
 > `rodio` a été **retiré** : la sortie audio passe exclusivement par cpal.
 
@@ -45,56 +50,43 @@
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `src/player.rs` | 6812 | Moteur de lecture (décodage VA-API, mise à l'échelle, reprise) |
-| `src/ui.rs` | 4605 | Interface (menus, OSD, playlist, préférences, mémoire de la fenêtre) |
-| `src/ass.rs` | 2058 | Rendu ASS (styles, animations, karaoké, sous-titres image) |
-| `src/settings.rs` | 2789 | Fenêtre « Préférences » : sections dépliables (table `SECTIONS`) |
-| `src/config.rs` | 2220 | Configuration (réglages réellement appliqués) |
-| `src/raccourcis.rs` | 925 | Table des raccourcis (défauts, personnalisation, aide F1) |
-| `src/main.rs` | 924 | Point d'entrée, options de ligne de commande, géométrie de fenêtre |
-| `src/audio.rs` | 688 | Sortie cpal + liste des périphériques |
-| `src/subtitles.rs` | 478 | Sous-titres externes |
-| `src/crash.rs` | 365 | Rapport de crash |
-| `src/utils.rs` | 142 | Utilitaires |
-| `src/hdr.rs` | 920 | HDR : détection PQ/HLG/BT.2020, plan de conversion (GPU/CPU), tramage, débanding — fonctions pures testables |
-| `src/edid.rs` | 309 | EDID : lecture et décodage des blocs CEA-861 (PQ, HLG, BT.2020, luminance max) des écrans allumés |
-| `src/mpris.rs` | 640 | MPRIS : interfaces D-Bus (racine + lecteur), état publié, file de commandes, réveil de l'interface |
-| `src/vignettes.rs` | 519 | Vignettes de la barre : décodeur FFmpeg autonome, fil de travail, regroupement par tranche |
+| `src/player.rs` | 7418 | Moteur de lecture (décodage VA-API, mise à l'échelle, cadence, pistes, filtres, reprise) |
+| `src/ui.rs` | 5306 | Interface (menus, OSD, playlist, fenêtres, mémoire de la fenêtre) |
+| `src/settings.rs` | 3338 | Fenêtre « Préférences » : sections dépliables (table `SECTIONS`) |
+| `src/config.rs` | 2724 | Configuration (réglages réellement appliqués), profils, export / import |
+| `src/ass.rs` | 2059 | Rendu ASS (styles, animations, karaoké, sous-titres image) |
+| `src/main.rs` | 1295 | Point d'entrée, options de ligne de commande, géométrie de fenêtre |
+| `src/hdr.rs` | 998 | HDR : détection PQ/HLG/BT.2020, plan de conversion (GPU/CPU), tramage, débanding |
+| `src/raccourcis.rs` | 990 | Table unique des raccourcis clavier et souris (défauts, personnalisation, aide F1) |
+| `src/audio.rs` | 695 | Sortie cpal, tampon circulaire, horloge audio |
+| `src/subtitles.rs` | 650 | Sous-titres externes (SRT / ASS), encodage |
+| `src/mpris.rs` | 640 | MPRIS : interfaces D-Bus, état publié, file de commandes, réveil de l'interface |
+| `src/vignettes.rs` | 519 | Vignettes de la barre : décodeur FFmpeg autonome, fil de travail |
 | `src/instance.rs` | 370 | Instance unique : socket Unix, transmission des chemins, balayage des sockets orphelins |
-| `src/x11.rs` | 114 | « Fenêtre toujours au-dessus » (`_NET_WM_STATE`, sans passer par la commande d'eframe qui panique) |
+| `src/crash.rs` | 365 | Rapport de crash |
+| `src/sortie_audio.rs` | 313 | Sorties PipeWire : liste lisible (`pw-dump`) et redirection du flux (`pw-metadata`) |
+| `src/edid.rs` | 309 | EDID : capacités annoncées par les écrans allumés |
+| `src/utils.rs` | 167 | Utilitaires |
+| `src/signets.rs` | 166 | Signets par média |
+| `src/systeme.rs` | 136 | Démarrage automatique et priorité du processus |
+| `src/theme.rs` | 131 | Thèmes externes JSON |
+| `src/migration.rs` | 128 | Reprise des données de l'ancien nom (KPlayer) |
+| `src/tray.rs` | 120 | Icône de zone de notification (StatusNotifierItem) |
+| `src/pistes.rs` | 117 | Mémoire des pistes choisies à la main |
+| `src/x11.rs` | 114 | « Fenêtre toujours au-dessus » (`_NET_WM_STATE`) |
+| `src/fenetre.rs` | 97 | Fenêtres flottantes détachables (viewport immédiat) |
 | `src/positions.rs` | 73 | Reprise de lecture |
-| `src/renderer.rs` | 43 | Transport des frames |
-| **Total** | **25299** | (hors `tools/`, 19 modules) |
-| `tools/bench-hwdec.sh` | 78 | Banc d'essai matériel/logiciel (CPU par thread) |
-| `tools/capture-lecteur.sh` | 56 | Lecture sur écran X virtuel + capture PNG |
-| `tools/diag-touches.sh` | 39 | Diagnostic du clavier sous Xvfb |
-| `tools/zones-barre.py` | 29 | Détection des boutons de la barre (analyse d'image) |
-| `tools/audit-ui.sh` | 512 | Audit de l'interface (boutons, raccourcis, fenêtres, gel) |
-| `tools/check-ctx-reentrance.py` | 114 | Interblocages egui : `ctx.*` dans une fermeture de saisie |
-| `tools/vivacite.sh` | 40 | Détecteur de gel (délivrance réelle d'un message) |
-| `tools/test-vivacite.sh` | 78 | Preuve que le détecteur de gel détecte (`SIGSTOP`/`SIGCONT`) |
-| `tools/diag-gel.sh` | 90 | Reproduit un gel et affiche la pile (lancement sous `gdb` + `SIGSTOP`) |
-| `tools/verif-filtres.sh` | 313 | Vérifie chaque filtre par une mesure (12 contrôles, `--dump-frame`) |
-| `tools/audit-prefs.sh` | 303 | Fenêtre Préférences : bornage, dépliage, défilement (géométrie journalisée) |
-| `tools/metrics-image.py` | 100 | Métriques d'image : bandes, bruit, peigne, luminance, saturation |
-| `tools/verif-fenetre.sh` | 272 | Mémoire de la taille et de la position de la fenêtre (9 contrôles : déplacement → configuration → relance → géométrie réelle) |
-| `tools/verif-fenetre-wayland.sh` | 293 | Mémoire de la fenêtre sous Wayland (12 contrôles ; mesure par script KWin, fenêtre ciblée par PID, `kwinrulesrc` sauvegardé/restauré) |
-| `tools/installer-association.sh` | 205 | « Ouvrir avec » : `.desktop`, icône, `mimeinfo.cache`, `--par-defaut`, `--etat`, `--retirer` |
-| `tools/verif-hdr.sh` | 390 | HDR (23 contrôles, mires en nits, VA-API vs logiciel) |
-| `tools/verif-focus.sh` | 233 | Pause selon le focus de la fenêtre (6 contrôles, deux fenêtres réelles) |
-| `tools/verif-mpris.sh` | 290 | MPRIS — module seul (27 contrôles, mode `--mpris-test`, sans écran) |
-| `tools/verif-vignettes.sh` | 230 | Vignettes — module seul (14 contrôles, sans écran) |
-| `tools/verif-playlist.sh` | 512 | Playlist : aléatoire, glisser-déposer, clic et ✕, volet borné (18 contrôles ; lignes visées depuis la géométrie journalisée) |
-| `tools/verif-rapide.sh` | 110 | Vérification ciblée : ne rejoue que les bancs d'un sujet (`playlist`, `ui`, `fenetre`…) |
-| `tools/verif-association.sh` | 393 | Association et instance unique (38 contrôles ; `Exec` réellement exécuté) |
-| `tools/regle-fenetre-kwin.sh` | 227 | Règle de fenêtre KWin : la position de RMPlayer sous Wayland (`--position`, `--depuis-fenetre`, `--etat`, `--retirer`) |
-| `tools/verif-ass.sh` | 412 | Rendu ASS : 21 tests unitaires + position, couleur, alignement, animations, karaoké |
-| `tools/verif-profils.sh` | 334 | Profils de réglages |
-| `tools/verif-pistes.sh` | 305 | Pistes embarquées : inventaire, bascule à chaud, sous-titres (16 contrôles) |
-| `tools/verif-audio.sh` | 514 | Audio : 29 contrôles (9 traitements mesurés) |
-| `tools/analyse-audio.py` | 143 | 8 mesures audio (niveaux, crête, S/B, canaux, fréquence, queue, début) |
+| `src/renderer.rs` | 43 | Transport des images |
+| **Total** | **29280** | 27 modules (hors `tools/`) |
 
-*(Compteurs `src/` et de `verif-fenetre.sh` mesurés en session 32 ; les autres lignes de `tools/` datent de la session 20 : indicatives.)*
+`tools/` : 44 bancs lancés par `tout-verifier.sh`, plus les outils de diagnostic (`audit-ui.sh`,
+`check-ctx-reentrance.py`, `vivacite.sh`, `diag-gel.sh`, `capture-lecteur.sh`…) et les
+installateurs (`installer-association.sh`, `regle-fenetre-kwin.sh`). **Liste, rôle et nombre de
+contrôles de chacun : `README.md`, § Outils** (c'est la table tenue à jour). Instruments
+partagés : `env-bancs.sh` (environnement des bancs), `analyse-audio.py`, `metrics-image.py`,
+`pw-flux.py` (où va le flux audio dans PipeWire).
+
+*(Compteurs de `src/` mesurés en session 37.)*
 
 ---
 
@@ -145,11 +137,11 @@
 | `set_scaling_method(ScalingMethod)` | Méthode de réduction transmise à `sws_getContext` (5 choix) |
 | `set_display_target(w, h)` | Taille de conversion RGBA (pixels). `(0, 0)` = natif ; hystérésis de 16 px |
 | `set_volume_max(u16)` | Plafond de volume (100–300 %) ; ramène le volume courant dans la limite |
-| `set_audio_device(&str)` | Périphérique de sortie (nom cpal, `""` = défaut) ; sortie recréée au chargement suivant |
+| `set_audio_device(&str) -> bool` | Sortie audio : `""` = défaut, `pw:<nom>` = sortie PipeWire (le flux est **redirigé** sans coupure), autre = nom ALSA ouvert tel quel. Renvoie `true` si la sortie a dû être recréée (l'appelant recharge alors le média) |
 | `set_speed(f32)` | Vitesse 0,1–8× **et** rééchantillonnage audio synchrone |
 | `set_resume(bool)` / `persist_position()` | Reprise de lecture (positions par média) |
 | `current_path() -> Option<&PathBuf>` | Média réellement ouvert (indépendant de la playlist) |
-| `reload_current_media()` | Recharge le média courant (position + pause conservées) — applique un changement de mode ou de périphérique |
+| `reload_current_media()` | Recharge le média courant (position + pause conservées) — applique un changement de mode ou de sortie ALSA |
 
 ### Structures
 
@@ -212,9 +204,10 @@ journalisation de géométrie sont pris en charge par `settings::window`.
 | `select_subtitle_stream(index)` | ouvre une piste de sous-titres du conteneur (`-1` = aucune) |
 | `embedded_text_at(ms)` | texte de la piste embarquée à cet instant |
 | `dump_subtitles()` | tous les événements de la piste (texte + minutages) |
-| `set_track_preferences(audio_lang, sub_lang, embedded)` | préférences appliquées aux prochains chargements |
+| `set_track_preferences(audio: &[String], subs: &[String], embedded)` | listes de langues **par priorité**, appliquées aux prochains chargements |
+| `memoriser_piste_audio(index)` / `set_audio_remember(bool)` | mémoire de la piste choisie à la main, par média (`pistes-audio.json` du cache) |
 
-Réglages : `audio.default_language`, `subtitles.default_language`, `subtitles.use_embedded`.
+Réglages : `audio.preferred_languages` (et `default_language` à défaut), `audio.remember_track`, `subtitles.preferred_languages`, `subtitles.use_embedded`. Choix : `choisir_piste_audio` écarte commentaires et audiodescriptions (drapeau du conteneur ou mot du titre), puis suit la liste de langues, puis la piste « par défaut » du fichier.
 Structures : `TrackInfo` (index, codec, langue, titre, canaux, taux, `bitmap`),
 `EmbeddedCue` (début, fin, texte).
 
@@ -330,7 +323,12 @@ gdb -q -nx -batch -x script.gdb ./target/release/rmplayer
 
 ---
 
-## Validation effectuée (dernière session)
+## Validation historique (sessions 9 à 20)
+
+> **Ces mesures datent des sessions 9 à 20.** L'état courant est mesuré par la suite complète
+> (`docs/DERNIERE-SUITE.txt`) et décrit module par module dans `README.md` (§ Outils). Quelques
+> lignes ci-dessous sont **corrigées depuis** (AV1 logiciel : `libdav1d` depuis la session 31 ; choix
+> du périphérique audio : refait en session 37, voir `src/sortie_audio.rs`).
 
 | Test | Résultat |
 |---|---|
@@ -377,7 +375,7 @@ gdb -q -nx -batch -x script.gdb ./target/release/rmplayer
 | Pistes — bascule à chaud | ✅ menu → « flux 2 — fre », lecture non interrompue |
 | Pistes — affichage | ✅ sous-titre embarqué dessiné (écart d'image 12,94/255) |
 | Décodage VA-API — H.264 720p / 4K | ✅ matériel confirmé (CPU 22 % → 22 %, 56 % → 37 %) |
-| Décodage VA-API — AV1 4K 60 i/s | ✅ 52 % CPU (aucun décodeur logiciel dans ce FFmpeg) |
+| Décodage VA-API — AV1 4K 60 i/s | ✅ 52 % CPU (le décodage logiciel AV1 est disponible depuis la session 31) |
 | Repli automatique — H.264 `yuvj420p` 1080p | ✅ repli signalé, lecture normale |
 | Bascule `H` en cours de lecture | ✅ rechargement à la position (00:09 conservé), mode affiché mis à jour |
 | Enchaînement de playlist (2 médias) | ✅ (non-régression après le correctif de playlist) |
@@ -389,7 +387,7 @@ gdb -q -nx -batch -x script.gdb ./target/release/rmplayer
 | Ouvrir dossier | ✅ playlist constituée, premier fichier lu |
 | Reprise de lecture | ✅ `Reprise de lecture à 29300 ms` après réouverture |
 | Vitesse 1,2× | ✅ `Audio rééchantillonné pour 1.20x (44100 Hz → 36750 Hz)` |
-| Changement de périphérique audio | ✅ sortie recréée, préférences listant les périphériques cpal |
+| Changement de périphérique audio | ✅ session 9 : sortie recréée. **Refait en session 37** : redirection du flux PipeWire en cours de lecture (`verif-peripheriques`) |
 | Enchaînement playlist (2 médias) | ✅ |
 | Rapport de crash (`--crash-test`) | ✅ `signal=11` |
 | Compilation | ✅ **0 avertissement** (aucun `never used` / `never read`) |

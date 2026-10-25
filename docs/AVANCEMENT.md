@@ -11,7 +11,7 @@
 **Projet :** lecteur vidéo professionnel Linux (Rust Media Player)  
 **Langage :** Rust + FFI FFmpeg 7.x (aucune dépendance à un lecteur externe)  
 **Dépôt :** `/media/blaise/LINUX_DATA/lecteur-linux`  
-**Dernière mise à jour :** 2026-10-21 (session 34)
+**Dernière mise à jour :** 2026-10-25 (session 37)
 
 ---
 
@@ -19,7 +19,7 @@
 
 1. [Où trouver quoi](#1-où-trouver-quoi) — **à lire en premier**
 2. [Compilation et lancement](#2-compilation-et-lancement)
-3. [Chantiers des sessions 29 à 31](#3-chantiers-des-sessions-29-à-31)
+3. [Chantiers des sessions 32 à 37](#3-chantiers-des-sessions-32-à-37)
 4. [Pièges à connaître](#4-pièges-à-connaître)
 5. [Reste à faire](#5-reste-à-faire)
 6. [Journal des modifications](#journal-des-modifications)
@@ -100,7 +100,7 @@ sans son (`Audio indisponible (lecture vidéo seule)`).
 
 ---
 
-## 3. Chantiers des sessions 32 à 34
+## 3. Chantiers des sessions 32 à 37
 
 Le détail des sessions **2 à 31** est dans [AVANCEMENT-ARCHIVE.md](AVANCEMENT-ARCHIVE.md).
 
@@ -554,6 +554,23 @@ de transitions : les marches deviennent du bruit), débanding (9 → 0 marches),
 matériel VA-API identique au logiciel à 0,2 près** (plus 6 contrôles de détection d'écran, 29 au
 total). 133 tests unitaires, dont 15 sur les
 fonctions pures (détection, profondeur, plan, tramage, débanding, noms d'opérateurs).
+
+### Sessions 36 et 37 — résumé
+
+Le détail de chaque défaut trouvé est dans les **pièges 114 à 128** (§4) ; les fonctions sont
+décrites dans `docs/PROCHAINES-FONCTIONS.md` (lots 1 à 6) et mesurées par les bancs du README.
+
+- **Session 36** : revue externe, bancs rendus autonomes (`env-bancs.sh`), repli CPU **borné** du
+  HDR, mise sous git (étiquettes `session36`, `session36-repli-hdr`), recette
+  `docs/AJOUTER-UNE-FONCTION.md`.
+- **Session 37** : lots 1 à 6 (récents, A-B, export/import, style des sous-titres, langues, couleur,
+  rogner/glisser, signets, souris, décodeur par codec, icône de notification, démarrage
+  automatique, priorité, cadence, thèmes, encodage) ; **saut en pause** (piège 122) ; **pistes
+  audio** (langues par priorité, commentaires écartés, `Ctrl+J`) ; **sortie audio PipeWire**
+  (piège 124) ; **fenêtres détachables** (piège 127) ; **renommage RMPlayer** et reprise des
+  données (piège 128) ; dépôt publié sur GitHub.
+
+---
 
 ## 4. Pièges à connaître
 
@@ -1201,73 +1218,15 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
 
 ## 5. Reste à faire
 
-État au **2026-10-19, fin de session 32**. Chaque ligne dit *pourquoi* ce n'est pas fait,
-pour éviter les listes décoratives.
-### Session 31 — programme préparé
+État au **2026-10-25 (session 37)**. **La référence est `docs/PROCHAINES-FONCTIONS.md`** : pour
+chaque fonction non faite, la raison, ligne par ligne (C4, F2, F3, F6, reste de F5, piste audio
+externe, signets renommables…). Les listes « priorité haute / moyenne » qui figuraient ici étaient
+périmées (`gpu-next`, AV1 logiciel et glisser-déposer sont faits) et ont été retirées.
 
-Cinq manques classés par **rapport valeur/effort**, dans l'ordre où ils ont été traités :
-
-| # | Chantier | Effort | Pourquoi d'abord | Preuve attendue |
-|---|---|---|---|---|
-| ~~0~~ | ~~**Échelle VA-API** (`scale_vaapi`)~~ + **désentrelacement VA-API** + **AV1 logiciel** | **fait (s.31, §6.37)** | **−42 %** (10,85 → 6,3 ms/image 1080p→720p), **−38 %** en désentrelacement (11,05 → 6,8), AV1 logiciel opérationnel | `tools/bench-optimisation.sh` 4/4 |
-| ~~1~~ | ~~**Famille de police des sous-titres** (+ position horizontale libre)~~ | **fait (s.31, §6.36)** | `verif-soustitres.sh` 5/5 : 268/307/332 px selon la police, centre 262/638/1013 px selon la position | 
-| ~~2~~ | ~~**Mémorisation de la taille et de la position de la fenêtre**~~ | **fait (s.32, §6.38)** | Taille, position et état agrandi relus au lancement ; hors écran → recentrée ; plein écran n'écrase rien | `tools/verif-fenetre.sh` 9/9 (déplacement → configuration → relance → géométrie réelle) |
-| ~~3~~ | ~~**Association de fichiers** (`.desktop` + `mimeapps`)~~ | **fait (s.33, §6.39)** | Lanceur installé, `--par-defaut` sur demande, instance unique : le double-clic lit le fichier dans la fenêtre déjà ouverte | `tools/verif-association.sh` 38/38 |
-| ~~4~~ | ~~**Lecture aléatoire** + **glisser-déposer**~~ | **fait (s.34, §6.40)** | Permutation suivie (chaque élément une fois), `Ctrl+A`, bouton 🔀, `playback.shuffle` mémorisé ; DnD avec repère et zone de fin de liste, ordre persisté, index courant suivi | `tools/verif-playlist.sh` 13/13 |
-| ~~5~~ | ~~**Vignettes de prévisualisation** au survol de la barre~~ | **fait (s.34, §6.42)** | Décodeur autonome dans un fil de travail, 320×180, regroupement par tranche d'une seconde | `tools/verif-vignettes.sh` 14/14 (module seul) + 3 contrôles d'intégration dans `verif-playlist.sh` |
-
-Reste ensuite, inchangé, la liste ci-dessous (`gpu-next`, AV1 logiciel, …).
-
-### Priorité haute (valeur d'usage réelle)
-
-*(Vide : les trois points qui l'occupaient — horloge audio maître, reconnexion d'un flux,
-sous-titres image — sont faits, respectivement en sessions 21, 22 et 23.)*
-
-### Priorité moyenne
-
-Liste tenue à jour au 2026-10-18 (fin de session 30). Deux entrées dépendent d'une brique
-**absente du build FFmpeg actuel** : le diagnostic est donné pour éviter de chercher au
-mauvais endroit (le code du lecteur n'y est pour rien).
-
-- [ ] **Rendu GPU type `gpu-next`** (libplacebo). Le FFmpeg de `/opt` est compilé **sans
-      aucune bibliothèque externe** (configuration réduite à `--enable-gpl
-      --enable-nonfree`), donc sans `vf_libplacebo` ; le contexte Vulkan, lui, **est présent**
-      (`-hwaccels` liste `vulkan`, `-init_hw_device vulkan` aboutit) mais aucun filtre Vulkan
-      n'est compilé, donc il ne sert à rien en l'état. Aucun rendu
-      GPU avec tone-mapping, dithering, deband ou scaling de qualité. Sur la machine,
-      `libvulkan-dev` et `libplacebo338` **sont installés**, mais **pas** les en-têtes de
-      libplacebo (`libplacebo-dev` manque) et il n'y a pas d'arbre source FFmpeg dans
-      `/opt` : il faudrait installer le paquet de développement, récupérer les sources
-      FFmpeg 7.1 et recompiler avec `--enable-vulkan --enable-libplacebo`. Côté lecteur,
-      le branchement se limite ensuite à une chaîne `libplacebo=…` (et à un chemin de
-      rendu direct en Vulkan pour l'affichage). Effort : **moyen côté code, lourd côté
-      outillage** ; à faire avec le même protocole de mesure que `bwdif` (§6.32).
-- [ ] **AV1 en décodage logiciel.** Aujourd'hui un AV1 n'est lisible que par VA-API : en
-      mode logiciel le décodeur natif s'ouvre mais ne produit **aucune image** (§7.17), et
-      le moteur refuse la lecture avec un message explicite au lieu de boucler. Or
-      **`libdav1d-dev` 1.4.1 est installé** sur la machine : recompiler FFmpeg en ajoutant
-      `--enable-libdav1d` suffit à obtenir un décodeur logiciel qui fonctionne (et
-      généralement plus rapide que le natif). Aucune modification du lecteur n'est
-      nécessaire — seulement la recompilation — mais la vérification demande un AV1 de
-      test et une comparaison CPU (`tools/bench-hwdec.sh` existe déjà). Effort :
-      **court**, à condition d'accepter de remplacer le FFmpeg de `/opt`.
-- [ ] **Réordonnancement de la playlist par glisser-déposer.** `egui` 0.33 fournit
-      `dnd_drag_source` / `dnd_drop_zone` : le chantier est de brancher le panneau (`L`), de
-      persister le nouvel ordre et de mettre à jour l'index courant sans casser
-      l'enchaînement automatique. Effort : **court** ; mesurable par journal (ordre écrit
-      dans la configuration et index courant).
-- [ ] **Transcodage à la volée / extraction d'extraits.** Effort **variable selon la
-      demande**, et c'est le seul point de cette liste dont l'ampleur n'est pas connue
-      d'avance :
-      * *court* — extraire un segment sans réencodage (remux `-ss/-t -c copy`) ou exporter
-        la piste audio en WAV/FLAC : les briques sont déjà là (`avformat`, écriture WAV
-        de `--dump-audio`) ;
-      * *moyen* — transcodage à la volée vers H.264/AAC avec choix de débit et de
-        résolution, pendant la lecture : il faut une seconde chaîne d'encodage, une file
-        bornée et une gestion de l'arrêt propre ;
-      * *long* — file de traitements, reprise après interruption, suivi de progression,
-        profils d'export.
-      Hors périmètre historique du projet (« lecture ») : à cadrer avant de commencer.
+- **Transcodage à la volée / extraction d'extraits** : hors du périmètre historique (« lecture »),
+  effort variable (un remux `-c copy` est court, un transcodage pendant la lecture est moyen, une
+  file de traitements est long) : à cadrer avant de commencer.
+- **Affichage sans rapatriement** (dmabuf/EGL) : n'a de sens qu'avec une surface capable de HDR.
 
 ### Limites assumées (constatées, sans chantier prévu)
 
@@ -1279,15 +1238,12 @@ mauvais endroit (le code du lecteur n'y est pour rien).
 - **`firequalizer`** : `superequalizer` (18 bandes fixes) couvre l'usage courant ; un
   égaliseur à courbe libre demanderait un éditeur de points et un second graphe audio.
 
-### Écarté volontairement (avec la mesure qui l'a motivé)
+### Écarté puis fait
 
-- **Mappage tonal HDR** : `tonemap` exige un signal linéaire, `zscale` (libzimg) est absent du
-  build et `colorspace` refuse `smpte2084`. Sur un flux PQ, `tonemap` seul donne une image
-  plate (**43/1023** au lieu de 504). Deux voies existent (recompiler FFmpeg avec zimg, ou
-  écrire la courbe à la main) mais les écrans de la machine sont SDR : **aucun bénéfice
-  mesurable** aujourd'hui. À rouvrir **avec** le chantier « rendu GPU type `gpu-next` »
-  (§8) : `vf_libplacebo` apporte tone-mapping et linéarisation correcte, ce qui rendrait
-  l'HDR utile le jour où un écran HDR serait branché.
+- **Mappage tonal HDR** : écarté en session 16 (`tonemap` seul donnait une image plate, 43/1023 au
+  lieu de 504, `zscale` absent, écrans SDR). **Fait en session 35** avec `libplacebo` (Vulkan) et le
+  FFmpeg recompilé (`docs/HDR.md`) ; ne reste que le *passthrough*, impossible tant que la fenêtre
+  est rendue en 8 bits.
 
 ### Corrigé depuis les sessions précédentes (cette liste était obsolète)
 

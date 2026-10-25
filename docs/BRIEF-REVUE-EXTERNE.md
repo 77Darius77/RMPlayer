@@ -1,6 +1,6 @@
 # Brief pour une revue externe (Claude) — RMPlayer
 
-*Écrit le 2026-10-21, après la session 35. À copier-coller tel quel, ou à donner comme fichier.*
+*Écrit le 2026-10-21 (session 35), **chiffres remis à jour le 2026-10-25 (session 37)**. À copier-coller tel quel, ou à donner comme fichier.*
 
 ---
 
@@ -8,8 +8,9 @@
 
 > **Contexte.** Projet `RMPlayer`, un lecteur vidéo Linux écrit en Rust + egui (FFmpeg 7.1.3 lié
 > directement, audio `cpal`, réglages JSON). Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`.
-> Pas de contrôle de version ; la sauvegarde est une archive tar.gz dans `sauvegardes/`.
-> 25 307 lignes, 19 modules, 26 bancs de vérification, 133 tests unitaires, 0 avertissement.
+> Dépôt git (branche `main`, étiquettes `session36`…), publié sur <https://github.com/77Darius77/RMPlayer> ;
+> archives tar.gz en plus dans `sauvegardes/`.
+> 29 280 lignes, 27 modules, 44 bancs de vérification, 176 tests unitaires, 0 avertissement.
 >
 > **Ce que je te demande.** Un **point d'avancement critique et indépendant** : est-ce que l'état
 > annoncé est vrai, est-ce que quelque chose est fragile, faux, ou prétendument fait alors qu'il
@@ -36,11 +37,11 @@
 > cd /media/blaise/LINUX_DATA/lecteur-linux
 > export PATH=$HOME/.cargo/bin:$PATH LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 > cargo build --release --offline 2>&1 | tail -3   # doit finir sans avertissement
-> cargo test  --release --offline 2>&1 | tail -3   # 133 tests, 0 échec
-> tools/verif-rapide.sh hdr                        # ~3 min, 49 contrôles
+> cargo test  --release --offline 2>&1 | tail -3   # 176 tests, 0 échec
+> tools/verif-rapide.sh hdr                        # ~3 min (verif-hdr : 36 contrôles, plus verif-filtres)
 > ./target/release/rmplayer --hdr-info CHEMIN/vers/un-film.mkv
 > ```
-> **Ne lance pas `tools/tout-verifier.sh`** (26 bancs, ~40 min, il ouvre un écran virtuel et prend
+> **Ne lance pas `tools/tout-verifier.sh`** (44 bancs, ~50 min, il ouvre un écran virtuel et prend
 > un verrou) : demande-le-moi si tu le veux. Et **ne modifie aucun fichier** : je veux un
 > diagnostic, pas un correctif. Si tu vois un vrai défaut, décris-le avec la commande qui le
 > prouve.
@@ -93,22 +94,22 @@ Ce qu'il devrait trouver, et qui te permettra de juger sa revue :
 
 | Question | Réponse à attendre |
 |---|---|
-| Chiffres | 25 307 l. / 19 modules / 26 bancs / 489 contrôles / 133 tests / 0 avertissement, archive 85 fichiers 619 Ko |
-| Point 1 (réglage lu ?) | Vérifié ici sur `peak_detect` : lu en `src/hdr.rs:475` et `src/settings.rs:1420`, jamais seulement stocké. `grep -rn "allow(dead_code)" src/` → **0** |
+| Chiffres | 29 280 l. / 27 modules / 44 bancs / 678 contrôles / 176 tests / 0 avertissement (suite complète du 2026-10-25) |
+| Point 1 (réglage lu ?) | Vérifié ici sur `peak_detect` : lu en `src/hdr.rs:518` et `src/settings.rs:1674`, jamais seulement stocké. `grep -rn "allow(dead_code)" src/` → **0** |
 | Point 5 (repli exercé ?) | `RMPLAYER_HDR_MOTEUR` n'apparaît que dans `src/hdr.rs` et `tools/verif-hdr.sh` : le repli CPU est **bien exercé** par la section 5 du banc |
 | Fragilité n° 1 | La **fenêtre est en RGBA 8 bits** : pas de passthrough HDR, la limite est réelle et documentée (`docs/HDR.md`) |
 | Fragilité n° 2 | Le **décodage matériel** : le rapatriement VA-API perdait les horodatages, ce qui rendait tout graphe de filtres muet (corrigé, piège 107) — zone à surveiller |
-| Fragilité n° 3 | **Pas de contrôle de version** : la seule sauvegarde est une archive, et rien ne garantit qu'elle est refaite (le projet la refait à la main, vérifiée par `diff -r`) |
+| Fragilité n° 3 | *(historique, session 35)* **Pas de contrôle de version** : corrigé en session 36 — le projet est sous git et publié sur GitHub ; les archives (`diff -r`) ne sont plus que des copies de secours |
 | Revendiqué mais non prouvé | Le passthrough HDR (branché, testé en unité, **inatteignable** sur cette machine : 3 écrans, tous SDR) ; c'est dit franchement |
 | Ne peut pas juger | La qualité perçue à l'usage, et le comportement sur du matériel différent (autre GPU, autre écran HDR) |
 
 ## 3. Si tu veux qu'il aille plus loin (à lui demander explicitement)
 
-- **`tools/tout-verifier.sh`** (26 bancs, ~40 min) : « lance-le et dis-moi si les 489 contrôles
+- **`tools/tout-verifier.sh`** (44 bancs, ~50 min) : « lance-le et dis-moi si les 678 contrôles
   passent, et si un banc est muet ».
 - **Test sur un vrai film HDR** : `rmplayer --hdr-info film.mkv` puis comparaison visuelle ;
   c'est le seul jugement qu'aucun banc ne remplace.
-- **Relecture ciblée d'un module** : `src/hdr.rs` (920 l.) ou `src/edid.rs` (309 l.) sont les deux
+- **Relecture ciblée d'un module** : `src/hdr.rs` (998 l.) ou `src/edid.rs` (309 l.) sont les deux
   plus récents et les plus autonomes — les seuls qu'on peut lire intégralement sans noyer le
   contexte.
 
