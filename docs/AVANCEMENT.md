@@ -1183,8 +1183,8 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      `tail -1` et `windowfocus` avant d'envoyer une touche. Non fait : la boîte « Ouvrir une adresse »
      (saisie rapide modale) et les menus déroulants de la barre restent dans le lecteur.
 
-128. 🟠 **Renommage KPlayer → RMPlayer (Rust Media Player, s.37) et retrait de toute référence à
-     PotPlayer.** Le nom est codé en ~700 endroits : binaire et crate (`rmplayer`), nom MPRIS
+128. 🟠 **Renommage KPlayer → RMPlayer (Rust Media Player, s.37) et nettoyage des textes de toute
+     référence à un autre lecteur.** Le nom est codé en ~700 endroits : binaire et crate (`rmplayer`), nom MPRIS
      (`org.mpris.MediaPlayer2.rmplayer`), filtre `RUST_LOG`, dossiers `~/.config/rmplayer` et
      `~/.cache/rmplayer`, socket d'instance, autostart, icône de zone de notification, journal de
      crash, tous les bancs. **Les données de l'utilisateur ne sont pas perdues** : au premier lancement,

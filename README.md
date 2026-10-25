@@ -1,4 +1,4 @@
-# RMPlayer
+# RMPlayer — Rust Media Player
 
 Lecteur vidéo pour Linux, écrit en **Rust**, s'appuyant directement sur **FFmpeg 7.x**
 (libav + libswscale + libswresample) et **egui/eframe** pour l'interface, **cpal** pour
