@@ -1239,6 +1239,20 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      **Piège de l'instrument** : le message d'annonce recouvre une partie de l'image au moment de la
      capture — comparer la géométrie, pas un décompte de pixels proche du bord.
 
+131. 🔴 **Après un saut en arrière, le graphe de filtres écartait toutes les images (HDR non converti).**
+     Hypothèse de départ (« latence de `libplacebo`, première image seulement ») **fausse**. Mesuré en
+     filmant la fenêtre pendant des sauts (`verif-hdr-saut`) : un saut isolé va bien, mais après un saut
+     EN ARRIÈRE le graphe répondait `EAGAIN` (sans message) tant que les horodatages n'avaient pas
+     rattrapé le plus grand déjà vu, et le moteur affichait l'image d'origine NON convertie : 94 images
+     sur 120 après cinq sauts, **240 sur 240 en répétition A-B** (chaque retour au point A est un saut en
+     arrière). Même défaut pour tout filtre sensible aux horodatages. Corrigé : le graphe reçoit des
+     horodatages qui ne reculent jamais (décalage recalculé à chaque recul, `graphe_decalage_pts`) ;
+     l'affichage n'en dépend pas. **Fausse piste instructive** : reconstruire le graphe à chaque saut
+     règle la lecture mais casse la pause (la première image d'un graphe neuf ne sort pas sans la
+     suivante). Journal qui l'a trahi : `Conversion couleur : … format converti YUV420P10LE` (images brutes)
+     alternant avec `YUV420P` (images filtrées). Garde : `verif-hdr-saut`, mutation faite (correctif
+     retiré → 94 et 240 images non converties).
+
 ## 5. Reste à faire
 
 État au **2026-10-25 (session 37)**. **La référence est `docs/PROCHAINES-FONCTIONS.md`** : pour

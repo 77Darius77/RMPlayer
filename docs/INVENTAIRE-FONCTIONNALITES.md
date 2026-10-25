@@ -31,7 +31,7 @@ Dernière vérification : **2026-10-25 (session 37)**. Les lignes des sessions 3
 | **Signets, souris avec Ctrl / Maj / Alt** (session 37) | ajouter, naviguer, supprimer, après redémarrage ; effets lus sur MPRIS (`verif-signets` 13/13 : signets renommables avec `Ctrl+Maj+N`, `verif-souris` 4/4) |
 | **Icône de notification, démarrage automatique, priorité** (session 37) | StatusNotifierItem piloté par D-Bus ; `.desktop` d'autostart ; nice de tous les fils (`verif-tray` 7/7, `verif-systeme` 10/10) |
 | **Thèmes externes** (session 37) | pixel de la barre de menus ; thème illisible refusé avec la raison (`verif-theme` 6/6) |
-| **Repli CPU borné du HDR** (session 36) | ≤ 1080p30 converti par le CPU, au-delà image non convertie avec avis à l'écran, pas de reconstruction à chaque image (`verif-hdr` 36/36) |
+| **Repli CPU borné du HDR** (session 36) | ≤ 1080p30 converti par le CPU, au-delà image non convertie avec avis à l'écran, pas de reconstruction à chaque image (`verif-hdr` 36/36) ; **après un saut en arrière ou un retour de boucle A-B**, l'image reste convertie (`verif-hdr-saut` 5/5) |
 | **Renommage RMPlayer et reprise des données** (session 37) | un vrai lancement relit les réglages, positions et thèmes de l'ancien dossier, copié sans jamais être supprimé (`verif-migration` 7/7) |
 | Ouverture média (MP4, MKV, AVI, MOV, WMV, FLV, WebM…) | lecture effective |
 | Décodage vidéo **matériel VA-API** + repli logiciel automatique | mode constaté affiché, §6.10 de `AVANCEMENT.md` |

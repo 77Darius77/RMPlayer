@@ -542,9 +542,7 @@ L'inventaire complet, avec les preuves, est tenu dans
   ignorées proprement, texte toujours lisible) ;
 - **HDR** : la conversion tonale vers SDR est faite (voir plus haut), mais pas le *passthrough* —
   la fenêtre est rendue en 8 bits SDR (`docs/HDR.md`). Sans Vulkan, le repli CPU est borné
-  (≤ 1080p30) ; au-delà l'image n'est pas convertie, avec un avis à l'écran. Après un saut, la
-  première image d'une source HDR peut apparaître non convertie (latence de `libplacebo`, non
-  étudiée) ;
+  (≤ 1080p30) ; au-delà l'image n'est pas convertie, avec un avis à l'écran ;
 - **volume maximal** plafonné à 300 % (au-delà, `cpal` écrête) ;
 - **interpolation de mouvement** : non implémentée ;
 - **sortie audio** : pas de reprise propre si le périphérique disparaît en cours de lecture
@@ -588,6 +586,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-soustitres.sh [écran]` | **Style des sous-titres** : trois familles de police mesurées (largeurs 268/307/332 px), position horizontale 20/50/80 %, police inconnue, non-régression — 5 contrôles |
 | `installer-association.sh [--par-defaut] [--etat] [--retirer]` | **« Ouvrir avec » RMPlayer** : lanceur `.desktop`, icône, cache des types MIME ; `--par-defaut` l'impose pour les formats qu'il gère |
 | — | **revue externe** : `docs/BRIEF-REVUE-EXTERNE.md` — ce qu'on demande à un relecteur extérieur, budget de lecture, six vérifications qui valent mieux que la lecture, deux pièges à faux positifs |
+| `verif-hdr-saut.sh [écran]` | **HDR après un saut** : la fenêtre est filmée pendant des sauts (en lecture, en pause, cinq rapprochés) et pendant une répétition A-B ; chaque image est classée convertie / non convertie — 5 contrôles |
 | `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, moteur CPU forcé, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision, **Vulkan coupé** (repli CPU borné, avis, pas de reconstruction à chaque image) — 36 contrôles |
 | `verif-focus.sh [écran]` | **Pause selon le focus** : jamais / perte de focus / fenêtre réduite, reprise au retour, respect d'une pause volontaire — 11 contrôles, avec une seconde fenêtre réelle ; la pause est mesurée aussi sur l'image (deux captures identiques), avec un témoin en lecture. Non couvert : une vraie réduction (mode 2), qui exige un gestionnaire de fenêtres |
 | `verif-recents.sh [écran]` | **Fichiers récents** : `config.json` relu après de vraies ouvertures (ordre, doublon, borne de 10) — 7 contrôles |
