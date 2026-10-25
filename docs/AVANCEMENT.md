@@ -1214,7 +1214,21 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      par son titre peut trouver une section placée AVANT dans le fichier : il a dupliqué 500 lignes
      de l'archive, détecté par le nombre de lignes. Les anciennes archives `sauvegardes/kplayer-*.tar.gz`
      gardent leur nom. Le fichier `.desktop` déjà installé continue de marcher (il appelle `run.sh`),
-     mais son `StartupWMClass` ne correspond plus : réinstaller par `--par-defaut`.
+     mais son `StartupWMClass` ne correspond plus : réinstaller par `tools/installer-association.sh --par-defaut`.
+
+129. 🔴 **Les lettres tapées dans un champ de texte étaient reçues comme raccourcis.** La boucle des
+     touches lit les événements bruts d'egui sans se demander si un champ de saisie a le focus :
+     taper « Passage » dans une boîte déclenchait `P` (élément précédent), `A` (point A-B), `S`
+     (capture d'écran), `F` (plein écran)… — vrai aussi pour « Ouvrir une adresse » et les champs des
+     préférences (langues, noms). Trouvé en ajoutant le renommage des signets, mesuré par une capture
+     d'écran involontaire (`verif-signets` §7, avec un témoin : « s » seul en produit une).
+     Corrigé : pendant la saisie, seuls `Échap` et les touches de fonction restent actifs.
+     **Piège dans le correctif** : `ctx.wants_keyboard_input()` est vrai dès qu'un widget QUELCONQUE a
+     le focus (un bouton après un clic ou un `Tab`), donc la première version bloquait tous les
+     raccourcis et figeait l'audit de l'interface (35/78). Le bon signal est `output.ime`, que seul un
+     `TextEdit` éditable publie : on le relève à la fin de chaque image (`saisie_texte_active`).
+     **Un test de mutation** (garde désactivée → le banc échoue exactement sur ce contrôle) prouve que
+     le banc voit le défaut.
 
 ## 5. Reste à faire
 

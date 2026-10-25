@@ -15,6 +15,8 @@ const PROXIMITE_MS: u64 = 1_000;
 const MARGE_NAVIGATION_MS: u64 = 600;
 /// Plafond par média (un fichier édité à la main ne doit pas peser des mégaoctets).
 const MAX_PAR_MEDIA: usize = 200;
+/// Longueur maximale d'un nom de signet, en caractères.
+const NOM_MAX: usize = 80;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Signet {
@@ -85,6 +87,21 @@ impl Signets {
         true
     }
 
+    /// Renomme le signet d'index `index`. Le nom est nettoyé (espaces de bord retirés, borné à
+    /// `NOM_MAX` caractères) ; un nom vide est refusé (le signet garde son nom).
+    pub fn renommer(&mut self, media: &Path, index: usize, nom: &str) -> bool {
+        let nom: String = nom.trim().chars().take(NOM_MAX).collect();
+        if nom.is_empty() {
+            return false;
+        }
+        let Some(signet) = self.par_media.get_mut(&cle(media)).and_then(|l| l.get_mut(index)) else {
+            return false;
+        };
+        signet.nom = nom;
+        self.enregistrer();
+        true
+    }
+
     /// Index du signet le plus proche de `ms`, s'il est à moins de `PROXIMITE_MS * 1,5`.
     pub fn index_proche(&self, media: &Path, ms: u64) -> Option<usize> {
         self.liste(media)
@@ -134,6 +151,25 @@ mod tests {
         let positions: Vec<u64> = s.liste(m).iter().map(|x| x.ms).collect();
         assert_eq!(positions, [5_000, 12_000]);
         assert!(s.liste(Path::new("/autre.mkv")).is_empty(), "par média");
+    }
+
+    #[test]
+    fn renommer_garde_la_position_nettoie_le_nom_et_refuse_le_vide() {
+        let mut s = Signets::en_memoire();
+        let m = Path::new("/film.mkv");
+        s.ajouter(m, 5_000);
+        s.ajouter(m, 12_000);
+        assert!(s.renommer(m, 1, "  Le passage clé  "));
+        assert_eq!(s.liste(m)[1].nom, "Le passage clé", "espaces de bord retirés");
+        assert_eq!(s.liste(m)[1].ms, 12_000, "la position ne bouge pas");
+        assert_eq!(s.liste(m)[0].nom, "Signet 1", "les autres signets ne changent pas");
+        assert!(!s.renommer(m, 1, "   "), "un nom vide est refusé");
+        assert_eq!(s.liste(m)[1].nom, "Le passage clé");
+        assert!(!s.renommer(m, 7, "x"), "index hors liste");
+        assert!(!s.renommer(Path::new("/autre.mkv"), 0, "x"), "média sans signet");
+        let long = "é".repeat(200);
+        assert!(s.renommer(m, 0, &long));
+        assert_eq!(s.liste(m)[0].nom.chars().count(), 80, "borné en caractères, pas en octets");
     }
 
     #[test]
