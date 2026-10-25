@@ -79,7 +79,7 @@ impl ColorRange {
 /// « Automatique » utilise la résolution native du média (comportement d'origine).
 /// Les autres valeurs **déforment** volontairement l'image : c'est ce qu'on veut pour
 /// corriger un encodage étiqueté 16:9 alors qu'il est en 4:3, ou pour remplir l'écran.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum AspectMode {
     #[serde(alias = "auto")]
     Auto,

@@ -62,6 +62,14 @@ pub enum Action {
     Echap,
     Capture,
     Aspect,
+    /// Remplir la fenêtre en rognant (couvrir) : bascule, puis retour au mode précédent.
+    AspectRogner,
+    /// Glisser l'image (décalage de 2 % par appui) et la recentrer.
+    ImageGlisserGauche,
+    ImageGlisserDroite,
+    ImageGlisserHaut,
+    ImageGlisserBas,
+    ImageCentrer,
     MiroirHorizontal,
     MiroirVertical,
     ZoneRecadrage,
@@ -116,6 +124,12 @@ impl Action {
         Action::Echap,
         Action::Capture,
         Action::Aspect,
+        Action::AspectRogner,
+        Action::ImageGlisserGauche,
+        Action::ImageGlisserDroite,
+        Action::ImageGlisserHaut,
+        Action::ImageGlisserBas,
+        Action::ImageCentrer,
         Action::MiroirHorizontal,
         Action::MiroirVertical,
         Action::ZoneRecadrage,
@@ -171,6 +185,12 @@ impl Action {
             Action::Echap => "affichage.echap",
             Action::Capture => "image.capture",
             Action::Aspect => "image.aspect",
+            Action::AspectRogner => "image.rogner",
+            Action::ImageGlisserGauche => "image.glisser_gauche",
+            Action::ImageGlisserDroite => "image.glisser_droite",
+            Action::ImageGlisserHaut => "image.glisser_haut",
+            Action::ImageGlisserBas => "image.glisser_bas",
+            Action::ImageCentrer => "image.centrer",
             Action::MiroirHorizontal => "image.miroir_h",
             Action::MiroirVertical => "image.miroir_v",
             Action::ZoneRecadrage => "image.zone_recadrage",
@@ -226,6 +246,12 @@ impl Action {
             Action::Echap => "Fermer la fenêtre / sortir du plein écran",
             Action::Capture => "Capture d'écran (PNG)",
             Action::Aspect => "Rapport d'aspect suivant",
+            Action::AspectRogner => "Remplir la fenêtre en rognant (bascule)",
+            Action::ImageGlisserGauche => "Image : glisser vers la gauche",
+            Action::ImageGlisserDroite => "Image : glisser vers la droite",
+            Action::ImageGlisserHaut => "Image : glisser vers le haut",
+            Action::ImageGlisserBas => "Image : glisser vers le bas",
+            Action::ImageCentrer => "Image : recentrer",
             Action::MiroirHorizontal => "Miroir horizontal",
             Action::MiroirVertical => "Miroir vertical",
             Action::ZoneRecadrage => "Afficher / masquer la zone de recadrage",
@@ -280,6 +306,12 @@ impl Action {
             | Action::MasquerInterface => "Affichage",
             Action::Capture
             | Action::Aspect
+            | Action::AspectRogner
+            | Action::ImageGlisserGauche
+            | Action::ImageGlisserDroite
+            | Action::ImageGlisserHaut
+            | Action::ImageGlisserBas
+            | Action::ImageCentrer
             | Action::MiroirHorizontal
             | Action::MiroirVertical
             | Action::ZoneRecadrage
@@ -330,6 +362,12 @@ impl Action {
             Action::Echap => "Echap",
             Action::Capture => "S",
             Action::Aspect => "K",
+            Action::AspectRogner => "Ctrl+K",
+            Action::ImageGlisserGauche => "Alt+Gauche",
+            Action::ImageGlisserDroite => "Alt+Droite",
+            Action::ImageGlisserHaut => "Alt+Haut",
+            Action::ImageGlisserBas => "Alt+Bas",
+            Action::ImageCentrer => "Alt+0",
             Action::MiroirHorizontal => "Ctrl+H",
             Action::MiroirVertical => "Ctrl+Maj+H",
             Action::ZoneRecadrage => "R",

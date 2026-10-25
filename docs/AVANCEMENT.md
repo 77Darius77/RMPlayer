@@ -1230,6 +1230,15 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      **Un test de mutation** (garde désactivée → le banc échoue exactement sur ce contrôle) prouve que
      le banc voit le défaut.
 
+130. 🟠 **Deux chemins pour « rapport d'aspect suivant » (piège 6 encore).** Le clavier (`K`) ne
+     parcourait que 5 des 8 modes (`_ => Auto` pour remplir, rogner et personnalisé) tandis que la
+     souris les parcourait tous ; et le chemin souris écrivait la configuration AVANT de poser la
+     nouvelle valeur (le fichier gardait l'ancienne). Un seul chemin maintenant (`aspect_suivant`,
+     `definir_aspect`), gardé par `verif-affichage` (6 appuis sur `K` arrivent sur « rogner »).
+     Ajoutés : `Ctrl+K` (bascule rogner), `Alt+flèches` (glisser de 2 %), `Alt+0` (recentrer).
+     **Piège de l'instrument** : le message d'annonce recouvre une partie de l'image au moment de la
+     capture — comparer la géométrie, pas un décompte de pixels proche du bord.
+
 ## 5. Reste à faire
 
 État au **2026-10-25 (session 37)**. **La référence est `docs/PROCHAINES-FONCTIONS.md`** : pour

@@ -118,6 +118,12 @@ continue alors sans son (avertissement « lecture vidéo seule »).
 | `Échap` | Fermer la fenêtre / sortir du plein écran |
 | `S` | Capture d'écran (PNG) |
 | `K` | Rapport d'aspect suivant |
+| `Ctrl+K` | Remplir la fenêtre en rognant (bascule) |
+| `Alt+←` | Image : glisser vers la gauche |
+| `Alt+→` | Image : glisser vers la droite |
+| `Alt+↑` | Image : glisser vers le haut |
+| `Alt+↓` | Image : glisser vers le bas |
+| `Alt+0` | Image : recentrer |
 | `Ctrl+H` | Miroir horizontal |
 | `Ctrl+Maj+H` | Miroir vertical |
 | `R` | Afficher / masquer la zone de recadrage |
@@ -341,8 +347,11 @@ tête. Tous les réglages affichés sont **réellement appliqués** :
 
 ### Personnalisation de l'image
 
-- **Rapport d'aspect** : automatique, 16:9, 4:3, 1,85:1, 2,35:1, remplir, personnalisé
-  (touche `K` pour faire défiler).
+- **Rapport d'aspect** : automatique, 16:9, 4:3, 1,85:1, 2,35:1, remplir (étirer), **rogner**
+  (couvrir la fenêtre sans bandes noires, en gardant le rapport), personnalisé — `K` les fait tous
+  défiler (clavier comme souris) ; **`Ctrl+K`** bascule « rogner » et revient au mode précédent.
+- **Glisser l'image** : `Alt+←/→/↑/↓` la décalent de 2 % par appui (jusqu'à ±50 %), `Alt+0` la
+  recentre — les mêmes curseurs que *Préférences ▸ Vidéo*.
 - **Bandes noires** : recadrage manuel (haut/bas/gauche/droite) ou **détection
   automatique** (analyse plusieurs images et retient la médiane des bandes mesurées).
 - **Chapitres** : menu *Lecture*, touches `Page↑` / `Page↓`.
@@ -587,7 +596,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-soustitres-style.sh [écran]` | **Style des sous-titres** : contour, marges haut/bas, interligne, ombre, second contour, échelle X/Y, fondu — pixels de la fenêtre — 9 contrôles |
 | `verif-soustitres-langues.sh [écran]` | **Langues par priorité, durées mini/maxi, piste mémorisée, alphabet** — 12 contrôles |
 | `verif-couleur.sh` | **Matrice et plage de couleur** : couleur RVB d'origine retrouvée (BT.601/709, limitée/complète) — 11 contrôles |
-| `verif-affichage.sh [écran]` | **Rogner et glisser**, et couleur identique par la chaîne GPU et la chaîne CPU — 7 contrôles |
+| `verif-affichage.sh [écran]` | **Rogner et glisser** (réglages **et raccourcis clavier**, cycle complet de `K`), et couleur identique par la chaîne GPU et la chaîne CPU — 16 contrôles |
 | `verif-signets.sh [écran]` | **Signets** par média : ajouter, suivant/précédent, supprimer, **renommer** (saisie réelle), après redémarrage ; **les touches tapées dans un champ de texte ne déclenchent aucun raccourci** — 13 contrôles |
 | `verif-souris.sh [écran]` | **Souris avec Ctrl / Maj / Alt** : effets lus sur MPRIS — 4 contrôles |
 | `verif-decodeur.sh` | **Décodeur par codec** : décodeur réellement ouvert, repli sur le défaut — 7 contrôles |
