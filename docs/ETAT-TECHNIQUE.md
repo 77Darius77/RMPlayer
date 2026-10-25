@@ -51,24 +51,27 @@
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `src/player.rs` | 7418 | Moteur de lecture (décodage VA-API, mise à l'échelle, cadence, pistes, filtres, reprise) |
-| `src/ui.rs` | 5306 | Interface (menus, OSD, playlist, fenêtres, mémoire de la fenêtre) |
-| `src/settings.rs` | 3338 | Fenêtre « Préférences » : sections dépliables (table `SECTIONS`) |
-| `src/config.rs` | 2724 | Configuration (réglages réellement appliqués), profils, export / import |
-| `src/ass.rs` | 2059 | Rendu ASS (styles, animations, karaoké, sous-titres image) |
-| `src/main.rs` | 1295 | Point d'entrée, options de ligne de commande, géométrie de fenêtre |
+| `src/player.rs` | 7899 | Moteur de lecture (décodage VA-API, mise à l'échelle, cadence, pistes, filtres, reprise) |
+| `src/ui.rs` | 5666 | Interface (menus, OSD, playlist, fenêtres, mémoire de la fenêtre) |
+| `src/settings.rs` | 3520 | Fenêtre « Préférences » : sections dépliables (table `SECTIONS`) |
+| `src/config.rs` | 3096 | Configuration (réglages réellement appliqués), profils, export / import |
+| `src/ass.rs` | 2058 | Rendu ASS (styles, animations, karaoké, sous-titres image) |
+| `src/main.rs` | 1330 | Point d'entrée, options de ligne de commande, géométrie de fenêtre |
+| `src/dvd.rs` | 1139 | DVD-Vidéo : IFO (titres, chapitres, cellules, pistes), `libdvdread` chargée à l'exécution, flux d'un titre pour FFmpeg (AVIO) |
+| `src/raccourcis.rs` | 1063 | Table unique des raccourcis clavier et souris (défauts, personnalisation, aide F1) |
 | `src/hdr.rs` | 998 | HDR : détection PQ/HLG/BT.2020, plan de conversion (GPU/CPU), tramage, débanding |
-| `src/raccourcis.rs` | 990 | Table unique des raccourcis clavier et souris (défauts, personnalisation, aide F1) |
-| `src/audio.rs` | 695 | Sortie cpal, tampon circulaire, horloge audio |
+| `src/audio.rs` | 737 | Sortie cpal, tampon circulaire, horloge audio |
 | `src/subtitles.rs` | 650 | Sous-titres externes (SRT / ASS), encodage |
-| `src/mpris.rs` | 640 | MPRIS : interfaces D-Bus, état publié, file de commandes, réveil de l'interface |
+| `src/mpris.rs` | 636 | MPRIS : interfaces D-Bus, état publié, file de commandes, réveil de l'interface |
 | `src/vignettes.rs` | 519 | Vignettes de la barre : décodeur FFmpeg autonome, fil de travail |
 | `src/instance.rs` | 370 | Instance unique : socket Unix, transmission des chemins, balayage des sockets orphelins |
 | `src/crash.rs` | 365 | Rapport de crash |
 | `src/sortie_audio.rs` | 313 | Sorties PipeWire : liste lisible (`pw-dump`) et redirection du flux (`pw-metadata`) |
 | `src/edid.rs` | 309 | EDID : capacités annoncées par les écrans allumés |
+| `src/capture.rs` | 208 | Captures d'écran : format (PNG / JPEG / WebP), qualité, taille native, modèle de nom |
+| `src/signets.rs` | 202 | Signets par média |
+| `src/shaders.rs` | 180 | Shaders de pixels (GLSL mpv) : lecture, assemblage, exemples |
 | `src/utils.rs` | 167 | Utilitaires |
-| `src/signets.rs` | 166 | Signets par média |
 | `src/systeme.rs` | 136 | Démarrage automatique et priorité du processus |
 | `src/theme.rs` | 131 | Thèmes externes JSON |
 | `src/migration.rs` | 128 | Reprise des données de l'ancien nom (KPlayer) |
@@ -78,9 +81,9 @@
 | `src/fenetre.rs` | 97 | Fenêtres flottantes détachables (viewport immédiat) |
 | `src/positions.rs` | 73 | Reprise de lecture |
 | `src/renderer.rs` | 43 | Transport des images |
-| **Total** | **29280** | 27 modules (hors `tools/`) |
+| **Total** | **32384** | 30 modules (hors `tools/`) |
 
-`tools/` : 44 bancs lancés par `tout-verifier.sh`, plus les outils de diagnostic (`audit-ui.sh`,
+`tools/` : 50 bancs lancés par `tout-verifier.sh`, plus les outils de diagnostic (`audit-ui.sh`,
 `check-ctx-reentrance.py`, `vivacite.sh`, `diag-gel.sh`, `capture-lecteur.sh`…) et les
 installateurs (`installer-association.sh`, `regle-fenetre-kwin.sh`). **Liste, rôle et nombre de
 contrôles de chacun : `README.md`, § Outils** (c'est la table tenue à jour). Instruments
@@ -146,6 +149,7 @@ partagés : `env-bancs.sh` (environnement des bancs), `analyse-audio.py`, `metri
 | `set_audio_device(&str) -> bool` | Sortie audio : `""` = défaut, `pw:<nom>` = sortie PipeWire (le flux est **redirigé** sans coupure), autre = nom ALSA ouvert tel quel. Renvoie `true` si la sortie a dû être recréée (l'appelant recharge alors le média) |
 | `set_speed(f32)` | Vitesse 0,1–8× **et** rééchantillonnage audio synchrone |
 | `set_resume(bool)` / `persist_position()` | Reprise de lecture (positions par média) |
+| `dvd() -> Option<&DvdOuvert>` | DVD en cours (référence, titres, titre courant) pour le menu *Titres du DVD*. `load_file` reconnaît un DVD (`dvd::reconnaitre_avec_vts`), ouvre le disque, choisit le titre, refuse un film brouillé, puis donne à FFmpeg un `AVIOContext` (`dvd::EntreeFfmpeg`) sur les cellules et le format `mpeg` ; langues, palette, durée et chapitres viennent des IFO (`completer_flux_dvd`, `chapitres_dvd`). Pour un DVD seulement : début du flux retranché des horodatages (`decalage_debut_us`, `decaler_paquet`), saut visant 1 s plus tôt, images sans horodatage écartées pendant un saut (piège 135) |
 | `current_path() -> Option<&PathBuf>` | Média réellement ouvert (indépendant de la playlist) |
 | `reload_current_media()` | Recharge le média courant (position + pause conservées) — applique un changement de mode ou de sortie ALSA |
 

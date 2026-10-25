@@ -517,8 +517,23 @@ const MAX_AVANCE_VIDEO_MS: u64 = 300;
 /// pour ne jamais se déclencher sur un simple à-coup.
 const SILENCE_HORLOGE_MS: u128 = 250;
 
+/// Un DVD en cours de lecture : le disque, ses titres, celui qui joue, et le flux d'E/S confié à FFmpeg.
+pub struct DvdOuvert {
+    pub reference: crate::dvd::Reference,
+    pub titres: Vec<crate::dvd::Titre>,
+    /// Numéro (à partir de 1) du titre qui joue.
+    pub courant: usize,
+    // Libéré après la fermeture du format (ordre des champs sans importance : `close_media` le décide).
+    _flux: crate::dvd::EntreeFfmpeg,
+}
+
 pub struct VideoPlayer {
     format_context: Option<*mut AVFormatContext>,
+    /// DVD ouvert (le `pb` de `format_context` lui appartient).
+    dvd: Option<DvdOuvert>,
+    /// Début du flux (µs) à retrancher des horodatages : un titre de DVD ne commence pas à 0.
+    /// Zéro pour tout autre média (comportement historique).
+    decalage_debut_us: i64,
     video_stream: Option<VideoStream>,
     audio_stream: Option<AudioStream>,
     /// Sortie audio matérielle (cpal) + tampon circulaire (créée une seule fois)
@@ -743,6 +758,8 @@ impl VideoPlayer {
 
         Self {
             format_context: None,
+            dvd: None,
+            decalage_debut_us: 0,
             video_stream: None,
             audio_stream: None,
             audio_output: None,
@@ -1780,11 +1797,35 @@ impl VideoPlayer {
         // Fermer un éventuel média déjà ouvert
         self.close_media();
 
+        // DVD : dossier VIDEO_TS, image, lecteur, ou fichier `.ifo` / `.vob` / `.bup` d'un DVD. La
+        // référence devient `dvd://<emplacement>#<titre>` : c'est elle qui sert de « chemin » du média
+        // (récents, reprise de position), avec le numéro de titre toujours explicite.
+        let (path, mut entree_dvd) = if est_reseau {
+            (path, None)
+        } else {
+            match self.preparer_dvd(&path) {
+                Ok(Some((p, d))) => (p, Some(d)),
+                Ok(None) => (path, None),
+                Err(m) => {
+                    self.state = PlayerState::Error(m.clone());
+                    return Err(m);
+                }
+            }
+        };
+
         let filename = CString::new(path.to_string_lossy().as_bytes())
             .map_err(|e| format!("Erreur de nom de fichier: {}", e))?;
 
         unsafe {
             let mut format_context: *mut AVFormatContext = std::ptr::null_mut();
+            if let Some(d) = entree_dvd.as_ref() {
+                // Le format MPEG-PS est connu d'avance (inutile de le sonder) et le flux d'E/S est le nôtre.
+                format_context = avformat_alloc_context();
+                if !format_context.is_null() {
+                    (*format_context).pb = d._flux.io();
+                    (*format_context).flags |= AVFMT_FLAG_CUSTOM_IO;
+                }
+            }
 
             // Options d'ouverture réseau : sans elles, une source injoignable fait
             // attendre l'ouverture indéfiniment (l'interface semble figée) et une
@@ -1806,10 +1847,15 @@ impl VideoPlayer {
                 }
             }
 
+            let format_force = if entree_dvd.is_some() {
+                av_find_input_format(c"mpeg".as_ptr())
+            } else {
+                std::ptr::null()
+            };
             let ret = avformat_open_input(
                 &mut format_context,
                 filename.as_ptr(),
-                std::ptr::null(),
+                format_force,
                 &mut options,
             );
             if !options.is_null() {
@@ -1849,6 +1895,15 @@ impl VideoPlayer {
                     "Impossible de lire les informations du fichier (code {})",
                     ret
                 ));
+            }
+
+            // Un titre de DVD : durée et langues viennent des fichiers d'information, et les horodatages
+            // du flux ne commencent pas à zéro.
+            self.decalage_debut_us = 0;
+            if let Some(d) = entree_dvd.as_ref() {
+                if let Some(titre) = d.titres.iter().find(|t| t.numero == d.courant) {
+                    self.decalage_debut_us = completer_flux_dvd(format_context, titre);
+                }
             }
 
             let mut video_index: i32 = -1;
@@ -2156,6 +2211,7 @@ impl VideoPlayer {
             }
 
             self.format_context = Some(format_context);
+            self.dvd = entree_dvd.take();
             // Le décodeur audio est ouvert par la même méthode que lors d'un
             // changement de piste : un seul chemin de code, donc un seul jeu de bugs.
             if audio_index >= 0 {
@@ -2219,11 +2275,21 @@ impl VideoPlayer {
                 tracing::info!("{} chapitre(s) dans le conteneur", chapters.len());
             }
 
+            // Chapitres du DVD : ceux des fichiers d'information (le flux MPEG-PS n'en porte pas).
+            if let Some(d) = self.dvd.as_ref() {
+                if let Some(titre) = d.titres.iter().find(|t| t.numero == d.courant) {
+                    chapters = chapitres_dvd(titre);
+                }
+            }
+
             let media_info = MediaInfo {
-                filename: path
-                    .file_name()
-                    .map(|n| n.to_string_lossy().to_string())
-                    .unwrap_or_else(|| "unknown".to_string()),
+                filename: match self.dvd.as_ref() {
+                    Some(d) => nom_dvd(&d.reference, d.courant),
+                    None => path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                },
                 resolution,
                 fps,
                 bitrate,
@@ -2311,6 +2377,7 @@ impl VideoPlayer {
             let debut_lecture = std::time::Instant::now();
             self.armer_delai_reseau(DELAI_LECTURE_MS);
             let ret = av_read_frame(format_context, pkt);
+            if ret >= 0 { decaler_paquet(format_context, pkt, self.decalage_debut_us); }
             self.desarmer_delai_reseau();
             let duree_lecture = debut_lecture.elapsed();
             if duree_lecture > Duration::from_millis(1000) {
@@ -2626,6 +2693,14 @@ impl VideoPlayer {
                         break;
                     }
                     let recv = avcodec_receive_frame(vs.codec_context, frame);
+                    // Flux MPEG-PS (DVD) : un saut tombe au milieu d'un groupe d'images, dont les premières
+                    // n'ont pas encore reçu d'horodatage (il vient du paquet suivant). Les étiqueter à la
+                    // position visée montrerait, à cet instant, une image d'une demi-seconde plus tôt.
+                    if recv == 0 && (*frame).pts < 0 && self.dvd.is_some() && self.seek_target_ms.is_some() {
+                        let mut f = frame;
+                        av_frame_free(&mut f);
+                        continue;
+                    }
                     if recv == 0 {
                         let pts_ms = if (*frame).pts >= 0 && vs.time_base.den != 0 {
                             ((*frame).pts as i128 * vs.time_base.num as i128 * 1000
@@ -3343,6 +3418,7 @@ impl VideoPlayer {
                 break;
             }
             let ret = unsafe { av_read_frame(format_context, paquet) };
+            if ret >= 0 { unsafe { decaler_paquet(format_context, paquet, self.decalage_debut_us) }; }
             if ret < 0 {
                 break;
             }
@@ -3386,6 +3462,7 @@ impl VideoPlayer {
                 break;
             }
             let ret = unsafe { av_read_frame(format_context, paquet) };
+            if ret >= 0 { unsafe { decaler_paquet(format_context, paquet, self.decalage_debut_us) }; }
             if ret < 0 {
                 break;
             }
@@ -3466,6 +3543,7 @@ impl VideoPlayer {
                 break;
             }
             let ret = unsafe { av_read_frame(format_context, paquet) };
+            if ret >= 0 { unsafe { decaler_paquet(format_context, paquet, self.decalage_debut_us) }; }
             if ret < 0 {
                 break; // fin de flux
             }
@@ -3991,7 +4069,12 @@ impl VideoPlayer {
         };
 
         unsafe {
-            let target_us = (position_ms as i64) * 1000; // µs
+            // Un flux MPEG-PS (DVD) se cherche à la position d'un paquet, pas d'une image clé : on
+            // atterrit souvent en plein milieu d'un groupe d'images, d'où la première image affichable
+            // est celle du groupe SUIVANT. On vise donc une seconde plus tôt (un groupe de DVD dure au
+            // plus 0,6 s) ; les images antérieures à la cible sont écartées par `seek_target_ms`.
+            let marge_us = if self.dvd.is_some() { 1_000_000 } else { 0 };
+            let target_us = ((position_ms as i64) * 1000 + self.decalage_debut_us - marge_us).max(0); // µs
             let target_ts = if stream_index >= 0 && time_base.den > 0 {
                 av_rescale_q(
                     target_us,
@@ -4465,6 +4548,35 @@ impl VideoPlayer {
     }
 
     /// Ferme le média courant et libère toutes les ressources FFmpeg associées.
+    /// Prépare l'ouverture d'un DVD si `path` en désigne un : ouvre le disque, choisit le titre, vérifie que
+    /// le film n'est pas brouillé. `Ok(None)` : ce n'est pas un DVD (le chemin suit la voie ordinaire).
+    fn preparer_dvd(&self, path: &std::path::Path) -> Result<Option<(PathBuf, DvdOuvert)>, String> {
+        let Some((reference, vts)) = crate::dvd::reconnaitre_avec_vts(path) else {
+            return Ok(None);
+        };
+        let disque = crate::dvd::Disque::ouvrir(&reference.emplacement)?;
+        let titres = disque.titres()?;
+        let courant = crate::dvd::choisir_titre(&titres, reference.titre, vts)?;
+        let titre = titres.iter().find(|t| t.numero == courant).ok_or("titre introuvable")?;
+        let source = crate::dvd::SourceTitre::ouvrir(&disque, titre)?;
+        let mut flux = crate::dvd::EntreeFfmpeg::nouvelle(source)?;
+        if flux.film_brouille() {
+            return Err(
+                "Ce DVD est protégé contre la copie (CSS) : son film est chiffré. Pour le lire, \
+                 installez libdvdcss (paquet libdvd-pkg ou libdvdcss2) ; RMPlayer ne contourne pas la protection."
+                    .to_string(),
+            );
+        }
+        let reference = crate::dvd::Reference { emplacement: reference.emplacement, titre: Some(courant) };
+        tracing::info!("DVD {} : titre {} sur {}", reference.emplacement.display(), courant, titres.len());
+        Ok(Some((PathBuf::from(reference.texte()), DvdOuvert { reference, titres, courant, _flux: flux })))
+    }
+
+    /// Le DVD en cours de lecture, pour le menu des titres.
+    pub fn dvd(&self) -> Option<&DvdOuvert> {
+        self.dvd.as_ref()
+    }
+
     fn close_media(&mut self) {
         // Mémorise la position avant de tout libérer (sauf option désactivée).
         // Jamais pour un flux réseau : une position dans un direct n'a pas de sens,
@@ -4526,6 +4638,8 @@ impl VideoPlayer {
             if let Some(mut fc) = self.format_context.take() {
                 avformat_close_input(&mut fc);
             }
+            // Le `pb` d'un DVD n'appartient pas à FFmpeg : libéré seulement une fois le format fermé.
+            self.dvd = None;
             // Le contexte de format est fermé : le pointeur confié à FFmpeg
             // (`interrupt_callback.opaque`) n'est plus utilisé, le garde-temps
             // peut être libéré.
@@ -7163,6 +7277,133 @@ impl Drop for VideoPlayer {
     fn drop(&mut self) {
         let _ = self.quit();
     }
+}
+
+/// Retranche le début du flux des horodatages d'un paquet (DVD : un titre ne commence pas à zéro).
+unsafe fn decaler_paquet(format_context: *mut AVFormatContext, pkt: *mut AVPacket, decalage_us: i64) {
+    if decalage_us == 0 {
+        return;
+    }
+    let index = (*pkt).stream_index;
+    if index < 0 || index as u32 >= (*format_context).nb_streams {
+        return;
+    }
+    let base = (**(*format_context).streams.add(index as usize)).time_base;
+    let d = av_rescale_q(decalage_us, AVRational { num: 1, den: AV_TIME_BASE }, base);
+    if (*pkt).pts != AV_NOPTS_VALUE {
+        (*pkt).pts -= d;
+    }
+    if (*pkt).dts != AV_NOPTS_VALUE {
+        (*pkt).dts -= d;
+    }
+}
+
+/// Complète un flux MPEG-PS de DVD avec ce que disent les fichiers d'information : langues des pistes
+/// audio et de sous-images, palette des sous-images, pistes de sous-images que la sonde n'a pas vues
+/// (leurs paquets sont rares), durée du titre. Renvoie le début du flux (µs) à retrancher des horodatages.
+unsafe fn completer_flux_dvd(format_context: *mut AVFormatContext, titre: &crate::dvd::Titre) -> i64 {
+    let palette = crate::dvd::palette_texte(&titre.palette);
+    let mut sous_images_vues = vec![false; titre.sous_titres.len()];
+    let nb = (*format_context).nb_streams as usize;
+    for i in 0..nb {
+        let st = *(*format_context).streams.add(i);
+        let octet = ((*st).id & 0xFF) as u8;
+        match (*(*st).codecpar).codec_type {
+            AVMediaType::AVMEDIA_TYPE_AUDIO => {
+                let rang = titre
+                    .audio
+                    .iter()
+                    .enumerate()
+                    .position(|(r, a)| crate::dvd::id_flux_audio(&a.codage, r) == octet);
+                if let Some(a) = rang.map(|r| &titre.audio[r]) {
+                    if !a.langue.is_empty() {
+                        poser_langue(st, &a.langue);
+                    }
+                }
+            }
+            AVMediaType::AVMEDIA_TYPE_SUBTITLE => {
+                let rang = (0..titre.sous_titres.len()).find(|&r| crate::dvd::id_flux_sous_image(r) == octet);
+                if let Some(r) = rang {
+                    sous_images_vues[r] = true;
+                    if !titre.sous_titres[r].langue.is_empty() {
+                        poser_langue(st, &titre.sous_titres[r].langue);
+                    }
+                    poser_palette(st, &palette);
+                }
+            }
+            _ => {}
+        }
+    }
+    // Pistes de sous-images annoncées par le disque mais absentes de la sonde.
+    for (r, vue) in sous_images_vues.iter().enumerate() {
+        if *vue {
+            continue;
+        }
+        let st = avformat_new_stream(format_context, std::ptr::null());
+        if st.is_null() {
+            continue;
+        }
+        (*st).id = crate::dvd::id_flux_sous_image(r) as i32;
+        (*(*st).codecpar).codec_type = AVMediaType::AVMEDIA_TYPE_SUBTITLE;
+        (*(*st).codecpar).codec_id = AVCodecID::AV_CODEC_ID_DVD_SUBTITLE;
+        if !titre.sous_titres[r].langue.is_empty() {
+            poser_langue(st, &titre.sous_titres[r].langue);
+        }
+        poser_palette(st, &palette);
+    }
+    // La durée du PGC est exacte ; celle que FFmpeg déduit des horodatages l'est à peu près.
+    if titre.duree_ms > 0 {
+        (*format_context).duration = titre.duree_ms as i64 * 1000;
+    }
+    let debut = (*format_context).start_time;
+    if debut != AV_NOPTS_VALUE && debut > 0 { debut } else { 0 }
+}
+
+unsafe fn poser_langue(st: *mut AVStream, langue: &str) {
+    if let Ok(v) = CString::new(langue) {
+        av_dict_set(&mut (*st).metadata, c"language".as_ptr(), v.as_ptr(), 0);
+    }
+}
+
+/// La palette des sous-images au format VobSub (`palette: rrggbb, …`), que le décodeur lit dans ses
+/// données annexes ; sans elle il devine des couleurs.
+unsafe fn poser_palette(st: *mut AVStream, palette: &str) {
+    let par = (*st).codecpar;
+    if !(*par).extradata.is_null() {
+        return;
+    }
+    let octets = palette.as_bytes();
+    let tampon = av_mallocz(octets.len() + AV_INPUT_BUFFER_PADDING_SIZE as usize) as *mut u8;
+    if tampon.is_null() {
+        return;
+    }
+    std::ptr::copy_nonoverlapping(octets.as_ptr(), tampon, octets.len());
+    (*par).extradata = tampon;
+    (*par).extradata_size = octets.len() as c_int;
+}
+
+/// Les chapitres d'un titre de DVD : chacun finit où le suivant commence (le dernier, à la fin du titre).
+fn chapitres_dvd(titre: &crate::dvd::Titre) -> Vec<Chapter> {
+    titre
+        .chapitres_ms
+        .iter()
+        .enumerate()
+        .map(|(i, &debut)| Chapter {
+            start_ms: debut,
+            end_ms: titre.chapitres_ms.get(i + 1).copied().unwrap_or(titre.duree_ms),
+            title: format!("Chapitre {}", i + 1),
+        })
+        .collect()
+}
+
+/// « DVD — <dossier> — titre n », le nom affiché d'un titre de DVD.
+fn nom_dvd(reference: &crate::dvd::Reference, titre: usize) -> String {
+    let nom = reference
+        .emplacement
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| reference.emplacement.display().to_string());
+    format!("DVD — {nom} — titre {titre}")
 }
 
 #[cfg(test)]

@@ -314,6 +314,30 @@ sépia, netteté et négatif dans `~/.config/rmplayer/shaders/` (coupés par dé
   l'avis le dit.
 - Mesuré sur les pixels, `--dump-frame` puis la vraie fenêtre : `tools/verif-shaders.sh`.
 
+### DVD-Vidéo
+
+*Fichier ▸ Ouvrir un DVD (dossier)…*, *Ouvrir un DVD (.ifo, .iso)…*, *Lire le DVD du lecteur*, ou directement
+`rmplayer /dev/sr0`, `rmplayer ~/Films/MonDVD`, un `VIDEO_TS.IFO`, un `VTS_01_1.VOB` rangé dans son dossier
+`VIDEO_TS`, une image `.iso`, ou le glisser-déposer d'un dossier : le **titre principal** (le plus long) se lit.
+*Lecture ▸ Titres du DVD* liste les autres (durée, chapitres) ; *Chapitres* donne ceux du titre, avec leurs
+instants, comme pour n'importe quel film (Page↑ / Page↓).
+
+- Les titres, durées, chapitres, **langues des pistes audio et des sous-images** et la palette viennent des
+  fichiers d'information (`.IFO`), lus par le lecteur lui-même ; le film est lu cellule par cellule, comme le fait
+  le disque. Les sous-images DVD sont rendues comme les autres sous-titres image.
+- Une référence `dvd://<emplacement>#<titre>` sert de « chemin » du média : récents, reprise de position
+  et signets retrouvent le bon titre.
+- `rmplayer --list-dvd <dossier|image|lecteur>` écrit les titres au format de `lsdvd` (sans lire le film).
+- **Prérequis** : la bibliothèque `libdvdread` (paquet `libdvdread8` / `libdvdread4`), chargée à l'exécution ;
+  sans elle, le DVD signale qu'elle manque et le reste du lecteur fonctionne.
+- **Pas de menus de DVD** (navigation interactive, boutons) : on choisit le titre dans le menu du lecteur.
+  Seul le premier angle d'un titre multi-angles est lu.
+- **Disques chiffrés (CSS)** : RMPlayer ne contourne aucune protection. Si le film est brouillé (les
+  paquets portent le bit de brouillage), il refuse avec un message clair ; avec `libdvdcss` installée par
+  vos soins, `libdvdread` déchiffre et la lecture suit son cours.
+- Mesuré sur un DVD fabriqué (trois plans de couleur, deux pistes audio, trois cellules) et comparé à `lsdvd` sur
+  un vrai disque : `tools/verif-dvd.sh`.
+
 ### Fenêtres détachables
 
 Les fenêtres *Préférences*, *Statistiques*, *Aide des raccourcis* et *À propos* sont dessinées dans
@@ -496,7 +520,7 @@ de départ, `--profil <nom>` applique un profil, `--list-tracks` / `--list-profi
 inventorient, `--ass-dump <fichier.ass>` montre comment un ASS est compris (styles,
 positions, animations), `--dump-subs` / `--dump-images` / `--dump-audio` / `--dump-frame` servent aux mesures
 (`--dump-images` détaille les sous-titres **image** : rectangles, pixels, empreinte).
-Une adresse de flux peut remplacer le nom de fichier. Autres options : `--boucle-ab <A> <B>`, `--export-config` / `--import-config`, `--autostart on|off|status`, `--list-audio`, `--hdr-info <fichier>`, `--nouvelle-instance`, `--fullscreen`, `--no-hwdec`. `--audio-buffer <ms>` impose la profondeur du tampon audio : c'est l'option de mesure qui
+Une adresse de flux peut remplacer le nom de fichier. Autres options : `--boucle-ab <A> <B>`, `--export-config` / `--import-config`, `--autostart on|off|status`, `--list-audio`, `--list-dvd <dossier|image|lecteur>`, `--hdr-info <fichier>`, `--nouvelle-instance`, `--fullscreen`, `--no-hwdec`. `--audio-buffer <ms>` impose la profondeur du tampon audio : c'est l'option de mesure qui
 démontre que cette profondeur n'a **aucun** effet sur la synchronisation image/son (la
 carte son fait foi) — voir `tools/verif-horloge.sh`.
 
@@ -602,6 +626,7 @@ L'inventaire complet, avec les preuves, est tenu dans
 - **HDR** : la conversion tonale vers SDR est faite (voir plus haut), mais pas le *passthrough* —
   la fenêtre est rendue en 8 bits SDR (`docs/HDR.md`). Sans Vulkan, le repli CPU est borné
   (≤ 1080p30) ; au-delà l'image n'est pas convertie, avec un avis à l'écran ;
+- **DVD** : pas de menus de DVD (navigation interactive) ni de choix d'angle ; seul le premier angle est lu ; pas de vignettes de la barre de progression pour un DVD, et la capture « taille native » y retombe sur l'image affichée (le décodeur autonome ne lit pas `dvd://`) ; un film chiffré (CSS) demande `libdvdcss` ;
 - **volume maximal** plafonné à 300 % (au-delà, `cpal` écrête) ;
 - **interpolation de mouvement** : non implémentée ;
 - **sortie audio** : pas de reprise propre si le périphérique disparaît en cours de lecture
@@ -649,6 +674,8 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-haut-parleurs.sh [écran]` | **Enceintes** : une source 5.1 dont chaque canal porte sa fréquence ; mixage vers mono / stéréo / 3.1 / 5.1 / 7.1 (nombre de canaux, ordre ALSA, réduction, extension) puis lecture réelle vers une sortie PipeWire à 6 canaux enregistrée canal par canal, et changement en cours de lecture — 10 contrôles |
 | `verif-modes-lecture.sh [écran]` | **Fin de fichier** : trois clips, séquence des titres lue sur MPRIS — enchaînement, lecture continue coupée, répéter le fichier, répéter la playlist, aléatoire avec et sans répétition, ancienne configuration — 7 contrôles |
 | `verif-capture.sh [écran]` | **Captures** : format écrit (signature et décodage du fichier), qualité JPEG qui agit (taille et écart de pixels), WebP identique au PNG, taille native, modèle de nom, ancienne configuration — 9 contrôles |
+| `verif-dvd.sh [écran]` | **DVD-Vidéo** : un DVD fabriqué (3 cellules, 3 chapitres, 2 pistes audio) — titres et chapitres, reconnaissance par dossier et par fichier (.ifo, .vob), image rouge / vert / bleu à travers les cellules, positions du titre (début du flux ≠ 0), titre 2, audio et langues, vraie fenêtre, menus (Titres du DVD), refus d'un film brouillé ; et, avec un vrai disque, titres identiques à `lsdvd` (44 contrôles) |
+| `fabrique-dvd.py <sortie> <fichier.vob>` | Écrit un mini DVD-Vidéo (`VIDEO_TS`, IFO, BUP) autour d'un VOB produit par `ffmpeg -f dvd` : 3 cellules coupées sur des images I, 2 titres, 3 chapitres, audio « fre » / « jpn » |
 | `verif-hdr-saut.sh [écran]` | **HDR après un saut** : la fenêtre est filmée pendant des sauts (en lecture, en pause, cinq rapprochés) et pendant une répétition A-B ; chaque image est classée convertie / non convertie — 5 contrôles |
 | `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, moteur CPU forcé, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision, **Vulkan coupé** (repli CPU borné, avis, pas de reconstruction à chaque image) — 36 contrôles |
 | `verif-focus.sh [écran]` | **Pause selon le focus** : jamais / perte de focus / fenêtre réduite, reprise au retour, respect d'une pause volontaire — 11 contrôles, avec une seconde fenêtre réelle ; la pause est mesurée aussi sur l'image (deux captures identiques), avec un témoin en lecture. Non couvert : une vraie réduction (mode 2), qui exige un gestionnaire de fenêtres |
@@ -718,6 +745,9 @@ src/
 ├── systeme.rs       Démarrage automatique et priorité du processus
 ├── theme.rs         Thèmes externes JSON
 ├── signets.rs       Signets par média
+├── capture.rs       Captures d'écran : format, qualité, taille, nom
+├── shaders.rs       Shaders de pixels (GLSL mpv) : lecture, assemblage, exemples
+├── dvd.rs           DVD-Vidéo : IFO, titres, chapitres, flux d'un titre pour FFmpeg (libdvdread chargée à l'exécution)
 ├── positions.rs     Positions de reprise
 ├── pistes.rs        Mémoire des pistes choisies à la main, par média
 ├── vignettes.rs     Vignettes de la barre de progression
