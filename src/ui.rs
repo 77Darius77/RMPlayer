@@ -898,28 +898,58 @@ impl App {
 
     /// Enregistre l'image courante en PNG dans le dossier de captures.
     fn take_screenshot(&mut self) {
-        let (width, height) = self.renderer.get_dimensions();
-        let frame = self.renderer.get_frame();
-        let (Some(frame), w, h) = (frame, width, height) else {
-            self.status_message = Some("Capture impossible : aucune image affichée".to_string());
-            return;
+        let position = self.player.current_position_ms();
+        let media = self.player.current_path().cloned();
+
+        // Taille d'origine : l'image du film décodée à part (décodeur autonome des vignettes), SANS
+        // les réglages d'image ni le HDR convertis ; sinon l'image telle qu'elle est affichée.
+        let natif = if self.config.interface.capture_native {
+            match media.as_ref().map(|m| crate::vignettes::extraire(m, position, 16_384)) {
+                Some(Ok(v)) => Some((v.largeur, v.hauteur, v.rgba)),
+                Some(Err(e)) => {
+                    tracing::warn!("Capture à la taille native impossible ({e}) — image affichée");
+                    None
+                }
+                None => None,
+            }
+        } else {
+            None
         };
-        let expected = (w as usize) * (h as usize) * 4;
-        if w == 0 || h == 0 || frame.len() < expected {
-            self.status_message = Some("Capture impossible : image incomplète".to_string());
-            return;
-        }
+        let (w, h, pixels) = match natif {
+            Some(image) => image,
+            None => {
+                let (width, height) = self.renderer.get_dimensions();
+                let frame = self.renderer.get_frame();
+                let (Some(frame), w, h) = (frame, width, height) else {
+                    self.status_message = Some("Capture impossible : aucune image affichée".to_string());
+                    return;
+                };
+                let expected = (w as usize) * (h as usize) * 4;
+                if w == 0 || h == 0 || frame.len() < expected {
+                    self.status_message = Some("Capture impossible : image incomplète".to_string());
+                    return;
+                }
+                (w, h, frame[..expected].to_vec())
+            }
+        };
 
-        let dir = self.config.screenshots_dir();
-        let name = format!(
-            "rmplayer-{}.png",
-            chrono::Local::now().format("%Y%m%d-%H%M%S")
+        let titre = media
+            .as_ref()
+            .and_then(|m| m.file_stem())
+            .map(|s| s.to_string_lossy().to_string());
+        let nom = crate::capture::nom_depuis_modele(
+            &self.config.interface.capture_name,
+            titre.as_deref(),
+            position,
+            chrono::Local::now(),
         );
-        let path = dir.join(&name);
+        let format = self.config.interface.capture_format;
+        let dir = self.config.screenshots_dir();
+        let path = crate::capture::chemin_libre(&dir, &nom, crate::capture::extension(format));
 
-        match save_png(&path, w, h, &frame[..expected]) {
+        match crate::capture::ecrire(&path, format, self.config.interface.capture_jpeg_quality, w, h, &pixels) {
             Ok(()) => {
-                tracing::info!("Capture enregistrée: {:?} ({}x{})", path, w, h);
+                tracing::info!("Capture enregistrée: {:?} ({}x{}, {:?})", path, w, h, format);
                 self.status_message = Some(format!("📸 Capture : {}", path.display()));
             }
             Err(e) => {
@@ -928,7 +958,6 @@ impl App {
             }
         }
     }
-    
 
     /// Active/désactive le décodage matériel et recharge le média à la position
     /// courante (le mode de décodage se choisit à l'ouverture du flux).
@@ -5301,18 +5330,7 @@ fn parse_couleur(texte: &str) -> Option<egui::Color32> {
 
 /// Écrit un PNG RGBA 8 bits. Encodeur pur Rust (`png`), aucune dépendance système.
 pub(crate) fn save_png(path: &Path, width: u32, height: u32, rgba: &[u8]) -> Result<(), String> {
-    let file = std::fs::File::create(path).map_err(|e| format!("création du fichier: {}", e))?;
-    let writer = std::io::BufWriter::new(file);
-    let mut encoder = png::Encoder::new(writer, width, height);
-    encoder.set_color(png::ColorType::Rgba);
-    encoder.set_depth(png::BitDepth::Eight);
-    let mut writer = encoder
-        .write_header()
-        .map_err(|e| format!("en-tête PNG: {}", e))?;
-    writer
-        .write_image_data(rgba)
-        .map_err(|e| format!("écriture PNG: {}", e))?;
-    Ok(())
+    crate::capture::ecrire(path, crate::config::CaptureFormat::Png, 100, width, height, rgba)
 }
 
 // La table statique des raccourcis a été remplacée par `raccourcis::Tableau` :

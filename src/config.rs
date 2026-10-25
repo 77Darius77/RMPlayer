@@ -1145,6 +1145,41 @@ impl SubtitleSettings {
     }
 }
 
+/// Format d'enregistrement d'une capture d'écran.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum CaptureFormat {
+    /// PNG, sans perte (défaut : le format d'avant ce réglage).
+    #[default]
+    #[serde(rename = "png", alias = "Png", alias = "PNG")]
+    Png,
+    /// JPEG, avec perte ; la qualité se règle (`interface.capture_jpeg_quality`).
+    #[serde(rename = "jpeg", alias = "jpg", alias = "Jpeg", alias = "JPEG", alias = "JPG")]
+    Jpeg,
+    /// WebP, **toujours sans perte** (le seul encodeur disponible hors ligne).
+    #[serde(rename = "webp", alias = "Webp", alias = "WEBP")]
+    Webp,
+}
+
+impl CaptureFormat {
+    pub const TOUS: [CaptureFormat; 3] = [Self::Png, Self::Jpeg, Self::Webp];
+
+    pub fn libelle(&self) -> &'static str {
+        match self {
+            Self::Png => "PNG (sans perte)",
+            Self::Jpeg => "JPEG (qualité réglable)",
+            Self::Webp => "WebP (sans perte)",
+        }
+    }
+}
+
+fn default_capture_quality() -> u8 {
+    92
+}
+
+fn default_capture_name() -> String {
+    crate::capture::MODELE_DEFAUT.to_string()
+}
+
 /// Paramètres interface
 #[derive(Debug, Clone, Serialize, Deserialize)]
 // `serde(default)` : un champ ajouté dans une version ultérieure ne doit pas faire
@@ -1190,6 +1225,18 @@ pub struct InterfaceSettings {
     /// Dossier d'enregistrement des captures d'écran (`~` accepté)
     #[serde(default = "default_screenshots_dir")]
     pub screenshots_dir: String,
+    /// Format des captures d'écran (touche S).
+    #[serde(default)]
+    pub capture_format: CaptureFormat,
+    /// Qualité JPEG, 1–100 (bornée à l'écriture).
+    #[serde(default = "default_capture_quality")]
+    pub capture_jpeg_quality: u8,
+    /// Capturer à la taille du film (sans les réglages d'image) plutôt qu'à la taille affichée.
+    #[serde(default)]
+    pub capture_native: bool,
+    /// Modèle du nom de fichier : `{media}`, `{position}`, `{date}`, `{heure}`.
+    #[serde(default = "default_capture_name")]
+    pub capture_name: String,
     /// Dernière géométrie de la fenêtre : coin supérieur gauche du **cadre**
     /// (décorations comprises — c'est la coordonnée qu'attend le gestionnaire de
     /// fenêtres), en points logiques. Ce n'est pas une préférence mais une
@@ -1574,6 +1621,10 @@ impl Default for InterfaceSettings {
             tray_icon: false,
             show_title: true,
             screenshots_dir: default_screenshots_dir(),
+            capture_format: CaptureFormat::default(),
+            capture_jpeg_quality: default_capture_quality(),
+            capture_native: false,
+            capture_name: default_capture_name(),
             // Aucune géométrie mémorisée : première taille connue, placement du
             // gestionnaire de fenêtres (comportement d'avant la session 32).
             window_pos: None,
@@ -2623,6 +2674,27 @@ mod tests {
         assert!(ancienne.recent.is_empty());
         assert!(!ancienne.resume);
         assert_eq!(ancienne.precache_ms, default_precache_ms());
+    }
+
+    #[test]
+    fn les_reglages_de_capture_se_relisent_et_un_ancien_fichier_garde_le_png() {
+        let c: Config = serde_json::from_str(
+            r#"{"interface": {"capture_format": "jpeg", "capture_jpeg_quality": 70, "capture_native": true, "capture_name": "{media}_{position}"}}"#,
+        )
+        .unwrap();
+        assert_eq!(c.interface.capture_format, CaptureFormat::Jpeg);
+        assert_eq!(c.interface.capture_jpeg_quality, 70);
+        assert!(c.interface.capture_native);
+        assert_eq!(c.interface.capture_name, "{media}_{position}");
+        // « jpg » et la casse sont acceptés ; un format inconnu est une erreur, pas un repli muet.
+        let jpg: Config = serde_json::from_str(r#"{"interface": {"capture_format": "jpg"}}"#).unwrap();
+        assert_eq!(jpg.interface.capture_format, CaptureFormat::Jpeg);
+        // Un config.json d'avant ces champs : PNG, qualité 92, taille affichée, nom d'origine.
+        let ancien: Config = serde_json::from_str(r#"{"interface": {"show_osd": false}}"#).unwrap();
+        assert_eq!(ancien.interface.capture_format, CaptureFormat::Png);
+        assert_eq!(ancien.interface.capture_jpeg_quality, 92);
+        assert!(!ancien.interface.capture_native);
+        assert_eq!(ancien.interface.capture_name, crate::capture::MODELE_DEFAUT);
     }
 
     #[test]

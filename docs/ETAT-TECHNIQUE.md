@@ -39,7 +39,8 @@
 | `zbus` | 5.19 | MPRIS (D-Bus, `blocking-api`, serveur dans son propre fil) |
 | `ksni` | 0.3 | Icône de zone de notification (StatusNotifierItem) |
 | `encoding_rs` | 0.8 | Encodages des sous-titres externes (alphabet imposé) |
-| `png` | 0.18 | Captures d'écran (encodeur pur Rust) |
+| `png` | 0.18 | Captures d'écran PNG (encodeur pur Rust) |
+| `image` | 0.25 | Captures JPEG et WebP (sans perte) : seuls ces deux encodeurs sont activés ; déjà présent via egui_extras |
 | `x11rb` | 0.13 | « Fenêtre toujours au-dessus » (X11 seulement) |
 
 > `rodio` a été **retiré** : la sortie audio passe exclusivement par cpal.

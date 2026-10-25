@@ -1008,8 +1008,8 @@ fn dessiner_interface(app: &mut App, ui: &mut egui::Ui) {
         });
     });
 
-    sous_section(ui, "Fichiers", |ui| {
-        ligne(ui, "grille_captures", "Captures d'écran", |ui| {
+    sous_section(ui, "Captures d'écran", |ui| {
+        ligne(ui, "grille_captures", "Dossier", |ui| {
             if ui
                 .text_edit_singleline(&mut app.config.interface.screenshots_dir)
                 .changed()
@@ -1017,7 +1017,57 @@ fn dessiner_interface(app: &mut App, ui: &mut egui::Ui) {
                 let _ = app.config.save();
             }
         });
-        aide(ui, "Dossier où la touche S écrit les PNG (le caractère ~ est accepté).");
+        aide(ui, "Dossier où la touche S écrit les captures (le caractère ~ est accepté).");
+
+        let mut format = app.config.interface.capture_format;
+        ligne(ui, "grille_capture_format", "Format", |ui| {
+            egui::ComboBox::from_id_salt("capture_format")
+                .selected_text(format.libelle())
+                .show_ui(ui, |ui| {
+                    for f in crate::config::CaptureFormat::TOUS {
+                        ui.selectable_value(&mut format, f, f.libelle());
+                    }
+                });
+        });
+        if format != app.config.interface.capture_format {
+            app.config.interface.capture_format = format;
+            let _ = app.config.save();
+        }
+
+        let jpeg = format == crate::config::CaptureFormat::Jpeg;
+        let mut qualite = app.config.interface.capture_jpeg_quality.clamp(1, 100);
+        ligne(ui, "grille_capture_qualite", "Qualité JPEG", |ui| {
+            ui.add_enabled(jpeg, egui::Slider::new(&mut qualite, 1..=100));
+        });
+        if qualite != app.config.interface.capture_jpeg_quality {
+            app.config.interface.capture_jpeg_quality = qualite;
+            let _ = app.config.save();
+        }
+
+        if ui
+            .checkbox(
+                &mut app.config.interface.capture_native,
+                "Taille d'origine du film (sans les réglages d'image)",
+            )
+            .on_hover_text("Décode l'image du fichier à sa résolution native ; sinon, l'image telle qu'affichée")
+            .changed()
+        {
+            let _ = app.config.save();
+        }
+
+        ligne(ui, "grille_capture_nom", "Nom du fichier", |ui| {
+            if ui
+                .text_edit_singleline(&mut app.config.interface.capture_name)
+                .changed()
+            {
+                let _ = app.config.save();
+            }
+        });
+        aide(
+            ui,
+            "Modèle : {media} (titre du film), {position} (HH-MM-SS), {date} (AAAAMMJJ), {heure} (HHMMSS). \
+             Un fichier existant n'est jamais écrasé (-2, -3…). WebP est toujours sans perte.",
+        );
     });
 }
 
@@ -3251,6 +3301,10 @@ fn interface_modifiee(app: &App) -> bool {
         || a.show_osd != d.show_osd
         || a.osd_duration != d.osd_duration
         || a.screenshots_dir != d.screenshots_dir
+        || a.capture_format != d.capture_format
+        || a.capture_jpeg_quality != d.capture_jpeg_quality
+        || a.capture_native != d.capture_native
+        || a.capture_name != d.capture_name
 }
 
 fn video_modifiee(app: &App) -> bool {

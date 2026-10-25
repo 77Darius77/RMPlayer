@@ -113,6 +113,8 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Fenêtres détachables (s.37)** : Préférences, Statistiques, Aide, À propos en vraies fenêtres
   système, `verif-fenetres-detachables` 24/24 (piège 127). Non fait : « Ouvrir une adresse » et les
   menus déroulants de la barre (fenêtres contextuelles d'egui, bornées par la fenêtre du lecteur).
+- **Captures (s.37)** : formats PNG / JPEG / WebP, qualité JPEG, taille native, modèle de nom,
+  `verif-capture` 9/9. Limite : WebP sans perte seulement (pas de `libwebp`) ; pas de sous-titres incrustés.
 - **HDR après un saut (s.37)** : le défaut était bien plus large que « la première image » — après un saut
   EN ARRIÈRE (ou chaque retour d'une boucle A-B), toute image HDR restait non convertie jusqu'à ce que la
   lecture rattrape l'ancien maximum d'horodatage. Corrigé, `verif-hdr-saut` 5/5 (piège 131).

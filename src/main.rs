@@ -8,6 +8,7 @@
 //!   - cpal pour l'audio PipeWire/PulseAudio
 
 mod ass;
+mod capture;
 mod config;
 mod edid;
 mod fenetre;
