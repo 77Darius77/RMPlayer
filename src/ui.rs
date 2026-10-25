@@ -1045,6 +1045,24 @@ impl App {
         self.annonce(&format!("Sortie audio : {libelle}"));
     }
 
+    /// Fixe la disposition des haut-parleurs : un seul chemin pour le menu, les préférences et le
+    /// raccourci. Le nombre de canaux de la sortie change : le film est rechargé (position conservée).
+    pub(crate) fn definir_enceintes(&mut self, layout: crate::config::SpeakerLayout) {
+        if self.config.audio.speakers == layout {
+            return;
+        }
+        self.config.audio.speakers = layout;
+        let recharger = self.player.set_speakers(layout);
+        let _ = self.config.save();
+        if recharger && self.player.current_path().is_some() {
+            if let Err(e) = self.player.reload_current_media() {
+                tracing::warn!("Rechargement après changement d'enceintes: {}", e);
+            }
+        }
+        tracing::info!(target: "kinterface", "enceintes : {}", layout.libelle());
+        self.annonce(&format!("Enceintes : {}", layout.libelle()));
+    }
+
     /// Passe à la sortie audio suivante (raccourci) ; la liste est relue à chaque appui.
     fn sortie_audio_suivante(&mut self) {
         self.actualiser_sorties_audio(true);
@@ -3483,6 +3501,7 @@ impl eframe::App for App {
                         // Piste audio suivante : même chemin que le menu Audio.
                         Action::PisteAudioSuivante => self.piste_audio_suivante(),
                         Action::SortieAudioSuivante => self.sortie_audio_suivante(),
+                        Action::Enceintes => self.definir_enceintes(self.player.speakers().suivante()),
                         // Chapitres (Page↑ / Page↓).
                         Action::ChapitrePrecedent => {
                             if self.player.previous_chapter().is_none() {
@@ -3887,6 +3906,23 @@ impl eframe::App for App {
                     }
                     if let Some(id) = sortie_choisie {
                         self.choisir_sortie_audio(&id);
+                    }
+
+                    // --- Enceintes (nombre de canaux de la sortie) ---
+                    let enceintes = self.config.audio.speakers;
+                    let mut choix_enceintes = None;
+                    ui.menu_button(format!("🔈 Enceintes : {}", enceintes.libelle()), |ui| {
+                        for l in crate::config::SpeakerLayout::TOUS {
+                            let actif = l == enceintes;
+                            let libelle = format!("{}{}", if actif { "● " } else { "   " }, l.libelle());
+                            if ligne_menu(ui, actif, libelle).clicked() && !actif {
+                                choix_enceintes = Some(l);
+                                ui.close();
+                            }
+                        }
+                    });
+                    if let Some(l) = choix_enceintes {
+                        self.definir_enceintes(l);
                     }
 
                     // --- Pistes du conteneur ---

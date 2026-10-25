@@ -116,6 +116,7 @@ continue alors sans son (avertissement « lecture vidéo seule »).
 | `J` | Piste de sous-titres suivante |
 | `Ctrl+J` | Piste audio suivante |
 | `Ctrl+Maj+J` | Sortie audio suivante |
+| `Ctrl+Maj+E` | Enceintes : disposition suivante |
 | `F`, `Entrée`, `F11` | Plein écran |
 | `Échap` | Fermer la fenêtre / sortir du plein écran |
 | `S` | Capture d'écran (PNG) |
@@ -277,6 +278,22 @@ pas rouvert. « Périphérique par défaut » suit la sortie du système. Une so
 éteinte) laisse la lecture sur la sortie par défaut. `rmplayer --list-audio` liste les sorties
 (`pw:<nom> — <description>`). Réglage : `audio.device` (`""`, `pw:<nom>`, ou un ancien nom ALSA).
 Mesuré au son, sur deux sorties factices : `tools/verif-peripheriques.sh`.
+
+### Enceintes : mono, stéréo, 5.1, 7.1…
+
+*Préférences ▸ Audio ▸ Sortie ▸ Enceintes*, le menu *Audio ▸ Enceintes* ou **`Ctrl+Maj+E`** (disposition
+suivante) choisissent le **nombre de canaux ouvert sur la sortie** et la façon dont le son du fichier y est
+mélangé (réduction ou extension par `swresample`) : automatique (celle de la sortie), mono, stéréo, 2.1,
+3.1, quadriphonie (4.0), 4.1, 5.0, 5.1, 6.1, 7.1. Le changement recharge le film à la même position.
+
+- Mono, stéréo, quadriphonie, 5.0, 5.1 et 7.1 sortent dans l'**ordre des canaux d'ALSA / PipeWire** (5.1 :
+  FL FR RL RR FC LFE) — mesuré dans le graphe PipeWire ; envoyer l'ordre de FFmpeg faisait sortir le
+  centre sur une enceinte arrière. 2.1, 3.1, 4.1 et 6.1 n'ont pas de position standard : leurs canaux
+  sortent dans l'ordre de FFmpeg.
+- Une sortie qui n'accepte pas ce nombre de canaux garde le sien (le mixage se fait vers lui) ; un profil
+  de réglages ne change jamais les enceintes de la machine.
+- Mesuré canal par canal : `tools/verif-haut-parleurs.sh` (source 5.1 dont chaque canal porte sa fréquence ;
+  sortie PipeWire factice à 6 canaux dont on enregistre chaque canal).
 
 ### Fenêtres détachables
 
@@ -609,6 +626,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-soustitres.sh [écran]` | **Style des sous-titres** : trois familles de police mesurées (largeurs 268/307/332 px), position horizontale 20/50/80 %, police inconnue, non-régression — 5 contrôles |
 | `installer-association.sh [--par-defaut] [--etat] [--retirer]` | **« Ouvrir avec » RMPlayer** : lanceur `.desktop`, icône, cache des types MIME ; `--par-defaut` l'impose pour les formats qu'il gère |
 | — | **revue externe** : `docs/BRIEF-REVUE-EXTERNE.md` — ce qu'on demande à un relecteur extérieur, budget de lecture, six vérifications qui valent mieux que la lecture, deux pièges à faux positifs |
+| `verif-haut-parleurs.sh [écran]` | **Enceintes** : une source 5.1 dont chaque canal porte sa fréquence ; mixage vers mono / stéréo / 3.1 / 5.1 / 7.1 (nombre de canaux, ordre ALSA, réduction, extension) puis lecture réelle vers une sortie PipeWire à 6 canaux enregistrée canal par canal, et changement en cours de lecture — 10 contrôles |
 | `verif-modes-lecture.sh [écran]` | **Fin de fichier** : trois clips, séquence des titres lue sur MPRIS — enchaînement, lecture continue coupée, répéter le fichier, répéter la playlist, aléatoire avec et sans répétition, ancienne configuration — 7 contrôles |
 | `verif-capture.sh [écran]` | **Captures** : format écrit (signature et décodage du fichier), qualité JPEG qui agit (taille et écart de pixels), WebP identique au PNG, taille native, modèle de nom, ancienne configuration — 9 contrôles |
 | `verif-hdr-saut.sh [écran]` | **HDR après un saut** : la fenêtre est filmée pendant des sauts (en lecture, en pause, cinq rapprochés) et pendant une répétition A-B ; chaque image est classée convertie / non convertie — 5 contrôles |

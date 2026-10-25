@@ -501,6 +501,9 @@ pub struct AudioSettings {
     /// ouvert tel quel par cpal (anciens réglages, `hw:…` en « avancé »).
     #[serde(default)]
     pub device: String,
+    /// Disposition des haut-parleurs (nombre de canaux de la sortie et mixage du fichier vers eux).
+    #[serde(default)]
+    pub speakers: SpeakerLayout,
     /// Volume maximal autorisé, en pourcentage — réellement appliqué (`set_volume_max`).
     #[serde(default = "default_volume_max")]
     pub volume_max: u16,
@@ -1199,6 +1202,132 @@ impl RepeatMode {
     }
 }
 
+/// Disposition des haut-parleurs de sortie : le nombre de canaux ouverts et la façon dont le son du
+/// fichier y est mélangé (réduction ou extension, par `swresample`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum SpeakerLayout {
+    /// Celle de la sortie (le nombre de canaux qu'elle annonce) : comportement d'origine.
+    #[default]
+    #[serde(rename = "auto", alias = "Auto")]
+    Auto,
+    #[serde(rename = "mono")]
+    Mono,
+    #[serde(rename = "stereo")]
+    Stereo,
+    /// Gauche, droite, grave (LFE).
+    #[serde(rename = "2.1")]
+    Deux1,
+    /// Gauche, droite, centre, grave.
+    #[serde(rename = "3.1")]
+    Trois1,
+    /// Quadriphonie : gauche, droite, arrière gauche, arrière droite.
+    #[serde(rename = "quad")]
+    Quad,
+    /// Gauche, droite, centre, grave, arrière centre. **Ordre FFmpeg** : ALSA/PipeWire n'a pas de position
+    /// standard pour cinq canaux avec un grave (il lit cinq canaux comme du 5.0).
+    #[serde(rename = "4.1")]
+    Quatre1,
+    /// Surround 5.0 : gauche, droite, centre, arrière gauche, arrière droite.
+    #[serde(rename = "5.0")]
+    Cinq0,
+    /// Surround 5.1 : gauche, droite, centre, grave, arrière gauche, arrière droite.
+    #[serde(rename = "5.1")]
+    Cinq1,
+    /// Surround 6.1 : 5.1 + arrière centre.
+    #[serde(rename = "6.1")]
+    Six1,
+    /// Surround 7.1 : 5.1 + latéral gauche, latéral droit.
+    #[serde(rename = "7.1")]
+    Sept1,
+}
+
+impl SpeakerLayout {
+    pub const TOUS: [SpeakerLayout; 11] = [
+        Self::Auto,
+        Self::Mono,
+        Self::Stereo,
+        Self::Deux1,
+        Self::Trois1,
+        Self::Quad,
+        Self::Quatre1,
+        Self::Cinq0,
+        Self::Cinq1,
+        Self::Six1,
+        Self::Sept1,
+    ];
+
+    pub fn libelle(&self) -> &'static str {
+        match self {
+            Self::Auto => "Automatique (celle de la sortie)",
+            Self::Mono => "Mono",
+            Self::Stereo => "Stéréo",
+            Self::Deux1 => "2.1",
+            Self::Trois1 => "3.1",
+            Self::Quad => "Quadriphonie (4.0)",
+            Self::Quatre1 => "4.1",
+            Self::Cinq0 => "5.0 (surround)",
+            Self::Cinq1 => "5.1 (surround)",
+            Self::Six1 => "6.1 (surround)",
+            Self::Sept1 => "7.1 (surround)",
+        }
+    }
+
+    /// Nom de la disposition chez FFmpeg (`None` = automatique).
+    pub fn nom_ffmpeg(&self) -> Option<&'static str> {
+        match self {
+            Self::Auto => None,
+            Self::Mono => Some("mono"),
+            Self::Stereo => Some("stereo"),
+            Self::Deux1 => Some("2.1"),
+            Self::Trois1 => Some("3.1"),
+            Self::Quad => Some("quad"),
+            Self::Quatre1 => Some("4.1"),
+            Self::Cinq0 => Some("5.0(back)"),
+            Self::Cinq1 => Some("5.1"),
+            Self::Six1 => Some("6.1"),
+            Self::Sept1 => Some("7.1"),
+        }
+    }
+
+    /// Nombre de canaux demandé (`None` = celui de la sortie).
+    pub fn canaux(&self) -> Option<u16> {
+        match self {
+            Self::Auto => None,
+            Self::Mono => Some(1),
+            Self::Stereo => Some(2),
+            Self::Deux1 => Some(3),
+            Self::Trois1 | Self::Quad => Some(4),
+            Self::Quatre1 | Self::Cinq0 => Some(5),
+            Self::Cinq1 => Some(6),
+            Self::Six1 => Some(7),
+            Self::Sept1 => Some(8),
+        }
+    }
+
+    /// Ordre dans lequel les canaux doivent être ENTRELACÉS pour la sortie : `ordre[i]` = indice (dans
+    /// l'ordre de la disposition FFmpeg) du canal à écrire en position `i`.
+    ///
+    /// **Pourquoi** : `cpal` ouvre un flux de N canaux sans positions, et ALSA / PipeWire en déduisent
+    /// l'ordre par défaut de ALSA — 5.1 : FL FR RL RR FC LFE ; 7.1 : FL FR RL RR FC LFE SL SR ;
+    /// 5.0 : FL FR RL RR FC (mesuré dans le graphe PipeWire). Envoyer l'ordre de FFmpeg (FL FR FC LFE
+    /// BL BR) faisait sortir le centre sur une enceinte arrière. `None` = l'ordre est déjà le bon
+    /// (mono, stéréo, quadriphonie) ou n'a pas de convention (2.1, 3.1, 4.1, 6.1 : ordre de FFmpeg).
+    pub fn ordre_alsa(&self) -> Option<&'static [usize]> {
+        match self {
+            Self::Cinq0 => Some(&[0, 1, 3, 4, 2]),
+            Self::Cinq1 => Some(&[0, 1, 4, 5, 2, 3]),
+            Self::Sept1 => Some(&[0, 1, 4, 5, 2, 3, 6, 7]),
+            _ => None,
+        }
+    }
+
+    /// Disposition suivante dans la liste (automatique après la dernière).
+    pub fn suivante(&self) -> Self {
+        let rang = Self::TOUS.iter().position(|l| l == self).unwrap_or(0);
+        Self::TOUS[(rang + 1) % Self::TOUS.len()]
+    }
+}
+
 fn default_continuous() -> bool {
     true
 }
@@ -1610,6 +1739,7 @@ impl Default for AudioSettings {
     fn default() -> Self {
         Self {
             device: String::new(),
+            speakers: SpeakerLayout::default(),
             volume_max: 150,
             default_language: String::new(),
             preferred_languages: Vec::new(),
@@ -1772,9 +1902,11 @@ impl Profil {
     /// machine (périphérique de sortie).
     pub fn appliquer(&self, config: &mut Config) {
         let peripherique = config.audio.device.clone();
+        let enceintes = config.audio.speakers;
         config.video = self.video.clone();
         config.audio = self.audio.clone();
         config.audio.device = peripherique;
+        config.audio.speakers = enceintes;
         config.subtitles = self.subtitles.clone();
         // Le nombre de bandes de l'égaliseur peut venir d'un fichier édité à la main.
         config.audio.sanitize();
@@ -2741,6 +2873,54 @@ mod tests {
         assert!(ancienne.recent.is_empty());
         assert!(!ancienne.resume);
         assert_eq!(ancienne.precache_ms, default_precache_ms());
+    }
+
+    #[test]
+    fn les_dispositions_d_enceintes_se_relisent_et_donnent_le_bon_nombre_de_canaux() {
+        let c: Config = serde_json::from_str(r#"{"audio": {"speakers": "5.1"}}"#).unwrap();
+        assert_eq!(c.audio.speakers, SpeakerLayout::Cinq1);
+        let ancien: Config = serde_json::from_str(r#"{"audio": {"volume_max": 150}}"#).unwrap();
+        assert_eq!(ancien.audio.speakers, SpeakerLayout::Auto, "ancien fichier : automatique");
+        let attendu = [
+            (SpeakerLayout::Mono, 1),
+            (SpeakerLayout::Stereo, 2),
+            (SpeakerLayout::Deux1, 3),
+            (SpeakerLayout::Trois1, 4),
+            (SpeakerLayout::Quad, 4),
+            (SpeakerLayout::Quatre1, 5),
+            (SpeakerLayout::Cinq0, 5),
+            (SpeakerLayout::Cinq1, 6),
+            (SpeakerLayout::Six1, 7),
+            (SpeakerLayout::Sept1, 8),
+        ];
+        for (l, n) in attendu {
+            assert_eq!(l.canaux(), Some(n), "{l:?}");
+            if let Some(ordre) = l.ordre_alsa() {
+                assert_eq!(ordre.len(), n as usize, "{l:?} : une permutation par canal");
+                let mut tri = ordre.to_vec();
+                tri.sort();
+                assert_eq!(tri, (0..n as usize).collect::<Vec<_>>(), "{l:?} : vraie permutation");
+            }
+            assert!(l.nom_ffmpeg().is_some());
+            // le nom écrit dans le fichier se relit
+            let json = serde_json::to_string(&l).unwrap();
+            assert_eq!(serde_json::from_str::<SpeakerLayout>(&json).unwrap(), l);
+        }
+        assert_eq!(SpeakerLayout::Auto.canaux(), None);
+        assert_eq!(SpeakerLayout::Auto.nom_ffmpeg(), None);
+        // le cycle parcourt tout puis revient à « automatique »
+        let mut l = SpeakerLayout::Auto;
+        for _ in 0..SpeakerLayout::TOUS.len() {
+            l = l.suivante();
+        }
+        assert_eq!(l, SpeakerLayout::Auto);
+        // un profil ne change pas les enceintes de la machine
+        let mut cfg = Config::default();
+        cfg.audio.speakers = SpeakerLayout::Sept1;
+        let mut profil = cfg.clone();
+        profil.audio.speakers = SpeakerLayout::Mono;
+        Profil::capture("p", &profil).appliquer(&mut cfg);
+        assert_eq!(cfg.audio.speakers, SpeakerLayout::Sept1);
     }
 
     #[test]

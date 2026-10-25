@@ -2167,6 +2167,28 @@ fn dessiner_audio(app: &mut App, ui: &mut egui::Ui) {
         if let Some(id) = choisi {
             app.choisir_sortie_audio(&id);
         }
+
+        // Disposition des haut-parleurs : le nombre de canaux ouvert sur la sortie et le mixage du fichier.
+        let mut enceintes = app.config.audio.speakers;
+        ligne(ui, "grille_enceintes", "Enceintes", |ui| {
+            egui::ComboBox::from_id_salt("audio_enceintes")
+                .selected_text(enceintes.libelle())
+                .width(280.0)
+                .show_ui(ui, |ui| {
+                    for l in crate::config::SpeakerLayout::TOUS {
+                        ui.selectable_value(&mut enceintes, l, l.libelle());
+                    }
+                });
+        });
+        if enceintes != app.config.audio.speakers {
+            app.definir_enceintes(enceintes);
+        }
+        aide(
+            ui,
+            "Mono, stéréo, quadriphonie, 5.0, 5.1 et 7.1 suivent l'ordre des canaux d'ALSA / PipeWire. \
+             2.1, 3.1, 4.1 et 6.1 n'ont pas de position standard : leurs canaux sortent dans l'ordre de FFmpeg. \
+             Une sortie qui n'accepte pas ce nombre de canaux garde le sien. Ctrl+Maj+E : disposition suivante.",
+        );
     });
 
     sous_section(ui, "Volume", |ui| {

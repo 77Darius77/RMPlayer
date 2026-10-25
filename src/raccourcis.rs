@@ -62,6 +62,8 @@ pub enum Action {
     /// Sortie audio suivante (haut-parleurs, casque, HDMI…) : « par défaut », puis chaque sortie
     /// PipeWire dans l'ordre des noms.
     SortieAudioSuivante,
+    /// Disposition des haut-parleurs suivante (automatique, mono, stéréo, 2.1… 7.1).
+    Enceintes,
     PleinEcran,
     Echap,
     Capture,
@@ -126,6 +128,7 @@ impl Action {
         Action::SousTitreSuivant,
         Action::PisteAudioSuivante,
         Action::SortieAudioSuivante,
+        Action::Enceintes,
         Action::PleinEcran,
         Action::Echap,
         Action::Capture,
@@ -189,6 +192,7 @@ impl Action {
             Action::SousTitreSuivant => "soustitres.suivant",
             Action::PisteAudioSuivante => "audio.piste_suivante",
             Action::SortieAudioSuivante => "audio.sortie_suivante",
+            Action::Enceintes => "audio.enceintes",
             Action::PleinEcran => "affichage.plein_ecran",
             Action::Echap => "affichage.echap",
             Action::Capture => "image.capture",
@@ -252,6 +256,7 @@ impl Action {
             Action::SousTitreSuivant => "Piste de sous-titres suivante",
             Action::PisteAudioSuivante => "Piste audio suivante",
             Action::SortieAudioSuivante => "Sortie audio suivante",
+            Action::Enceintes => "Enceintes : disposition suivante",
             Action::PleinEcran => "Plein écran",
             Action::Echap => "Fermer la fenêtre / sortir du plein écran",
             Action::Capture => "Capture d'écran (PNG)",
@@ -310,7 +315,8 @@ impl Action {
             | Action::ImagePrecedente => "Vitesse et chapitres",
             Action::VolumePlus | Action::VolumeMoins | Action::Muet
             | Action::PisteAudioSuivante
-            | Action::SortieAudioSuivante => "Son",
+            | Action::SortieAudioSuivante
+            | Action::Enceintes => "Son",
             Action::SousTitresVisibles | Action::SousTitreSuivant => "Sous-titres",
             Action::PleinEcran
             | Action::Echap
@@ -372,6 +378,7 @@ impl Action {
             Action::SousTitreSuivant => "J",
             Action::PisteAudioSuivante => "Ctrl+J",
             Action::SortieAudioSuivante => "Ctrl+Maj+J",
+            Action::Enceintes => "Ctrl+Maj+E",
             Action::PleinEcran => "F, Entree, F11",
             Action::Echap => "Echap",
             Action::Capture => "S",

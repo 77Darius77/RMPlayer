@@ -1264,6 +1264,18 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      **Pièges de l'instrument** : observer dès le lancement (un clip de 3 s est fini avant 4 s) ;
      compresser la séquence des titres pour ne pas compter deux fois le même.
 
+133. 🔴 **Le 5.1 sortait dans le mauvais ordre : le centre sur une enceinte arrière.** `cpal` ouvre un flux de N
+     canaux SANS positions ; ALSA / PipeWire en déduisent l'ordre par défaut d'ALSA (5.1 : FL FR RL RR FC LFE,
+     7.1 : … SL SR, 5 canaux : 5.0, 4 canaux : quadriphonie, 3 et 7 canaux : positions inconnues — lu dans le
+     graphe PipeWire, `info.params.Format.position`), alors que `swresample` produit l'ordre de FFmpeg
+     (FL FR FC LFE BL BR). Mesuré sur une sortie à 6 canaux dont on enregistre chaque canal : le centre
+     (700 Hz) sortait sur le canal arrière gauche. Corrigé par une permutation des canaux juste après
+     `swr_convert` (`SpeakerLayout::ordre_alsa`) ; 2.1, 3.1, 4.1 et 6.1, sans convention, gardent l'ordre
+     de FFmpeg. **Pièges de l'instrument** : `pw-record` n'écrit pas de WAV à 6 canaux (« Format not
+     recognised ») — écrire du CAF puis convertir ; les WAV de plus de 2 canaux sont « extensibles »
+     (format 0xFFFE) ; le « 5.1 » de FFmpeg a des canaux ARRIÈRE (BL/BR), le « 5.1(side) » des latéraux ;
+     un `pkill -f` dont le motif figure dans la commande qui le lance tue le shell (piège 126).
+
 ## 5. Reste à faire
 
 État au **2026-10-25 (session 37)**. **La référence est `docs/PROCHAINES-FONCTIONS.md`** : pour

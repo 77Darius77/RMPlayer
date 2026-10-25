@@ -20,6 +20,7 @@ Usage : analyse-audio.py <commande> <fichier.wav> [arguments]
   freq     <wav>                fréquence dominante (Hz) et durée (s)
   queue    <wav> <ms> <ms>      énergie RMS entre deux instants (ms)
   debut    <wav> [seuil]        premier instant audible (ms)
+  enceintes <wav> <f1,f2,…>     JSON : nombre de canaux et, par canal, l'amplitude à chaque fréquence
 """
 import struct
 import sys
@@ -28,7 +29,7 @@ import numpy as np
 
 
 def lire(path):
-    """Lit un WAV (entier 16 bits ou flottant 32 bits) et renvoie (canaux, taux)."""
+    """Lit un WAV (entier 16 bits ou flottant 32 bits, « extensible » compris) et renvoie (canaux, taux)."""
     d = open(path, "rb").read()
     if d[:4] != b"RIFF" or d[8:12] != b"WAVE":
         raise SystemExit(f"{path} : ce n'est pas un fichier WAV")
@@ -41,6 +42,9 @@ def lire(path):
             fmt = struct.unpack("<H", d[pos + 8 : pos + 10])[0]
             canaux = struct.unpack("<H", d[pos + 10 : pos + 12])[0]
             taux = struct.unpack("<I", d[pos + 12 : pos + 16])[0]
+            if fmt == 0xFFFE and taille >= 40:
+                # WAVE_FORMAT_EXTENSIBLE (au-delà de 2 canaux) : le vrai format est le début du GUID
+                fmt = struct.unpack("<H", d[pos + 8 + 24 : pos + 8 + 26])[0]
         elif cid == b"data":
             brut = d[pos + 8 : pos + 8 + taille]
             if fmt == 3:
@@ -119,7 +123,32 @@ def cmd_debut(path, seuil="0.01"):
     print(f"{audibles[0] * 1000 / taux:.0f}")
 
 
+def cmd_enceintes(path, frequences):
+    """Pour chaque canal : l'amplitude (0–1) de la composante la plus proche de chaque fréquence.
+
+    Sert à vérifier QUEL haut-parleur reçoit QUEL signal (mixage, ordre des canaux) : une source dont
+    chaque canal porte une fréquence propre, puis la matrice « canal × fréquence » de la sortie.
+    """
+    import json
+
+    x, taux = lire(path)
+    freqs = [float(f) for f in frequences.split(",") if f]
+    n = len(x)
+    fenetre = np.hanning(n)
+    sortie = []
+    for c in range(x.shape[1]):
+        spectre = np.abs(np.fft.rfft(x[:, c] * fenetre)) * 2.0 / (fenetre.sum())
+        axe = np.fft.rfftfreq(n, 1.0 / taux)
+        ligne = []
+        for f in freqs:
+            largeur = (np.abs(axe - f) <= 15.0)
+            ligne.append(round(float(spectre[largeur].max()) if largeur.any() else 0.0, 4))
+        sortie.append(ligne)
+    print(json.dumps({"canaux": int(x.shape[1]), "taux": int(taux), "amplitudes": sortie}))
+
+
 COMMANDES = {
+    "enceintes": cmd_enceintes,
     "niveaux": cmd_niveaux,
     "crete": cmd_crete,
     "sn": cmd_sn,
