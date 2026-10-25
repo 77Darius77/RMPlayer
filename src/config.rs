@@ -1145,6 +1145,64 @@ impl SubtitleSettings {
     }
 }
 
+/// Ce qui se passe à la fin d'un fichier de la playlist (les trois valeurs de `LoopStatus` de MPRIS).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum RepeatMode {
+    /// Pas de répétition : à la fin de la liste, la lecture s'arrête (comportement d'origine).
+    #[default]
+    #[serde(rename = "none", alias = "aucune", alias = "None")]
+    Aucune,
+    /// Le fichier courant est relu en boucle.
+    #[serde(rename = "file", alias = "fichier", alias = "track", alias = "Track")]
+    Fichier,
+    /// À la fin de la liste (ou du tour, en aléatoire), la lecture reprend au début.
+    #[serde(rename = "playlist", alias = "Playlist")]
+    Playlist,
+}
+
+impl RepeatMode {
+    pub const TOUS: [RepeatMode; 3] = [Self::Aucune, Self::Fichier, Self::Playlist];
+
+    pub fn libelle(&self) -> &'static str {
+        match self {
+            Self::Aucune => "Aucune répétition",
+            Self::Fichier => "Répéter le fichier",
+            Self::Playlist => "Répéter la playlist",
+        }
+    }
+
+    /// Mode suivant dans le cycle aucune → fichier → playlist → aucune.
+    pub fn suivant(&self) -> Self {
+        match self {
+            Self::Aucune => Self::Fichier,
+            Self::Fichier => Self::Playlist,
+            Self::Playlist => Self::Aucune,
+        }
+    }
+
+    /// Valeur de `LoopStatus` (MPRIS).
+    pub fn mpris(&self) -> &'static str {
+        match self {
+            Self::Aucune => "None",
+            Self::Fichier => "Track",
+            Self::Playlist => "Playlist",
+        }
+    }
+
+    pub fn depuis_mpris(valeur: &str) -> Option<Self> {
+        match valeur {
+            "None" => Some(Self::Aucune),
+            "Track" => Some(Self::Fichier),
+            "Playlist" => Some(Self::Playlist),
+            _ => None,
+        }
+    }
+}
+
+fn default_continuous() -> bool {
+    true
+}
+
 /// Format d'enregistrement d'une capture d'écran.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum CaptureFormat {
@@ -1426,6 +1484,13 @@ pub struct PlaybackSettings {
     /// veut pas la réactiver à chaque film).
     #[serde(default)]
     pub shuffle: bool,
+    /// Répétition à la fin d'un fichier (aucune / un fichier / toute la playlist).
+    #[serde(default)]
+    pub repeat: RepeatMode,
+    /// Lecture continue : enchaîner le fichier suivant de la playlist. Coupée, la lecture s'arrête
+    /// après chaque fichier (la répétition d'un fichier, elle, continue de le relire).
+    #[serde(default = "default_continuous")]
+    pub continuous: bool,
     /// **Fichiers récents**, le plus récent d'abord, sans doublon, bornés à
     /// `RECENTS_MAX`. Écrits à chaque ouverture (`noter_recent`), proposés par le menu
     /// Fichier → Récents.
@@ -1640,6 +1705,8 @@ impl Default for PlaybackSettings {
             resume: true,
             precache_ms: default_precache_ms(),
             shuffle: false,
+            repeat: RepeatMode::default(),
+            continuous: true,
             recent: Vec::new(),
             ab_repetitions: 0,
             ab_delay_ms: 0,
@@ -2674,6 +2741,31 @@ mod tests {
         assert!(ancienne.recent.is_empty());
         assert!(!ancienne.resume);
         assert_eq!(ancienne.precache_ms, default_precache_ms());
+    }
+
+    #[test]
+    fn la_repetition_et_la_lecture_continue_se_relisent_et_un_ancien_fichier_garde_le_comportement_d_origine() {
+        let c: Config = serde_json::from_str(r#"{"playback": {"repeat": "playlist", "continuous": false}}"#).unwrap();
+        assert_eq!(c.playback.repeat, RepeatMode::Playlist);
+        assert!(!c.playback.continuous);
+        let t: Config = serde_json::from_str(r#"{"playback": {"repeat": "track"}}"#).unwrap();
+        assert_eq!(t.playback.repeat, RepeatMode::Fichier, "« track » (MPRIS) est accepté");
+        let ancien: Config = serde_json::from_str(r#"{"playback": {"resume": false}}"#).unwrap();
+        assert_eq!(ancien.playback.repeat, RepeatMode::Aucune);
+        assert!(ancien.playback.continuous, "lecture continue par défaut");
+        // Le cycle passe par les trois modes et revient ; MPRIS fait l'aller-retour.
+        let mut m = RepeatMode::Aucune;
+        let mut vus = Vec::new();
+        for _ in 0..3 {
+            vus.push(m);
+            m = m.suivant();
+        }
+        assert_eq!(vus, RepeatMode::TOUS);
+        assert_eq!(m, RepeatMode::Aucune);
+        for mode in RepeatMode::TOUS {
+            assert_eq!(RepeatMode::depuis_mpris(mode.mpris()), Some(mode));
+        }
+        assert_eq!(RepeatMode::depuis_mpris("Autre"), None);
     }
 
     #[test]

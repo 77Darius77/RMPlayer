@@ -205,20 +205,37 @@ reglage Shuffle "<true>" >/dev/null
 reglage LoopStatus "<'Playlist'>" >/dev/null
 reglage Rate "<1.5>" >/dev/null
 sleep 1
-for attendu in "Volume(0.5)" "Aleatoire(true)" "Boucle(true)" "Vitesse(1.5)"; do
+for attendu in "Volume(0.5)" "Aleatoire(true)" "Repetition(Playlist)" "Vitesse(1.5)"; do
     if grep -q "commande: $attendu" "$BASE/journal.txt"; then
         ok "réglage transmis : $attendu"
     else
         ko "réglage perdu : $attendu"
     fi
 done
-# LoopStatus « None » doit couper la boucle.
+# Les trois modes de LoopStatus sont tous appliqués (Track = relire le fichier, None = couper) ;
+# une valeur inconnue est ignorée.
+reglage LoopStatus "<'Track'>" >/dev/null
+sleep 0.8
+if grep -q "commande: Repetition(Fichier)" "$BASE/journal.txt"; then
+    ok "LoopStatus Track → répéter le fichier"
+else
+    ko "LoopStatus Track non transmis"
+fi
 reglage LoopStatus "<'None'>" >/dev/null
 sleep 0.8
-if grep -q "commande: Boucle(false)" "$BASE/journal.txt"; then
-    ok "LoopStatus None → boucle coupée"
+if grep -q "commande: Repetition(Aucune)" "$BASE/journal.txt"; then
+    ok "LoopStatus None → répétition coupée"
 else
     ko "LoopStatus None non transmis"
+fi
+avant=$(grep -c "commande: Repetition" "$BASE/journal.txt")
+reglage LoopStatus "<'Bizarre'>" >/dev/null
+sleep 0.8
+apres=$(grep -c "commande: Repetition" "$BASE/journal.txt")
+if [ "$avant" = "$apres" ]; then
+    ok "LoopStatus inconnu : ignoré"
+else
+    ko "LoopStatus inconnu : une commande a été transmise"
 fi
 
 echo

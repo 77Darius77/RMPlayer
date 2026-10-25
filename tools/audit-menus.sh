@@ -344,7 +344,7 @@ clic 1 "▶ Lecture" "Menu Lecture : Lecture|Lecture$" "Lecture ▸ Lecture repr
 clic 1 "⏭ Suivant (N)" "Chargement du média" "Lecture ▸ Suivant change de média"
 clic 1 "⏮ Précédent (P)" "Chargement du média" "Lecture ▸ Précédent revient en arrière"
 clic 1 "⏭ Chapitre suivant (Page↓)" "Chapitre suivant" "Lecture ▸ Chapitre suivant saute au chapitre"
-clic 1 "🔁 Boucle" "Boucle" "Lecture ▸ Boucle active la répétition"
+clic 1 "Répéter le fichier" "Répétition : Fichier" "Lecture ▸ Répéter le fichier active la répétition"
 
 # Audio
 clic 2 "🔇 Couper le son" "Mute: true" "Audio ▸ Couper le son coupe le son"

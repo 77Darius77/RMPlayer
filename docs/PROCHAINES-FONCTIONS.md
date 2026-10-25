@@ -113,6 +113,9 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Fenêtres détachables (s.37)** : Préférences, Statistiques, Aide, À propos en vraies fenêtres
   système, `verif-fenetres-detachables` 24/24 (piège 127). Non fait : « Ouvrir une adresse » et les
   menus déroulants de la barre (fenêtres contextuelles d'egui, bornées par la fenêtre du lecteur).
+- **Modes de lecture (s.37)** : répétition (aucune / fichier / playlist), lecture continue, aléatoire borné à
+  un tour, `verif-modes-lecture` 7/7 (piège 132). Changement de comportement assumé : l'aléatoire s'arrête
+  après un tour s'il n'y a pas de répétition de playlist (il tournait indéfiniment).
 - **Captures (s.37)** : formats PNG / JPEG / WebP, qualité JPEG, taille native, modèle de nom,
   `verif-capture` 9/9. Limite : WebP sans perte seulement (pas de `libwebp`) ; pas de sous-titres incrustés.
 - **HDR après un saut (s.37)** : le défaut était bien plus large que « la première image » — après un saut

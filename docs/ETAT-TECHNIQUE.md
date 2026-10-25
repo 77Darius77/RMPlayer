@@ -125,7 +125,10 @@ partagés : `env-bancs.sh` (environnement des bancs), `analyse-audio.py`, `metri
 | `play_next()` / `play_previous()` / `play_index(i)` | Navigation dans la playlist |
 | `playlist_index()`, `playlist_index_advance()`, `remove_from_playlist(i)` | Gestion de la playlist |
 | `is_finished()` | Vrai en fin de flux |
-| `set_volume()`, `toggle_mute()`, `set_speed()`, `toggle_loop()`, `toggle_subtitles()` | Réglages |
+| `set_volume()`, `toggle_mute()`, `set_speed()`, `toggle_subtitles()` | Réglages |
+| `set_repeat(RepeatMode)` / `repeat()` | Répétition : aucune, un fichier (`loop_enabled`), toute la playlist |
+| `set_continuous(bool)` / `continuous()` | Lecture continue (enchaîner les fichiers) |
+| `index_apres_fin() -> Option<usize>` | Élément à jouer à la fin du courant selon la lecture continue, l'aléatoire et la répétition (`None` = arrêt) |
 | `audio_buffered_ms()`, `has_audio()` | État audio (tampon en ms, présence d'une piste) |
 
 ### Décodage et réglages (tous réellement appliqués)

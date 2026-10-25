@@ -626,6 +626,8 @@ impl App {
         // à la session précédente). L'ordre est mélangé sur la playlist restaurée
         // juste après, donc on le refait une fois la liste en place.
         player.set_shuffle(config.playback.shuffle);
+        player.set_repeat(config.playback.repeat);
+        player.set_continuous(config.playback.continuous);
         player.set_boucle_ab(config.playback.ab_repetitions, config.playback.ab_delay_ms);
         // Restaure la playlist enregistrée : elle était sauvegardée mais jamais
         // relue, si bien que la liste était vide à chaque démarrage.
@@ -2109,7 +2111,7 @@ impl App {
             // MPRIS attend un volume de 0 à 1 ; RMPlayer autorise jusqu'à 1,5.
             volume: (self.player.get_volume() as f64).clamp(0.0, 1.0),
             aleatoire: self.player.shuffle(),
-            boucle: self.player.loop_enabled,
+            repetition: self.player.repeat(),
             vitesse: self.player.get_speed() as f64,
             peut_precedent: total > 1,
             peut_suivant: total > 1,
@@ -2171,11 +2173,7 @@ impl App {
                         self.basculer_aleatoire();
                     }
                 }
-                crate::mpris::Commande::Boucle(actif) => {
-                    if self.player.loop_enabled != actif {
-                        self.player.toggle_loop();
-                    }
-                }
+                crate::mpris::Commande::Repetition(mode) => self.definir_repetition(mode),
                 crate::mpris::Commande::Quitter => {
                     self.pending_viewport_cmds
                         .push(egui::ViewportCommand::Close);
@@ -2329,6 +2327,44 @@ impl App {
             }
             None => tracing::info!("Playlist : élément précédent demandé, playlist vide"),
         }
+    }
+
+    /// Fixe la répétition (moteur + configuration) : un seul chemin pour le menu, le panneau de
+    /// playlist, les préférences, les raccourcis et MPRIS.
+    pub(crate) fn definir_repetition(&mut self, mode: crate::config::RepeatMode) {
+        self.player.set_repeat(mode);
+        self.config.playback.repeat = mode;
+        let _ = self.config.save();
+        self.annonce(&format!("Répétition : {}", mode.libelle().to_lowercase()));
+    }
+
+    /// Aucune → fichier → playlist → aucune.
+    pub(crate) fn repetition_suivante(&mut self) {
+        let suivant = self.player.repeat().suivant();
+        self.definir_repetition(suivant);
+    }
+
+    /// `Ctrl+L` : relire le fichier courant, ou arrêter la répétition (quel que soit le mode).
+    pub(crate) fn basculer_boucle(&mut self) {
+        let mode = if self.player.repeat() == crate::config::RepeatMode::Fichier {
+            crate::config::RepeatMode::Aucune
+        } else {
+            crate::config::RepeatMode::Fichier
+        };
+        self.definir_repetition(mode);
+    }
+
+    /// Active ou coupe la lecture continue et retient le choix.
+    pub(crate) fn basculer_continue(&mut self) {
+        let actif = !self.player.continuous();
+        self.player.set_continuous(actif);
+        self.config.playback.continuous = actif;
+        let _ = self.config.save();
+        self.annonce(if actif {
+            "Lecture continue : activée (les fichiers s'enchaînent)"
+        } else {
+            "Lecture continue : désactivée (arrêt après chaque fichier)"
+        });
     }
 
     /// Active ou coupe la lecture aléatoire, et **retient le choix** dans la
@@ -2965,22 +3001,12 @@ impl eframe::App for App {
         // Enchaînement automatique : si le média est terminé et qu'un élément
         // suivant existe dans la playlist, on l'enchaîne.
         if self.player.is_finished() {
-            // `prochain_index` suit le mode : en lecture aléatoire, l'enchaînement
-            // doit passer par l'ordre mélangé, sinon la fin d'un fichier rejouerait
-            // la liste dans l'ordre pendant que ▶︎ suivant la parcourt au hasard.
-            // Il n'y a **pas** de retour au début : arriver à la fin de la liste
-            // arrête la lecture (comportement historique, `loop_enabled` pour
-            // relire en boucle).
-            let suivant = self.player.prochain_index();
-            let fin_de_liste = self.player.shuffle()
-                || self.player.playlist_index() + 1 < self.player.playlist.len();
-            if fin_de_liste {
-                if let Some(idx) = suivant {
-                    if let Some(chemin) = self.player.playlist.get(idx).cloned() {
-                        self.load_media(&chemin);
-                        self.player.playlist_index_advance();
-                    }
-                }
+            // `index_apres_fin` suit tous les modes : lecture continue (coupée, rien ne suit),
+            // aléatoire (l'ordre mélangé, un tour), répétition de la playlist (retour au début) ;
+            // sans répétition, la fin de la liste arrête la lecture. Il passe par
+            // `play_playlist_index`, le chemin de « suivant » (règles de profil, sous-titres, OSD).
+            if let Some(idx) = self.player.index_apres_fin() {
+                self.play_playlist_index(idx);
             }
         }
 
@@ -3363,15 +3389,9 @@ impl eframe::App for App {
                         },
                         // Lecture en boucle (Ctrl+L) — placé AVANT le motif `L` simple,
                         // sinon ce dernier capterait aussi Ctrl+L (premier motif gagnant).
-                        Action::Boucle => {
-                            self.player.toggle_loop();
-                            let actif = self.player.loop_enabled;
-                            self.annonce(if actif {
-                                "Lecture en boucle : activée"
-                            } else {
-                                "Lecture en boucle : désactivée"
-                            });
-                        }
+                        Action::Boucle => self.basculer_boucle(),
+                        Action::Repetition => self.repetition_suivante(),
+                        Action::LectureContinue => self.basculer_continue(),
                         // Lecture aléatoire (Ctrl+A)
                         Action::Aleatoire => self.basculer_aleatoire(),
                         // Reprise à la position quittée (Ctrl+R)
@@ -3789,9 +3809,23 @@ impl eframe::App for App {
                     }
                     
                     ui.separator();
-                    let mut loop_enabled = self.player.loop_enabled;
-                    if case_menu(ui, &mut loop_enabled, "🔁 Boucle").clicked() {
-                        self.player.toggle_loop();
+                    // Que faire à la fin d'un fichier : répétition, lecture continue, aléatoire.
+                    ui.label(egui::RichText::new("À la fin d'un fichier").small().weak());
+                    let courante = self.player.repeat();
+                    for mode in crate::config::RepeatMode::TOUS {
+                        let actif = courante == mode;
+                        let libelle = format!("{}{}", if actif { "● " } else { "   " }, mode.libelle());
+                        if ligne_menu(ui, actif, libelle).clicked() && !actif {
+                            self.definir_repetition(mode);
+                        }
+                    }
+                    let mut continue_ = self.player.continuous();
+                    if case_menu(ui, &mut continue_, "Lecture continue (enchaîner)").clicked() {
+                        self.basculer_continue();
+                    }
+                    let mut melange = self.player.shuffle();
+                    if case_menu(ui, &mut melange, "🔀 Lecture aléatoire").clicked() {
+                        self.basculer_aleatoire();
                     }
                 }));
                 
@@ -4770,12 +4804,18 @@ impl eframe::App for App {
                         {
                             self.basculer_aleatoire();
                         }
+                        let repetition = self.player.repeat();
+                        let (icone, aide_rep) = match repetition {
+                            crate::config::RepeatMode::Aucune => ("🔁 Aucune", "Répétition : aucune — clic : relire le fichier (Ctrl+Maj+L)"),
+                            crate::config::RepeatMode::Fichier => ("🔂 Fichier", "Répétition : le fichier — clic : relire la playlist (Ctrl+Maj+L)"),
+                            crate::config::RepeatMode::Playlist => ("🔁 Playlist", "Répétition : la playlist — clic : aucune répétition (Ctrl+Maj+L)"),
+                        };
                         if ui
-                            .selectable_label(self.player.loop_enabled, "🔁 Boucle")
-                            .on_hover_text("Relire la playlist en boucle (Ctrl+L)")
+                            .selectable_label(repetition != crate::config::RepeatMode::Aucune, icone)
+                            .on_hover_text(aide_rep)
                             .clicked()
                         {
-                            self.player.toggle_loop();
+                            self.repetition_suivante();
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if ui

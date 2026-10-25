@@ -940,7 +940,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             rang: 0,
             volume: 0.8,
             aleatoire: false,
-            boucle: false,
+            repetition: config::RepeatMode::Aucune,
             vitesse: 1.0,
             peut_precedent: true,
             peut_suivant: true,

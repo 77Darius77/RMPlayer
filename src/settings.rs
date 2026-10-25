@@ -3024,17 +3024,27 @@ fn dessiner_lecture(app: &mut App, ui: &mut egui::Ui) {
             let _ = app.config.save();
             tracing::info!("Lecture aléatoire (préférences) : {}", actif);
         }
-        // La boucle vit dans le moteur (état de séance), pas dans la configuration :
-        // une copie locale suffit pour la case à cocher, et c'est le moteur qui
-        // décide ensuite.
-        let mut boucle = app.player.loop_enabled;
+        // Répétition et lecture continue : même chemin que le menu et les raccourcis.
+        let mut repetition = app.player.repeat();
+        ligne(ui, "grille_repetition", "À la fin d'un fichier", |ui| {
+            egui::ComboBox::from_id_salt("repetition")
+                .selected_text(repetition.libelle())
+                .show_ui(ui, |ui| {
+                    for m in crate::config::RepeatMode::TOUS {
+                        ui.selectable_value(&mut repetition, m, m.libelle());
+                    }
+                });
+        });
+        if repetition != app.player.repeat() {
+            app.definir_repetition(repetition);
+        }
+        let mut continue_ = app.player.continuous();
         if ui
-            .checkbox(&mut boucle, "Lecture en boucle")
-            .on_hover_text("Relire la playlist en boucle (Ctrl+L)")
+            .checkbox(&mut continue_, "Lecture continue (enchaîner les fichiers de la playlist)")
+            .on_hover_text("Coupée, la lecture s'arrête après chaque fichier (Ctrl+Maj+C)")
             .changed()
         {
-            app.player.toggle_loop();
-            tracing::info!("Boucle (préférences) : {}", app.player.loop_enabled);
+            app.basculer_continue();
         }
         aide(
             ui,
