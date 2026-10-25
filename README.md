@@ -20,7 +20,7 @@ cargo build --release
 | Élément | Détail |
 |---|---|
 | FFmpeg | 7.1 installé dans `/opt/ffmpeg-7.1` (voir `.cargo/config.toml`) |
-| Audio | PipeWire, PulseAudio ou ALSA |
+| Audio | PipeWire, PulseAudio ou ALSA. La **sélection de la sortie** par son nom demande PipeWire et ses outils `pw-dump` / `pw-metadata` (sans eux : sortie par défaut et sorties ALSA directes) |
 | Affichage | X11 ou Wayland |
 
 > Le profil `release` conserve volontairement `debug = "line-tables-only"` et
@@ -32,7 +32,7 @@ cargo build --release
 ## Lancement
 
 ```bash
-# Script fourni : positionne LD_LIBRARY_PATH et DISPLAY
+# Script fourni : positionne LD_LIBRARY_PATH (et refuse de démarrer sans session graphique)
 ./run.sh film.mp4
 
 # Plusieurs fichiers = playlist (le premier est lu)
@@ -80,36 +80,62 @@ continue alors sans son (avertissement « lecture vidéo seule »).
 
 | Touche | Action |
 |---|---|
-| `Espace` | Lecture / pause |
-| `←` / `→` | Reculer / avancer de 5 s |
-| `Maj + ←/→` | Reculer / avancer de 1 s |
-| `Ctrl + ←/→` | Reculer / avancer de 30 s |
-| `↑` / `↓` | Volume |
-| `M` | Muet |
-| `V` | Sous-titres on/off |
+| `Q` | Fermer le lecteur |
+| `Espace`, `clic du milieu` | Lecture / pause |
+| `N` | Élément suivant de la playlist |
+| `P` | Élément précédent de la playlist |
+| `←`, `Ctrl+Molette↓` | Reculer de 5 s |
+| `Maj+←` | Reculer de 1 s |
+| `Ctrl+←` | Reculer de 30 s |
+| `→`, `Ctrl+Molette↑` | Avancer de 5 s |
+| `Maj+→` | Avancer de 1 s |
+| `Ctrl+→` | Avancer de 30 s |
+| `↑`, `Molette↑` | Volume + |
+| `↓`, `Molette↓` | Volume − |
+| `M` | Couper / rétablir le son |
+| `Ctrl+L` | Lecture en boucle |
+| `Ctrl+A` | Lecture aléatoire (playlist) |
+| `Ctrl+R` | Reprise à la position quittée |
+| `A` | Répétition A-B : point A |
+| `B` | Répétition A-B : point B |
+| `Ctrl+B` | Signet : ajouter à la position |
+| `Ctrl+Maj+→` | Signet : aller au suivant |
+| `Ctrl+Maj+←` | Signet : aller au précédent |
+| `Ctrl+Maj+B` | Signet : supprimer celui de la position |
+| `[`, `Maj+Molette↓` | Vitesse −0,1 |
+| `]`, `Maj+Molette↑` | Vitesse +0,1 |
+| `\` | Vitesse normale (1,0×) |
+| `Page↑` | Chapitre précédent |
+| `Page↓` | Chapitre suivant |
+| `.` | Image suivante |
+| `,` | Image précédente |
+| `V`, `double-clic` | Afficher / masquer les sous-titres |
 | `J` | Piste de sous-titres suivante |
-| `F`, `Entrée`, `F11` | Plein écran (bascule) |
-| `Échap` | Fermer la fenêtre ouverte, sinon sortir du plein écran |
+| `Ctrl+J` | Piste audio suivante |
+| `Ctrl+Maj+J` | Sortie audio suivante |
+| `F`, `Entrée`, `F11` | Plein écran |
+| `Échap` | Fermer la fenêtre / sortir du plein écran |
 | `S` | Capture d'écran (PNG) |
-| `H` | Décodage matériel ↔ logiciel |
-| `A` / `B` | Répétition A-B (point A / point B, puis annuler) |
+| `K` | Rapport d'aspect suivant |
+| `Ctrl+H` | Miroir horizontal |
+| `Ctrl+Maj+H` | Miroir vertical |
+| `R` | Afficher / masquer la zone de recadrage |
 | `T` | Fenêtre toujours au-dessus |
 | `Tab` | Masquer / afficher l'interface |
-| `O` | OSD (bandeau d'informations) |
-| `I` | Statistiques de lecture |
+| `O` | Bandeau d'informations (OSD) |
+| `I` | Fenêtre des statistiques |
 | `L` | Panneau de playlist |
-| `F5` | Préférences |
-| `F1` | Aide des raccourcis (dans l'application) |
+| `F1` | Aide des raccourcis |
 | `F2` | À propos |
-| `[` `]` | Vitesse −0,1 / +0,1 — `\` revient à 1,0 (le son suit) |
-| `Ctrl+L` | Lecture en boucle |
-| `Ctrl+R` | Reprise à la position quittée (activer/désactiver) |
-| `N` / `P` | Élément suivant / précédent |
-| `Clic sur la barre` | Se placer à la position cliquée (ou glisser) |
-| `Q` | Quitter |
+| `F5` | Préférences |
+| `H` | Décodage matériel ↔ logiciel |
+
+Cette table est celle de `src/raccourcis.rs` : **tous** ces raccourcis (clavier et souris) se
+réaffectent dans *Préférences ▸ Raccourcis*, et l'aide `F1` affiche ceux qui sont réellement actifs.
+`Clic sur la barre` de progression place la lecture à la position cliquée (ou glisser).
 
 Les fenêtres *Préférences*, *Aide des raccourcis*, *Statistiques* et *À propos* se ferment par
-leur bouton **✕** ou par **`Échap`**.
+leur bouton **✕** ou par **`Échap`**, et peuvent être **détachées** (voir plus bas).
 
 > `F12` n'est **pas** utilisable : sous KDE, ce raccourci est réservé par le bureau
 > (Yakuake) et n'atteint jamais l'application — d'où le choix de `F2`.
@@ -226,6 +252,60 @@ avec `--enable-libdav1d` (session 31). C'était nécessaire — le décodeur nat
 échoue sur un AV1 réel (« Error submitting packet to decoder: Function not implemented »),
 et `av1dec` exige l'accélération matérielle. Le repli logiciel n'est donc plus une limite.
 
+### Choisir la sortie audio
+
+Le lecteur propose les **vraies sorties du système** par leur nom (enceinte Bluetooth, casque,
+écran HDMI…), pas les ~35 noms ALSA bruts (`dmix:CARD=HDMI,DEV=3`) que `cpal` énumère. Trois
+façons de choisir, qui passent par le même code :
+
+- le menu **Audio** (section « Sortie audio ») ;
+- *Préférences ▸ Audio ▸ Sortie* (les périphériques ALSA `hw:` / `plughw:` restent proposés en
+  « avancé ») ;
+- **`Ctrl+Maj+J`** : sortie suivante, pendant la lecture.
+
+Le changement est **immédiat et sans coupure** : le flux est redirigé dans PipeWire, le film n'est
+pas rouvert. « Périphérique par défaut » suit la sortie du système. Une sortie disparue (enceinte
+éteinte) laisse la lecture sur la sortie par défaut. `rmplayer --list-audio` liste les sorties
+(`pw:<nom> — <description>`). Réglage : `audio.device` (`""`, `pw:<nom>`, ou un ancien nom ALSA).
+Mesuré au son, sur deux sorties factices : `tools/verif-peripheriques.sh`.
+
+### Fenêtres détachables
+
+Les fenêtres *Préférences*, *Statistiques*, *Aide des raccourcis* et *À propos* sont dessinées dans
+la fenêtre du lecteur : elles n'en sortent pas, et une petite fenêtre les rogne. Le bouton
+**⧉ Détacher** en fait de **vraies fenêtres système**, déplaçables sur un autre écran ; **⧉
+Rattacher** les ramène, `Échap` les ferme. Le choix est mémorisé fenêtre par fenêtre
+(`interface.detached_windows`). Les menus déroulants de la barre et la boîte « Ouvrir une
+adresse » restent dans le lecteur. Mesuré côté système : `tools/verif-fenetres-detachables.sh`.
+
+### Au quotidien
+
+- **Fichiers récents** (menu *Fichier*, 10 entrées, « effacer ») ; **lecture aléatoire** et
+  **glisser-déposer** dans la playlist ; reprise à la position quittée.
+- **Signets** par média : `Ctrl+B` pose, `Ctrl+Maj+→/←` navigue, `Ctrl+Maj+B` supprime ;
+  conservés d'une session à l'autre.
+- **Répétition A-B** (`A` / `B`) avec nombre de répétitions et délai ; `--boucle-ab A B` depuis la
+  ligne de commande.
+- **Vignettes** : survoler la barre de progression montre l'image de l'instant pointé.
+- **Pause selon le focus** : jamais, à la perte de focus, ou fenêtre réduite ; reprise au retour.
+- **Souris avec modificateurs** : `Ctrl+molette` ±5 s, `Maj+molette` vitesse (personnalisable).
+- **Saut en pause** : l'image et la réplique de sous-titre suivent un saut même en pause.
+
+### Intégration au système
+
+- **Icône de zone de notification** (StatusNotifierItem, KDE Plasma) : *Préférences ▸ Lecture ▸ Système*.
+- **Démarrage automatique** à l'ouverture de session : *Préférences ▸ Lecture ▸ Système* ou
+  `rmplayer --autostart on|off|status`.
+- **Priorité du processus** (nice de tous les fils) et **fréquence d'images maximale**.
+- **Décodeur par codec** : forcer un décodeur précis (repli sur le défaut s'il ne s'ouvre pas) ;
+  `--list-tracks` indique le décodeur réellement ouvert.
+- **Thèmes externes** : un fichier JSON dans `~/.config/rmplayer/themes/` (un thème illisible est
+  refusé avec la raison).
+- **Export / import de la configuration** : `rmplayer --export-config f.json`,
+  `--import-config f.json` (refus sans écraser si le fichier est invalide).
+- **Reprise de l'ancien nom** : au premier lancement, les données de KPlayer (`~/.config/kplayer`,
+  `~/.cache/kplayer`) sont **copiées** dans `rmplayer` — jamais supprimées.
+
 ### Préférences (F5)
 
 Fenêtre organisée en **sections dépliables** — `src/settings.rs`, table `SECTIONS` — bornée
@@ -250,7 +330,9 @@ tête. Tous les réglages affichés sont **réellement appliqués** :
   de volume**, **mode nuit**, **réduction de bruit** (3 niveaux), **élargissement stéréo**,
   **crossfeed**, **karaoké**, **réverbération** (3 tailles), **décalage ±2 s**,
   **correction de hauteur** à vitesse ≠ 1 ;
-- **Sous-titres** : chargement automatique, taille de police, langue préférée ; les pistes
+- **Sous-titres** : chargement automatique, **style** (police, taille, couleur, contour et second
+  contour, ombre, interligne, marges, échelle X/Y, fondu), **langues par priorité**, durées mini/maxi,
+  **encodage** imposé des fichiers externes, mémoire de la piste choisie ; les pistes
   **image** du conteneur (**PGS** des Blu-ray, sous-images **DVD**, **DVB**) sont rendues
   telles quelles — position, taille et couleurs du disque — et non plus refusées ;
 - **Lecture** : reprise à la position quittée, vitesse.
@@ -344,7 +426,7 @@ de départ, `--profil <nom>` applique un profil, `--list-tracks` / `--list-profi
 inventorient, `--ass-dump <fichier.ass>` montre comment un ASS est compris (styles,
 positions, animations), `--dump-subs` / `--dump-images` / `--dump-audio` / `--dump-frame` servent aux mesures
 (`--dump-images` détaille les sous-titres **image** : rectangles, pixels, empreinte).
-Une adresse de flux peut remplacer le nom de fichier. `--audio-buffer <ms>` impose la profondeur du tampon audio : c'est l'option de mesure qui
+Une adresse de flux peut remplacer le nom de fichier. Autres options : `--boucle-ab <A> <B>`, `--export-config` / `--import-config`, `--autostart on|off|status`, `--list-audio`, `--hdr-info <fichier>`, `--nouvelle-instance`, `--fullscreen`, `--no-hwdec`. `--audio-buffer <ms>` impose la profondeur du tampon audio : c'est l'option de mesure qui
 démontre que cette profondeur n'a **aucun** effet sur la synchronisation image/son (la
 carte son fait foi) — voir `tools/verif-horloge.sh`.
 
@@ -352,14 +434,17 @@ carte son fait foi) — voir `tools/verif-horloge.sh`.
 
 Le lecteur énumère les pistes **audio** et de **sous-titres** du conteneur :
 
-- menu **Audio** : liste des pistes (langue, titre, codec, canaux, taux), changement
-  **à chaud** sans recharger le média ; un champ *langue préférée* (`fre`, `eng`…) choisit
-  automatiquement la piste au chargement — sans préférence, la première piste est retenue ;
+- menu **Audio** : liste des pistes (langue, titre, codec, canaux, taux), changement **à chaud**
+  sans recharger le média ; `Ctrl+J` passe à la suivante. Au chargement, le choix suit une
+  **liste de langues par priorité** (*Préférences ▸ Audio*, ex. `fre, eng`), écarte les pistes de
+  **commentaire et d'audiodescription** (drapeau du conteneur ou mot du titre) tant qu'une autre
+  existe, retient la piste « par défaut » du fichier à défaut de langue, et peut **mémoriser par
+  film** la piste choisie à la main ;
 - menu **Sous-titres** : liste des pistes du fichier, possibilité de les désactiver ;
   un fichier de sous-titres externe reste **prioritaire** s'il est chargé.
 
-Les sous-titres **image** (PGS des Blu-ray, DVD) sont détectés et signalés comme non
-affichables : leur rendu demanderait de composer des bitmaps sur la vidéo.
+Les sous-titres **image** (PGS des Blu-ray, DVD, DVB) sont rendus tels quels (position, taille et
+couleurs du disque).
 
 En ligne de commande : `--list-tracks`, `--audio-track <n>`, `--sub-track <n>`,
 `--dump-subs <fichier.txt>`.
@@ -413,6 +498,11 @@ Le dispositif est autonome et **préserve le core dump** du système.
   les causes racines), pièges à connaître.
 - **[docs/INVENTAIRE-FONCTIONNALITES.md](docs/INVENTAIRE-FONCTIONNALITES.md)** — ce qui
   fonctionne réellement vs ce qui est annoncé sans l'être.
+- **[docs/PROCHAINES-FONCTIONS.md](docs/PROCHAINES-FONCTIONS.md)** — ce qui reste à faire, avec
+  la raison de chaque fonction non faite.
+- **[docs/AJOUTER-UNE-FONCTION.md](docs/AJOUTER-UNE-FONCTION.md)** — la recette pour ajouter une
+  fonction sans produire un faux « fait » (mesure d'abord, témoin positif).
+- **[docs/HDR.md](docs/HDR.md)** — la chaîne HDR et ses limites.
 - **[docs/OPTIMISATION.md](docs/OPTIMISATION.md)** — où part le temps
   (mesuré) et le plan d'optimisation chiffré.
 - **[docs/ETAT-TECHNIQUE.md](docs/ETAT-TECHNIQUE.md)** — environnement, API du moteur,
@@ -439,24 +529,26 @@ L'inventaire complet, avec les preuves, est tenu dans
 - en ASS, les **dessins vectoriels** `\p` et les rotations 3D `\frx`/`\fry` ne sont pas
   rendus, et un `\clip` vectoriel non rectangulaire est réduit à ses bornes (balises
   ignorées proprement, texte toujours lisible) ;
-- **pas de rendu GPU type `gpu-next`** : ce build FFmpeg n'a ni `libplacebo` ni Vulkan
-  (`--enable-libplacebo --enable-vulkan` à la recompilation) ;
-- **AV1** n'est décodable qu'en matériel *avec ce build* : pas de décodeur AV1 logiciel, et le
-  lecteur refuse alors la lecture avec un message explicite ;
+- **HDR** : la conversion tonale vers SDR est faite (voir plus haut), mais pas le *passthrough* —
+  la fenêtre est rendue en 8 bits SDR (`docs/HDR.md`). Sans Vulkan, le repli CPU est borné
+  (≤ 1080p30) ; au-delà l'image n'est pas convertie, avec un avis à l'écran. Après un saut, la
+  première image d'une source HDR peut apparaître non convertie (latence de `libplacebo`, non
+  étudiée) ;
 - **volume maximal** plafonné à 300 % (au-delà, `cpal` écrête) ;
-- **HDR** : **volontairement absent**, pour deux raisons cumulées — inutile sur un écran
-  SDR, et nuisible ici : `tonemap` exige un signal linéaire, `zscale` (libzimg) manque et
-  `colorspace` refuse `smpte2084`. Appliqué tel quel, `tonemap` écrase l'image (mesuré :
-  43/1023 au lieu de 504). Ce n'est pas un oubli mais une décision documentée ;
-- **interpolation de mouvement** : non implémentée.
+- **interpolation de mouvement** : non implémentée ;
+- **sortie audio** : pas de reprise propre si le périphérique disparaît en cours de lecture
+  (PipeWire reroute le flux : rien d'observable ici, non mesuré pour une enceinte Bluetooth qui
+  s'éteint puis se rallume) ; pas de piste audio **externe** (`.mka`, `.ac3` à côté du film) ;
+- **encodage des sous-titres** : l'encodage imposé ne s'applique qu'aux fichiers **externes** ;
+- **plein écran sur plusieurs moniteurs** : les autres écrans noircis ne sont pas gérés (non
+  mesurable sous Wayland) ; pas de langue d'interface (le français seul) ;
+- **signets** : on ne peut pas encore les renommer ;
+- la liste complète du reste à faire est dans `docs/PROCHAINES-FONCTIONS.md`.
 
 Ce qui **est** implémenté et mesuré (filtres d'image, égaliseur 18 bandes, traitements
 audio, pistes embarquées, ASS, profils) est listé dans
 [docs/INVENTAIRE-FONCTIONNALITES.md](docs/INVENTAIRE-FONCTIONNALITES.md) — chaque ligne
 renvoie au banc d'essai qui la vérifie.
-
-
-Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 
 ---
 
@@ -470,14 +562,14 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-profils.sh [écran]` | **Profils** : application réelle, persistance, robustesse (fichier corrompu, doublons) — 17 contrôles |
 | `verif-regles.sh [écran]` | **Profils par règle** : chemin / extension / résolution mesurés sur l'image et le son, ordre, règles orphelines, ajout et suppression par l'interface — 24 contrôles |
 | `etat-court.sh [--check]` | **Régénère la fiche de reprise** `docs/ETAT-COURT.md` : lignes de code, bancs, dernier résultat de la suite, tests, avertissements, archive, capacités du FFmpeg installé |
-| `tout-verifier.sh` | Démarre l'écran virtuel si besoin, prend un **verrou** (une seule suite à la fois), enchaîne les 41 bancs et imprime le total (629 contrôles). Pose d'abord l'environnement des bancs (`env-bancs.sh` : Python avec numpy/PIL, session X11, écran virtuel 1500×900) |
+| `tout-verifier.sh` | Démarre l'écran virtuel si besoin, prend un **verrou** (une seule suite à la fois), enchaîne **tous** les bancs et imprime le total (le dernier résultat est dans `docs/DERNIERE-SUITE.txt`, ~50 min). Pose d'abord l'environnement des bancs (`env-bancs.sh` : Python avec numpy/PIL, session X11, écran virtuel 1500×900) |
 | `verif-cadrage.sh [écran]` | **Cadrage et sous-titres** : recadrage, détection des bandes, chapitres, couleur/position/taille/délai du texte, rapport d'aspect — 10 contrôles |
 | `verif-pistes.sh [écran]` | **Pistes embarquées** : inventaire, changement de piste audio mesuré en fréquence, sous-titres (texte, minutages, affichage) — 16 contrôles |
 | `capture-lecteur.sh <fichier> <image.png> [attente_s] [touches…]` | Lecture sur un écran X virtuel et capture PNG (validation visuelle) |
 | `diag-touches.sh` | Diagnostic des touches sous Xvfb (focus, fenêtre cible) |
-| `audit-prefs.sh [écran]` | Fenêtre « Préférences » : bornage à l'écran, dépliage/repliage des sections, défilement (7 contrôles, géométrie journalisée) |
-| `verif-audio.sh` | **Vérifie les traitements audio par mesure** : 29 contrôles (égaliseur, hauteur, normaliseur, mode nuit, bruit, stéréo, réverbération, décalage), sans carte son |
-| `verif-personnalisation.sh [écran]` | **Personnalisation** : clic droit, raccourcis réaffectés (et ancienne touche libérée), repère de recadrage mesuré au pixel, miroir horizontal mesuré — 13 contrôles |
+| `audit-prefs.sh [écran]` | Fenêtre « Préférences » : bornage à l'écran, dépliage/repliage des sections, défilement (10 contrôles, géométrie journalisée) |
+| `verif-audio.sh` | **Vérifie les traitements audio par mesure** : 34 contrôles (égaliseur, hauteur, normaliseur, mode nuit, bruit, stéréo, réverbération, décalage), sans carte son |
+| `verif-personnalisation.sh [écran]` | **Personnalisation** : clic droit, raccourcis réaffectés (et ancienne touche libérée), repère de recadrage mesuré au pixel, miroir horizontal mesuré — 19 contrôles |
 | `audit-menus.sh [écran]` | **Menus** : les six menus un par un — présence des entrées, lisibilité, et **effet réel** de 19 d'entre elles (31 contrôles) ; clique à partir de la géométrie journalisée, sans deviner les pixels |
 | `capture-menus.sh` | Capture chaque menu déroulant (inspection visuelle de l'ordre et de la lisibilité) |
 | `verif-sousimages.sh [écran]` | **Sous-titres image (PGS/DVD)** : géométrie, pixels opaques, déterminisme, taille et couleur à l'écran, extinction, non-régression du texte — 10 contrôles ; `fabrique-pgs.py` génère le flux de test |
@@ -508,8 +600,9 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-audio-pistes.sh [écran]` | **Pistes audio** : langues par priorité, commentaires écartés, piste par défaut, source mono, mémoire par film — mesuré au son — 11 contrôles |
 | `verif-mpris.sh` | **MPRIS** (module seul, mode `--mpris-test`, sans fenêtre) : nom sur le bus, métadonnées en µs, commandes reçues, `SetPosition` filtré par piste, réglages Volume/Shuffle/LoopStatus/Rate, `PropertiesChanged`, nom rendu, absence de bus gérée — 27 contrôles |
 | `verif-vignettes.sh` | **Vignettes de la barre** (module seul, chemin `--vignette`) : taille, position réelle à une image près, deux positions → deux images, déterminisme, largeur bornée, coût, sortie réutilisée, largeur non multiple de 32, hors durée — 14 contrôles, sans écran |
-| `verif-playlist.sh [écran]` | **Playlist** : lecture aléatoire (quatre avances → quatre fichiers distincts, mode mémorisé), **glisser-déposer réel à la souris**, clic sur une ligne, ✕ qui retire, volet borné avec des noms longs — 18 contrôles ; les lignes sont visées depuis la géométrie journalisée, jamais devinée |
-| `verif-rapide.sh <sujet…>` | **Vérification ciblée** : ne rejoue que les bancs concernés par une modification (`playlist`, `ui`, `fenetre`, `association`, `filtres`, `audio`, `reseau`) — la suite complète prend ~35 min, ceci ~3 |
+| `verif-playlist.sh [écran]` | **Playlist** : lecture aléatoire (quatre avances → quatre fichiers distincts, mode mémorisé), **glisser-déposer réel à la souris**, clic sur une ligne, ✕ qui retire, volet borné avec des noms longs — 28 contrôles ; les lignes sont visées depuis la géométrie journalisée, jamais devinée |
+| `verif-rapide.sh <sujet…>` | **Vérification ciblée** : ne rejoue que les bancs concernés par une modification (`verif-rapide.sh --liste` donne les sujets : `ui`, `audio`, `peripheriques`, `fenetres`, `association`, `mpris`…) ; un nom de banc est aussi accepté — de quelques minutes au lieu de ~50 |
+| `pw-flux.py <sink\|etat\|defaut> [pid]` | Où va le flux audio d'un processus dans PipeWire (`pw-dump`) : l'instrument de `verif-peripheriques.sh` |
 | `verif-association.sh [écran]` | **Association et instance unique** : la ligne `Exec` est réellement exécutée (le média se charge), types MIME vérifiés contre le système, seconde ouverture absorbée par la première instance, socket orphelin repris puis balayé, désinstallation — 38 contrôles, `~/.local` de l'utilisateur intact |
 | `verif-fenetre-wayland.sh` | **Mémoire de la fenêtre sous Wayland** : taille enregistrée, aucune position inventée, règle KWin appliquée puis retirée, redimensionnement suivi — mesure par script KWin chargé en D-Bus, fenêtre ciblée par PID, `kwinrulesrc` restauré — 12 contrôles (ignoré si aucune session Wayland) |
 | `regle-fenetre-kwin.sh [--position x,y] [--depuis-fenetre] [--etat] [--retirer]` | **Règle de fenêtre KWin** : la position de RMPlayer sous Wayland (le client ne peut pas se placer lui-même) |
@@ -517,7 +610,7 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-precache.sh [écran]` | **Pré-cache des flux** : un serveur HLS local journalise chaque requête — avance des segments, coupure de 3 s absorbée (blocage 0,46 s contre 4,34 s), reprise en continuité — 9 contrôles |
 | `verif-reseau.sh [écran]` | **Reconnexion d'un flux interrompu** : sert un HLS local et simule les pannes (503, serveur tué, connexion fermée, serveur muet), vérifie la reprise à la position, la synchronisation, l'abandon après 8 essais et qu'une vraie fin n'est pas prise pour une coupure — 21 contrôles |
 | `serveur-hls.py <dossier> <port> <sentinelles>` | Serveur HTTP de test à pannes pilotées par fichiers (`panne`, `refus`, `gel`) |
-| `verif-horloge.sh` | **La cadence suit-elle la carte son ?** 18 contrôles : écart image/son borné à une image, tampon maintenu, tampon approfondi sans effet, seek, 2×, pause, replis (média muet, audio terminé) — crée son propre puits audio et restaure la sortie de l'utilisateur |
+| `verif-horloge.sh` | **La cadence suit-elle la carte son ?** 19 contrôles : écart image/son borné à une image, tampon maintenu, tampon approfondi sans effet, seek, 2×, pause, replis (média muet, audio terminé) — crée son propre puits audio et restaure la sortie de l'utilisateur |
 | `analyse-audio.py <commande> <wav>` | Mesures élémentaires (niveaux, crête, S/B, canaux, fréquence, queue, début) |
 | `bench-desentrelacement.sh` | **Désentrelaceurs comparés par la mesure** : fabrique un contenu entrelacé dont l'original est connu, puis compare `yadif`, `bwdif` (et `estdif`) en PSNR, détail fin conservé et coût par image 1080p |
 | `verif-filtres.sh` | **Vérifie chaque filtre d'image par une mesure** (détramage, débruitage, désentrelacement `bwdif`/`yadif`, luminosité, saturation, netteté, rotation, zoom) : 16 contrôles chiffrés, sans écran |
@@ -534,29 +627,51 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 
 ```
 src/
-├── main.rs        Point d'entrée : logging, rapport de crash, CLI, eframe
-├── player.rs      Moteur FFmpeg : démux, décodage, cadence, seek, playlist
-├── ui.rs          Interface egui : contrôles, OSD, playlist, sous-titres, plein écran
-├── audio.rs       Sortie cpal : tampon circulaire + callback temps réel
-├── subtitles.rs   Sous-titres externes : parsing SRT / ASS / SSA
-├── crash.rs       Rapport de crash sûr (handler de signal async-signal-safe)
-├── config.rs      Configuration JSON persistante
-├── renderer.rs    Transport des frames RGBA vers egui
-└── utils.rs       Utilitaires (formatage, détection de format)
+├── main.rs          Point d'entrée : journal, migration des données, rapport de crash, ligne de commande, eframe
+├── player.rs        Moteur FFmpeg : démux, décodage, cadence, seek, playlist, pistes, filtres
+├── ui.rs            Interface egui : menus, contrôles, OSD, playlist, sous-titres, plein écran
+├── settings.rs      Fenêtre Préférences (sections dépliables)
+├── fenetre.rs       Fenêtres flottantes détachables (vraies fenêtres système)
+├── raccourcis.rs    Table unique des raccourcis clavier et souris, personnalisable
+├── audio.rs         Sortie cpal : tampon circulaire, callback temps réel, horloge audio
+├── sortie_audio.rs  Sorties PipeWire : liste lisible et redirection du flux
+├── subtitles.rs     Sous-titres externes : SRT / ASS / SSA, encodage
+├── ass.rs           Analyse ASS/SSA : styles, balises, animations
+├── config.rs        Configuration JSON persistante, profils, export / import
+├── hdr.rs           HDR : détection, conversion tonale, tramage
+├── edid.rs          Capacités annoncées par l'écran (EDID)
+├── mpris.rs         MPRIS : touches média et widget du bureau
+├── instance.rs      Instance unique (« Ouvrir avec » arrive dans la fenêtre ouverte)
+├── tray.rs          Icône de zone de notification (StatusNotifierItem)
+├── systeme.rs       Démarrage automatique et priorité du processus
+├── theme.rs         Thèmes externes JSON
+├── signets.rs       Signets par média
+├── positions.rs     Positions de reprise
+├── pistes.rs        Mémoire des pistes choisies à la main, par média
+├── vignettes.rs     Vignettes de la barre de progression
+├── migration.rs     Reprise des données de l'ancien nom (KPlayer)
+├── crash.rs         Rapport de crash sûr (handler de signal async-signal-safe)
+├── renderer.rs      Transport des images RGBA vers egui
+├── x11.rs           Fenêtre toujours au-dessus (X11)
+├── utils.rs         Utilitaires (formatage, types MIME)
 ```
 
 ---
 
-## Sauvegarde du projet
+## Versions et sauvegardes
 
-Ce dossier n'est **pas** sous contrôle de version. Des archives horodatées sont déposées
-dans `sauvegardes/` (sources, documentation et outils ; sans les artefacts de compilation) :
+Le projet est sous **git** (branche `main` ; une branche `fonction/<nom>` par fonction, fusionnée
+avec `--no-ff` ; étiquettes `session36`, `session37`…) et publié sur
+<https://github.com/77Darius77/RMPlayer>. Des archives horodatées complètent le dépôt dans
+`sauvegardes/` (non suivi par git) :
 
 ```bash
 ls -la sauvegardes/
 tar xzf sauvegardes/rmplayer-AAAA-MM-JJ.tar.gz -C /chemin/de/restauration
 ```
 
+(les archives antérieures au renommage s'appellent `kplayer-AAAA-MM-JJ-…`).
+
 ## Licence
 
-MIT
+[MIT](LICENSE)
