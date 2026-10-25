@@ -120,6 +120,9 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Sous-titre intégré après un saut — corrigé (s.37)** : la cause n'était pas la lecture des
   paquets mais le fait qu'un saut **en pause** ne décodait aucune image (voir piège 122). Gardé par
   `verif-saut-pause` 5/5.
+- **Fenêtres détachables (s.37)** : Préférences, Statistiques, Aide, À propos en vraies fenêtres
+  système, `verif-fenetres-detachables` 24/24 (piège 127). Non fait : « Ouvrir une adresse » et les
+  menus déroulants de la barre (fenêtres contextuelles d'egui, bornées par la fenêtre du lecteur).
 - **Sortie audio (s.37)** : les vraies sorties PipeWire par leur nom, changement en cours de
   lecture (menu Audio, préférences, Ctrl+Maj+J), retour à « par défaut » qui efface la cible,
   `verif-peripheriques` 17/17 (piège 124). Non mesuré : le comportement d'un flux épinglé sur une

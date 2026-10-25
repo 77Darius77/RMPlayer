@@ -10,6 +10,7 @@
 mod ass;
 mod config;
 mod edid;
+mod fenetre;
 mod hdr;
 mod instance;
 mod mpris;
