@@ -571,6 +571,13 @@ fn find_output_device(host: &cpal::Host, name: &str) -> Option<cpal::Device> {
     None
 }
 
+/// Un périphérique ALSA qui court-circuite le serveur de son (`hw:`, `plughw:`) : seul ce genre
+/// d'entrée reste utile à proposer, en « avancé » — le reste (`dmix:`, `front:`, `surround51:`…)
+/// n'est que du bruit quand PipeWire fait déjà le travail.
+pub fn est_sortie_directe(nom: &str) -> bool {
+    nom.starts_with("hw:") || nom.starts_with("plughw:")
+}
+
 /// Liste les périphériques de sortie disponibles (nom, taux, canaux) — proposée dans
 /// les préférences pour que le réglage « sortie audio » ait un sens concret.
 pub fn available_output_devices() -> Vec<(String, u32, u16)> {

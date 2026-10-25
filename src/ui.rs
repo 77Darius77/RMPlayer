@@ -68,6 +68,10 @@ pub struct App {
     /// affichage des préférences : l'énumération cpal ouvre chaque périphérique et
     /// produit du bruit ALSA/Jack au démarrage).
     pub(crate) audio_devices: Option<Vec<(String, u32, u16)>>,
+    /// Sorties audio PipeWire (les vraies : enceinte, casque, écran) et l'instant de leur lecture.
+    /// Relue au plus toutes les 3 s tant qu'un menu la réclame : `pw-dump` coûte une quarantaine de ms.
+    pub(crate) sorties_audio: Vec<crate::sortie_audio::Sortie>,
+    sorties_audio_le: Option<std::time::Instant>,
     /// Temps écoulé depuis le dernier enregistrement de la position de lecture
     position_tick: f32,
     /// Position choisie sur la barre de progression pendant un glissement
@@ -628,6 +632,8 @@ impl App {
             error_message: None,
             status_message: None,
             audio_devices: None,
+            sorties_audio: Vec::new(),
+            sorties_audio_le: None,
             position_tick: 0.0,
             seek_preview: None,
             progress_rect: None,
@@ -913,6 +919,63 @@ impl App {
         if self.show_settings && self.audio_devices.is_none() {
             self.audio_devices = Some(crate::audio::available_output_devices());
         }
+    }
+
+    /// Relit les sorties PipeWire si la liste est ancienne (ou si `force`).
+    pub(crate) fn actualiser_sorties_audio(&mut self, force: bool) {
+        let perimee = self
+            .sorties_audio_le
+            .map_or(true, |t| t.elapsed() > std::time::Duration::from_secs(3));
+        if force || perimee {
+            self.sorties_audio = crate::sortie_audio::lister();
+            self.sorties_audio_le = Some(std::time::Instant::now());
+        }
+    }
+
+    /// Nom lisible d'un réglage de sortie : la description PipeWire, « Périphérique par défaut »,
+    /// ou le nom brut tel qu'enregistré (ancien nom ALSA, sortie débranchée).
+    pub(crate) fn libelle_sortie_audio(&self, id: &str) -> String {
+        if id.is_empty() {
+            return "Périphérique par défaut".to_string();
+        }
+        match crate::sortie_audio::nom_pipewire(id) {
+            Some(nom) => match self.sorties_audio.iter().find(|s| s.nom == nom) {
+                Some(s) => s.description.clone(),
+                None => format!("{nom} (absente)"),
+            },
+            None => id.to_string(),
+        }
+    }
+
+    /// Choisit la sortie audio : **un seul chemin** pour le menu Audio, les préférences et le
+    /// raccourci. Le moteur redirige le flux sans coupure ; seule une sortie ALSA explicite
+    /// recrée la sortie et fait recharger le film (la position est conservée).
+    pub(crate) fn choisir_sortie_audio(&mut self, id: &str) {
+        if self.config.audio.device == id {
+            return;
+        }
+        self.config.audio.device = id.to_string();
+        let recharger = self.player.set_audio_device(id);
+        let _ = self.config.save();
+        if recharger && self.player.current_path().is_some() {
+            if let Err(e) = self.player.reload_current_media() {
+                tracing::warn!("Rechargement après changement de sortie audio: {}", e);
+            }
+        }
+        let libelle = self.libelle_sortie_audio(id);
+        tracing::info!(target: "kinterface", "sortie audio choisie : {}", libelle);
+        self.annonce(&format!("Sortie audio : {libelle}"));
+    }
+
+    /// Passe à la sortie audio suivante (raccourci) ; la liste est relue à chaque appui.
+    fn sortie_audio_suivante(&mut self) {
+        self.actualiser_sorties_audio(true);
+        if self.sorties_audio.is_empty() {
+            self.annonce("Aucune autre sortie audio (PipeWire introuvable)");
+            return;
+        }
+        let suivante = crate::sortie_audio::suivante(&self.sorties_audio, &self.config.audio.device);
+        self.choisir_sortie_audio(&suivante);
     }
 
     /// Ferme la fenêtre la plus « en avant » parmi celles qui sont ouvertes.
@@ -3223,6 +3286,7 @@ impl eframe::App for App {
                         }
                         // Piste audio suivante : même chemin que le menu Audio.
                         Action::PisteAudioSuivante => self.piste_audio_suivante(),
+                        Action::SortieAudioSuivante => self.sortie_audio_suivante(),
                         // Chapitres : comme PotPlayer (Page↑ / Page↓).
                         Action::ChapitrePrecedent => {
                             if self.player.previous_chapter().is_none() {
@@ -3581,6 +3645,39 @@ impl eframe::App for App {
                         .clicked()
                     {
                         self.player.toggle_mute();
+                    }
+
+                    // --- Sortie audio ---
+                    // Les vraies sorties du système (enceinte, casque, écran), pas les noms ALSA
+                    // bruts. Même chemin que les préférences et Ctrl+Maj+J.
+                    ui.separator();
+                    self.actualiser_sorties_audio(false);
+                    ui.label(egui::RichText::new("Sortie audio").small().weak());
+                    let actuelle = self.config.audio.device.clone();
+                    let mut entrees: Vec<(String, String)> =
+                        vec![(String::new(), "Périphérique par défaut".to_string())];
+                    for s in &self.sorties_audio {
+                        let libelle = if s.par_defaut {
+                            format!("{} (défaut du système)", s.description)
+                        } else {
+                            s.description.clone()
+                        };
+                        entrees.push((s.identifiant(), libelle));
+                    }
+                    if !entrees.iter().any(|(id, _)| *id == actuelle) {
+                        // Réglage hors liste (ancien nom ALSA, sortie éteinte) : on le montre.
+                        entrees.push((actuelle.clone(), self.libelle_sortie_audio(&actuelle)));
+                    }
+                    let mut sortie_choisie: Option<String> = None;
+                    for (id, libelle) in entrees {
+                        let actif = id == actuelle;
+                        let libelle = format!("{}{}", if actif { "● " } else { "   " }, libelle);
+                        if ligne_menu(ui, actif, libelle).clicked() && !actif {
+                            sortie_choisie = Some(id);
+                        }
+                    }
+                    if let Some(id) = sortie_choisie {
+                        self.choisir_sortie_audio(&id);
                     }
 
                     // --- Pistes du conteneur ---

@@ -27,6 +27,7 @@ mod vignettes;
 mod ui;
 mod settings;
 mod signets;
+mod sortie_audio;
 mod systeme;
 mod theme;
 mod tray;
@@ -523,6 +524,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         for p in &profils {
             println!("{} — {}", p.name, p.resume());
+        }
+        std::process::exit(0);
+    }
+
+    // `--list-audio` : les sorties que cpal énumère, telles que les voit le lecteur.
+    // Les sorties PipeWire d'abord (celles qu'on choisit : `pw:<nom> — <description>`), puis les
+    // périphériques ALSA que cpal énumère.
+    if args.iter().any(|a| a == "--list-audio") {
+        for s in sortie_audio::lister() {
+            println!(
+                "{} — {}{}",
+                s.identifiant(),
+                s.description,
+                if s.par_defaut { " (défaut du système)" } else { "" }
+            );
+        }
+        for (nom, taux, canaux) in audio::available_output_devices() {
+            println!("{} ({} Hz, {} canaux)", nom, taux, canaux);
         }
         std::process::exit(0);
     }

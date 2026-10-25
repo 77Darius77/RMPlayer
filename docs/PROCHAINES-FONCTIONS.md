@@ -120,6 +120,11 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Sous-titre intégré après un saut — corrigé (s.37)** : la cause n'était pas la lecture des
   paquets mais le fait qu'un saut **en pause** ne décodait aucune image (voir piège 122). Gardé par
   `verif-saut-pause` 5/5.
+- **Sortie audio (s.37)** : les vraies sorties PipeWire par leur nom, changement en cours de
+  lecture (menu Audio, préférences, Ctrl+Maj+J), retour à « par défaut » qui efface la cible,
+  `verif-peripheriques` 17/17 (piège 124). Non mesuré : le comportement d'un flux épinglé sur une
+  sortie qui s'éteint puis se rallume en cours de lecture (enceinte Bluetooth). La sortie
+  absente au lancement, elle, est mesurée (repli sur le défaut).
 - **Pistes audio (s.37)** : langues par priorité, commentaires et audiodescriptions écartés, piste
   « par défaut » du fichier, mémoire par film (Ctrl+J), `verif-audio-pistes` 11/11. Non fait :
   piste audio **externe** (fichier `.mka`/`.ac3` à côté du film) et reprise après perte du

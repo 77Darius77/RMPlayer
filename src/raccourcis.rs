@@ -53,6 +53,9 @@ pub enum Action {
     SousTitreSuivant,
     /// Piste audio suivante (VO / VF / commentaire…), dans l'ordre du fichier.
     PisteAudioSuivante,
+    /// Sortie audio suivante (haut-parleurs, casque, HDMI…) : « par défaut », puis chaque sortie
+    /// PipeWire dans l'ordre des noms.
+    SortieAudioSuivante,
     PleinEcran,
     Echap,
     Capture,
@@ -105,6 +108,7 @@ impl Action {
         Action::SousTitresVisibles,
         Action::SousTitreSuivant,
         Action::PisteAudioSuivante,
+        Action::SortieAudioSuivante,
         Action::PleinEcran,
         Action::Echap,
         Action::Capture,
@@ -158,6 +162,7 @@ impl Action {
             Action::SousTitresVisibles => "soustitres.visibles",
             Action::SousTitreSuivant => "soustitres.suivant",
             Action::PisteAudioSuivante => "audio.piste_suivante",
+            Action::SortieAudioSuivante => "audio.sortie_suivante",
             Action::PleinEcran => "affichage.plein_ecran",
             Action::Echap => "affichage.echap",
             Action::Capture => "image.capture",
@@ -211,6 +216,7 @@ impl Action {
             Action::SousTitresVisibles => "Afficher / masquer les sous-titres",
             Action::SousTitreSuivant => "Piste de sous-titres suivante",
             Action::PisteAudioSuivante => "Piste audio suivante",
+            Action::SortieAudioSuivante => "Sortie audio suivante",
             Action::PleinEcran => "Plein écran",
             Action::Echap => "Fermer la fenêtre / sortir du plein écran",
             Action::Capture => "Capture d'écran (PNG)",
@@ -258,7 +264,9 @@ impl Action {
             | Action::ChapitreSuivant
             | Action::ImageSuivante
             | Action::ImagePrecedente => "Vitesse et chapitres",
-            Action::VolumePlus | Action::VolumeMoins | Action::Muet | Action::PisteAudioSuivante => "Son",
+            Action::VolumePlus | Action::VolumeMoins | Action::Muet
+            | Action::PisteAudioSuivante
+            | Action::SortieAudioSuivante => "Son",
             Action::SousTitresVisibles | Action::SousTitreSuivant => "Sous-titres",
             Action::PleinEcran
             | Action::Echap
@@ -310,6 +318,7 @@ impl Action {
             Action::SousTitresVisibles => "V, DoubleClic",
             Action::SousTitreSuivant => "J",
             Action::PisteAudioSuivante => "Ctrl+J",
+            Action::SortieAudioSuivante => "Ctrl+Maj+J",
             Action::PleinEcran => "F, Entree, F11",
             Action::Echap => "Echap",
             Action::Capture => "S",

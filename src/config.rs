@@ -496,8 +496,9 @@ pub const EQ_FREQUENCIES: [u32; EQ_BANDS] = [
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AudioSettings {
-    /// Nom exact du périphérique de sortie (cpal) ; vide = périphérique par défaut.
-    /// La liste est proposée dans les préférences (voir `audio::available_output_devices`).
+    /// Sortie audio : vide = sortie par défaut du système ; `pw:<node.name>` = une sortie PipeWire
+    /// (`sortie_audio::lister`, choisie par son nom lisible) ; tout autre texte = nom ALSA brut
+    /// ouvert tel quel par cpal (anciens réglages, `hw:…` en « avancé »).
     #[serde(default)]
     pub device: String,
     /// Volume maximal autorisé, en pourcentage — réellement appliqué (`set_volume_max`).
