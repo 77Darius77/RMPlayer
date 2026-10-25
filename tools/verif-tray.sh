@@ -14,7 +14,7 @@
 #   4. menu « Quitter » : le lecteur se ferme.
 #
 # **Effet de bord sur le bureau réel** : l'icône apparaît quelques secondes dans la zone de
-# notification de la session (comme KPlayer apparaît dans le widget multimédia pendant
+# notification de la session (comme RMPlayer apparaît dans le widget multimédia pendant
 # verif-mpris). Sans watcher StatusNotifier, le banc se déclare non exécutable.
 #
 # Usage : tools/verif-tray.sh [écran]      (défaut : :99)
@@ -22,11 +22,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-tray
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -47,12 +47,12 @@ items() {
 }
 items >/dev/null || { echo "aucun StatusNotifierWatcher sur le bus de session — banc non exécutable ici"; exit 2; }
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 
 arreter() {
-    for pid in $(pgrep -x kplayer 2>/dev/null); do
+    for pid in $(pgrep -x rmplayer 2>/dev/null); do
         aff=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
         [ "$aff" = "$DISP" ] && kill "$pid" 2>/dev/null
     done
@@ -82,7 +82,7 @@ lance() {
 mon_item() {  # nom de bus de l'icône de CE processus, ou vide
     items | grep -o "org.kde.StatusNotifierItem-$K_PID-[0-9]*" | head -1
 }
-fenetres_visibles() { xdotool search --onlyvisible --pid "$K_PID" --name KPlayer 2>/dev/null | wc -l; }
+fenetres_visibles() { xdotool search --onlyvisible --pid "$K_PID" --name RMPlayer 2>/dev/null | wc -l; }
 # id_menu <libellé> : identifiant dbusmenu de l'entrée portant ce libellé
 id_menu() {
     gdbus call --session --dest "$ITEM" --object-path /MenuBar --method com.canonical.dbusmenu.GetLayout 0 "int32 -1" "@as []" 2>/dev/null \
@@ -97,7 +97,7 @@ clic_menu() {  # clic_menu <id>
     gdbus call --session --dest "$ITEM" --object-path /MenuBar --method com.canonical.dbusmenu.Event "$1" clicked "<0>" 0 >/dev/null 2>&1
 }
 statut() {
-    gdbus call --session --dest org.mpris.MediaPlayer2.kplayer --object-path /org/mpris/MediaPlayer2 \
+    gdbus call --session --dest org.mpris.MediaPlayer2.rmplayer --object-path /org/mpris/MediaPlayer2 \
         --method org.freedesktop.DBus.Properties.Get org.mpris.MediaPlayer2.Player PlaybackStatus 2>/dev/null \
         | sed -n "s/.*'\(Playing\|Paused\|Stopped\)'.*/\1/p"
 }

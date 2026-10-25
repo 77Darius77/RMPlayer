@@ -25,7 +25,7 @@ ATTENTE="${4:-15}"
 
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 # L'application tourne sur l'écran demandé (sinon winit refuse de démarrer) ;
 # les commandes d'injection visent explicitement le même écran.
 export DISPLAY="$DISP"
@@ -41,7 +41,7 @@ set confirm off
 set width 0
 shell ( sleep $ATTENTE; \\
   W=""; for i in \$(seq 1 30); do \\
-    W=\$(DISPLAY=$DISP xdotool search --name KPlayer 2>/dev/null | head -1); \\
+    W=\$(DISPLAY=$DISP xdotool search --name RMPlayer 2>/dev/null | head -1); \\
     [ -n "\$W" ] && break; sleep 1; done; \\
   echo "fenetre=\$W" >>$INJECT; \\
   DISPLAY=$DISP xdotool windowactivate --sync \$W >>$INJECT 2>&1 \\
@@ -50,7 +50,7 @@ shell ( sleep $ATTENTE; \\
   DISPLAY=$DISP xdotool mousemove \$((X + WIDTH / 2)) \$((Y + HEIGHT / 3)) >>$INJECT 2>&1; \\
   sleep 1; DISPLAY=$DISP xdotool key --clearmodifiers $TOUCHE >>$INJECT 2>&1; \\
   echo "touche $TOUCHE envoyée" >>$INJECT; sleep 3; \\
-  echo "SIGSTOP" >>$INJECT; kill -STOP \$(pgrep -x kplayer) >>$INJECT 2>&1 ) &
+  echo "SIGSTOP" >>$INJECT; kill -STOP \$(pgrep -x rmplayer) >>$INJECT 2>&1 ) &
 run $FILM
 echo ===ETAT===
 info program
@@ -60,10 +60,10 @@ echo ===FIN===
 quit
 EOF
 
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 sleep 1
-timeout $((ATTENTE + 60)) gdb -q -nx -batch -x "$CMDS" ./target/release/kplayer </dev/null >"$SORTIE" 2>&1
-pkill -x kplayer 2>/dev/null || true
+timeout $((ATTENTE + 60)) gdb -q -nx -batch -x "$CMDS" ./target/release/rmplayer </dev/null >"$SORTIE" 2>&1
+pkill -x rmplayer 2>/dev/null || true
 
 echo "--- injection :"; sed 's/^/    /' "$INJECT"
 echo "--- pile du fil principal :"

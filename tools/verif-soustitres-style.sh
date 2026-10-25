@@ -20,11 +20,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-soustitres-style
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -40,12 +40,12 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "$XDG_RUNTIME_DIR/bus" ]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 fi
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache" "$BASE/media"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache" "$BASE/media"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 
 arreter() {
-    for pid in $(pgrep -x kplayer 2>/dev/null); do
+    for pid in $(pgrep -x rmplayer 2>/dev/null); do
         aff=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
         [ "$aff" = "$DISP" ] && kill "$pid" 2>/dev/null
     done
@@ -94,14 +94,14 @@ capture() {
     sleep 4.5
     if [ -n "$pos" ]; then
         local piste
-        piste=$(gdbus call --session --dest org.mpris.MediaPlayer2.kplayer --object-path /org/mpris/MediaPlayer2 \
+        piste=$(gdbus call --session --dest org.mpris.MediaPlayer2.rmplayer --object-path /org/mpris/MediaPlayer2 \
             --method org.freedesktop.DBus.Properties.Get org.mpris.MediaPlayer2.Player Metadata 2>/dev/null \
             | sed -n "s/.*trackid[^']*objectpath '\([^']*\)'.*/\1/p" | head -1)
-        gdbus call --session --dest org.mpris.MediaPlayer2.kplayer --object-path /org/mpris/MediaPlayer2 \
+        gdbus call --session --dest org.mpris.MediaPlayer2.rmplayer --object-path /org/mpris/MediaPlayer2 \
             --method org.mpris.MediaPlayer2.Player.Pause >/dev/null 2>&1
         sleep 0.4
-        gdbus call --session --dest org.mpris.MediaPlayer2.kplayer --object-path /org/mpris/MediaPlayer2 \
-            --method org.mpris.MediaPlayer2.Player.SetPosition "${piste:-/org/kplayer/track/0}" "$((pos * 1000))" >/dev/null 2>&1
+        gdbus call --session --dest org.mpris.MediaPlayer2.rmplayer --object-path /org/mpris/MediaPlayer2 \
+            --method org.mpris.MediaPlayer2.Player.SetPosition "${piste:-/org/rmplayer/track/0}" "$((pos * 1000))" >/dev/null 2>&1
         sleep 1.2
     fi
     xdotool mousemove 3 3 2>/dev/null || true

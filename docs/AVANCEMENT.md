@@ -1,4 +1,4 @@
-# KPlayer — Suivi d'Avancement
+# RMPlayer — Suivi d'Avancement
 
 > **Pour un état d'ensemble, lire d'abord [`ETAT-DU-PROJET.md`](ETAT-DU-PROJET.md)** :
 > ce qui fonctionne, ce qui reste à faire, les règles du projet, et l'emplacement de la
@@ -8,7 +8,7 @@
 > qui fonctionne réellement de ce qui est annoncé mais inerte (réglages décoratifs,
 > capture d'écran simulée, panneau playlist inatteignable…).
 
-**Projet :** lecteur vidéo professionnel Linux (objectif : qualité PotPlayer)  
+**Projet :** lecteur vidéo professionnel Linux (Rust Media Player)  
 **Langage :** Rust + FFI FFmpeg 7.x (aucune dépendance à un lecteur externe)  
 **Dépôt :** `/media/blaise/LINUX_DATA/lecteur-linux`  
 **Dernière mise à jour :** 2026-10-21 (session 34)
@@ -37,8 +37,7 @@
 |---|---|
 | **Reprendre le travail** | **`docs/ETAT-COURT.md`** — fiche d'une page, régénérée par `tools/etat-court.sh` |
 | Ce qui marche, ce qui reste | `docs/ETAT-DU-PROJET.md` |
-| Chaque réglage face à PotPlayer | `docs/POTPLAYER-VERS-KPLAYER.md` |
-| Coûts mesurés et plan d'optimisation | `docs/OPTIMISATION-COMPARATIF.md` |
+| Coûts mesurés et plan d'optimisation | `docs/OPTIMISATION.md` |
 | API et structures du code | `docs/ETAT-TECHNIQUE.md` |
 | Fonctionnalités et limites assumées | `docs/INVENTAIRE-FONCTIONNALITES.md` |
 | Sessions 2 à 31 (détail) | `docs/AVANCEMENT-ARCHIVE.md` |
@@ -72,7 +71,7 @@ cargo build --release
 ./run.sh mon_fichier.mp4
 
 # Ou directement
-LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib ./target/release/kplayer fichier.mp4
+LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib ./target/release/rmplayer fichier.mp4
 
 # Options
 ./run.sh --fullscreen fichier.mp4   # démarre en plein écran
@@ -92,7 +91,7 @@ Plusieurs fichiers en ligne de commande forment une **playlist** (le premier est
 Depuis un **shell hors session graphique**, il faut exporter `XDG_RUNTIME_DIR` :
 
 ```bash
-XDG_RUNTIME_DIR=/run/user/1000 LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib ./target/release/kplayer fichier.mp4
+XDG_RUNTIME_DIR=/run/user/1000 LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib ./target/release/rmplayer fichier.mp4
 ```
 
 Sans cela, PipeWire est injoignable et ALSA répond `Host is down (112)`.
@@ -164,7 +163,7 @@ traitées :
    Le journal l'explique une fois, au démarrage.
 3. **La position se règle par le compositeur** : `tools/regle-fenetre-kwin.sh` installe une
    **règle de fenêtre KWin** (mécanisme officiel — Plasma 6.8 en livre une pour Steam) :
-   `wmclass=kplayer`, `positionrule=3` (Apply), `types=1`. `--depuis-fenetre` lit la position
+   `wmclass=rmplayer`, `positionrule=3` (Apply), `types=1`. `--depuis-fenetre` lit la position
    de la fenêtre ouverte (script KWin + journal) pour l'adopter ; `--retirer` défait tout,
    avec sauvegarde horodatée de `kwinrulesrc`.
 
@@ -177,7 +176,7 @@ qui suit `reconfigure` ignore la règle (constaté : placement au centre à 1239
 300,220).
 
 **Preuve** : `tools/verif-fenetre-wayland.sh`, **12 contrôles** sur la session réelle (ciblage
-par **PID** — jamais `pkill kplayer`, qui fermerait le lecteur de l'utilisateur), mesure par un
+par **PID** — jamais `pkill rmplayer`, qui fermerait le lecteur de l'utilisateur), mesure par un
 script KWin chargé en D-Bus qui écrit `frameGeometry`/`clientGeometry` dans le journal avec un
 marqueur unique (un `tail -1` sur le journal rendait la mesure de l'exécution précédente), et
 **restauration** du `kwinrulesrc` en sortie (vérifiée à l'identique). Le banc X11
@@ -186,23 +185,23 @@ Wayland que si un compositeur est joignable (sinon « ignoré », pas « échec 
 
 ### 6.39 Association de fichiers et instance unique (session 33)
 
-**Le manque.** KPlayer ne s'ouvrait que par `run.sh`, la ligne de commande ou une icône
+**Le manque.** RMPlayer ne s'ouvrait que par `run.sh`, la ligne de commande ou une icône
 posée à la main : aucun fichier `.desktop`, donc aucun « Ouvrir avec » dans Dolphin, aucune
 entrée dans le menu des applications, et double-cliquer une vidéo ouvrait une **seconde**
 fenêtre (deux processus, deux fichiers de position, impression que le clic n'a rien fait).
 
 **Ce qui est fait.**
 
-1. **Un lanceur** : `assets/kplayer.desktop.in` (modèle) + `tools/installer-association.sh`
-   qui écrit `$XDG_DATA_HOME/applications/kplayer.desktop`, installe l'icône dans
+1. **Un lanceur** : `assets/rmplayer.desktop.in` (modèle) + `tools/installer-association.sh`
+   qui écrit `$XDG_DATA_HOME/applications/rmplayer.desktop`, installe l'icône dans
    `hicolor/256x256/apps`, met à jour `mimeinfo.cache` et, sur demande (`--par-defaut`),
    s'enregistre dans `mimeapps.list`. `--etat` et `--retirer` complètent l'outil, qui
    sauvegarde la configuration visée avant d'y toucher.
 2. **Instance unique** (`src/instance.rs`) : socket Unix dans `$XDG_RUNTIME_DIR`, dont le
-   **nom dépend du dossier de configuration** (`kplayer-<FNV-1a>.sock`). Un second
+   **nom dépend du dossier de configuration** (`rmplayer-<FNV-1a>.sock`). Un second
    lancement transmet ses chemins et sort avec le code 0 ; la fenêtre existante charge le
    média, l'ajoute à la playlist et démarre la lecture. `--nouvelle-instance` force une
-   seconde fenêtre, `KPLAYER_INSTANCE_UNIQUE=0` désactive la mécanique.
+   seconde fenêtre, `RMPLAYER_INSTANCE_UNIQUE=0` désactive la mécanique.
 3. **`run.sh` corrigé** : il faisait `cd` dans son dossier (les chemins relatifs passés en
    argument devenaient faux) et inventait `DISPLAY=":0"` quand la variable manquait — sous
    Wayland, cela lançait winit en X11 sur un serveur absent.
@@ -213,7 +212,7 @@ nommerait un service. Le socket fait le travail avec la bibliothèque standard s
 
 **Quatre mesures qui ont changé la conception** :
 
-- `xdg-mime query default video/mp4` répond **« kplayer.desktop » même quand rien n'est
+- `xdg-mime query default video/mp4` répond **« rmplayer.desktop » même quand rien n'est
   enregistré** (il retombe sur la base de GIO). `--etat` et `--retirer` lisent donc
   `mimeapps.list` eux-mêmes ; sinon on annonçait une association inexistante et on effaçait
   celles de l'utilisateur.
@@ -229,7 +228,7 @@ nommerait un service. Le socket fait le travail avec la bibliothèque standard s
 
 **Nettoyage des sockets.** Un processus tué par `SIGTERM`/`SIGKILL` n'exécute aucun code de
 nettoyage : chaque banc, qui a son dossier de configuration, laissait son socket (**26
-accumulés en une suite**, mesuré). Au démarrage, chaque socket `kplayer-*.sock` est
+accumulés en une suite**, mesuré). Au démarrage, chaque socket `rmplayer-*.sock` est
 interrogé par un **ping** (`#ping` → `pong`) : celui qui ne répond pas est retiré. Le ping
 n'ouvre rien et ne met aucune fenêtre au premier plan — vérifié par le banc.
 
@@ -245,8 +244,7 @@ jamais).
 
 **Ce qui manquait.** La playlist était une liste figée : impossible d'en changer l'ordre,
 impossible de la parcourir au hasard. Deux réglages comptent pourtant dans l'usage quotidien
-d'un lecteur — c'est exactement le reproche « il en manque toujours un » que le comparatif
-PotPlayer avait listé.
+d'un lecteur — c'est exactement le reproche « il en manque toujours un ».
 
 **Lecture aléatoire.** `playback.shuffle` (mémorisé), `Ctrl+A`, bouton d'état 🔀 dans le
 panneau, case à cocher dans *Préférences ▸ Lecture*. Le parcours est une **permutation**
@@ -336,7 +334,7 @@ disparaît, retrait journalisé).
 
 **Le besoin.** Survoler la barre de progression montre l'image de l'instant pointé : c'est ce
 qui permet de se déplacer dans un film sans avancer à l'aveugle. C'était le dernier manque
-« confort de navigation » du comparatif PotPlayer.
+« confort de navigation » identifié.
 
 **Architecture : un décodeur autonome, pas le lecteur.** Demander une image « ailleurs » au
 lecteur en cours obligerait à un `seek` puis un retour : la lecture sauterait, l'horloge audio
@@ -389,8 +387,7 @@ demandes pour 3 positions survolées, et ne bouge plus à l'arrêt.
 ### 6.43 MPRIS : touches média et widget du bureau (session 34)
 
 **Le besoin.** Les touches média du clavier et le widget « lecture en cours » de Plasma
-n'agissaient/n'affichaient rien. C'était le dernier manque d'**intégration au bureau** du
-comparatif PotPlayer, et il n'a qu'une solution : D-Bus (`org.mpris.MediaPlayer2`, spécification
+n'agissaient/n'affichaient rien. C'était le dernier manque d'**intégration au bureau**, et il n'a qu'une solution : D-Bus (`org.mpris.MediaPlayer2`, spécification
 freedesktop 2.2). Coût assumé : une dépendance, `zbus` 5.19 (`blocking-api`, pour ne pas
 installer d'exécuteur asynchrone dans un projet entièrement synchrone).
 
@@ -440,8 +437,7 @@ afficherait des curseurs inertes.
 
 ### 6.44 Finition des réglages : teinte, niveaux, adoucir, interlettre, marges, presets, focus (session 34)
 
-**Ce qui manquait.** Quatre réglages de PotPlayer relevés au §11 du comparatif (`Dialog(384)`
-et `Dialog(383)`), plus deux manques de confort. Chacun est désormais **mesuré** par un banc,
+**Ce qui manquait.** Quatre réglages d'image et de sous-titres, plus deux manques de confort. Chacun est désormais **mesuré** par un banc,
 et non simplement présent dans un menu.
 
 | Réglage | Filtre / mécanisme | Mesure |
@@ -602,10 +598,10 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
     statistique d'image (cf. §6.11). Même logique pour la vitesse : vérifier le
     rééchantillonnage dans le journal.
 16. **Les journaux d'FFmpeg sont redirigés vers `tracing`** (`av_log_set_callback`) et
-    n'apparaissent qu'en `RUST_LOG=kplayer=debug` (ou en filtrant sur `ffmpeg`). Sans
+    n'apparaissent qu'en `RUST_LOG=rmplayer=debug` (ou en filtrant sur `ffmpeg`). Sans
     cela, un flux refusé crachait des centaines de lignes sur la sortie d'erreur et
     masquait les messages de l'application. Pour les voir :
-    `RUST_LOG=kplayer=debug,ffmpeg=debug ./run.sh film.mkv`.
+    `RUST_LOG=rmplayer=debug,ffmpeg=debug ./run.sh film.mkv`.
 17. **Un décodeur peut n'exister qu'en version matérielle.** Le décodeur AV1 de ce
     FFmpeg s'ouvre sans VA-API mais ne produit jamais d'image : libavcodec boucle alors
     sur des erreurs (CPU saturé, aucune image). Le moteur refuse désormais d'emblée
@@ -875,7 +871,7 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
     la position « appliquée » venait d'un essai manuel antérieur → écrire dans le fichier que
     le système lit vraiment, sauvegarder/restaurer, et vérifier **le même chemin** ; (c)
     cibler la fenêtre par sa **classe** aurait touché la fenêtre de l'utilisateur (et
-    `pkill -x kplayer` aurait fermé son lecteur) → cibler par **PID**. (§6.38)
+    `pkill -x rmplayer` aurait fermé son lecteur) → cibler par **PID**. (§6.38)
 
 81. 🟡 **KWin recharge ses règles de façon différée.** Une fenêtre lancée dans la seconde qui
     suit `qdbus6 org.kde.KWin /KWin reconfigure` ignore encore la règle (mesuré : placement au
@@ -1005,7 +1001,7 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      (« taille 1259x710 » pour un sous-titre de 267x53, couleur bleue), un autre attendait
      indéfiniment un banc tué par l'autre. `tout-verifier.sh` prend désormais un **verrou
      `flock`** et refuse de démarrer si une suite tourne (code 4, message explicite). Et
-     chaque banc qui capture l'écran arrête les instances `kplayer` **de son écran**
+     chaque banc qui capture l'écran arrête les instances `rmplayer` **de son écran**
      seulement (`DISPLAY` lu dans `/proc`), jamais celles de l'utilisateur. (§6.44)
 
 105. 🟡 **Une valeur de pixel « évidente » dépend du chemin de conversion.** Le fond du média
@@ -1085,7 +1081,7 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      fenêtres.
 
 116. 🔴 **« 133 tests, 0 échec » n'était pas déterministe.** Deux tests de `hdr.rs` posaient
-     `KPLAYER_HDR_MOTEUR` dans l'environnement du processus (`std::env::set_var`) pendant que
+     `RMPLAYER_HDR_MOTEUR` dans l'environnement du processus (`std::env::set_var`) pendant que
      d'autres, en parallèle, appelaient `plan()` qui lit cette variable : 3 exécutions sur 25
      échouaient (de 1 à 3 tests rouges), et la fiche affichait « 132 » parce que
      `etat-court.sh` lit `N passed` sans voir le `1 failed` qui le suit. **Un test ne touche
@@ -1182,20 +1178,34 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      Bouton « ⧉ Détacher » / « ⧉ Rattacher », Échap ferme la fenêtre détachée, choix mémorisé dans
      `interface.detached_windows`. Mesuré côté système par `verif-fenetres-detachables` (24 contrôles) :
      fenêtre X distincte, déplacée à cheval sur le bord du lecteur, contenu visible. **Pièges de
-     l'instrument** : `xdotool search --name KPlayer` renvoie aussi les fenêtres détachées
-     (« KPlayer — Préférences ») — fixer l'identifiant de la fenêtre principale AU LANCEMENT, avec
+     l'instrument** : `xdotool search --name RMPlayer` renvoie aussi les fenêtres détachées
+     (« RMPlayer — Préférences ») — fixer l'identifiant de la fenêtre principale AU LANCEMENT, avec
      `tail -1` et `windowfocus` avant d'envoyer une touche. Non fait : la boîte « Ouvrir une adresse »
      (saisie rapide modale) et les menus déroulants de la barre restent dans le lecteur.
+
+128. 🟠 **Renommage KPlayer → RMPlayer (Rust Media Player, s.37) et retrait de toute référence à
+     PotPlayer.** Le nom est codé en ~700 endroits : binaire et crate (`rmplayer`), nom MPRIS
+     (`org.mpris.MediaPlayer2.rmplayer`), filtre `RUST_LOG`, dossiers `~/.config/rmplayer` et
+     `~/.cache/rmplayer`, socket d'instance, autostart, icône de zone de notification, journal de
+     crash, tous les bancs. **Les données de l'utilisateur ne sont pas perdues** : au premier lancement,
+     `src/migration.rs` COPIE l'ancien dossier `kplayer` (jamais déplacé ni supprimé ; copie dans un
+     dossier provisoire puis renommage, pour qu'une copie interrompue ne passe pas pour terminée).
+     Mesuré par `verif-migration` : le programme relit la valeur posée dans l'ancien dossier.
+     **Pièges** : (a) le test qui fige l'empreinte de la chaîne « kplayer » change de valeur (la chaîne
+     change, pas l'algorithme) ; (b) un `ls` d'un dossier dont le CHEMIN contient le mot cherché fausse
+     un `grep` (banc de migration) ; (c) un script de réécriture qui cherche « la section suivante »
+     par son titre peut trouver une section placée AVANT dans le fichier : il a dupliqué 500 lignes
+     de l'archive, détecté par le nombre de lignes. Les anciennes archives `sauvegardes/kplayer-*.tar.gz`
+     gardent leur nom. Le fichier `.desktop` déjà installé continue de marcher (il appelle `run.sh`),
+     mais son `StartupWMClass` ne correspond plus : réinstaller par `--par-defaut`.
 
 ## 5. Reste à faire
 
 État au **2026-10-19, fin de session 32**. Chaque ligne dit *pourquoi* ce n'est pas fait,
 pour éviter les listes décoratives.
-### Session 31 — programme préparé (à partir de `docs/COMPARAISON-POTPLAYER.md`)
+### Session 31 — programme préparé
 
-La comparaison réglage par réglage avec PotPlayer a été faite et consignée
-(`docs/COMPARAISON-POTPLAYER.md`). Elle donne cinq manques classés par **rapport
-valeur/effort**, dans l'ordre où ils seront traités :
+Cinq manques classés par **rapport valeur/effort**, dans l'ordre où ils ont été traités :
 
 | # | Chantier | Effort | Pourquoi d'abord | Preuve attendue |
 |---|---|---|---|---|
@@ -1310,19 +1320,18 @@ mauvais endroit (le code du lecteur n'y est pour rien).
 ---
 
 
-### Optimisation — comparatif mesuré avec PotPlayer (session 31)
+### Optimisation — mesures (session 31)
 
-Document complet : **`docs/OPTIMISATION-COMPARATIF.md`**. Résumé des faits mesurés :
+Document complet : **`docs/OPTIMISATION.md`**. Résumé des faits mesurés :
 
-- Le moteur de PotPlayer (`ffcodec64.dll`) est **FFmpeg 8.x** (`Lavc63.8.101`) compilé avec
-  **`libdav1d`** et **`libplacebo`** ; le nôtre est **7.1.3** (`Lavc61.19`) **sans aucune
-  bibliothèque externe**.
+- Notre FFmpeg est la **7.1.3** (`Lavc61.19`) **sans aucune bibliothèque externe** (ni `libdav1d`
+  ni `libplacebo` au moment de la mesure).
 - Notre chemin vidéo coûte **11,96 ms/image** en 1080p (VA-API, aucun filtre) — et le
   décodage matériel n'apporte que **1 ms** : le temps est dans la **copie GPU→CPU, l'échelle
   et la conversion RGBA**, pas dans le décodage.
 - **Le gain le plus fort** : faire l'échelle **dans le GPU** (`scale_vaapi`) et ne
   rapatrier que le résultat. Estimation d'abord (9,95 → 4,60 ms/image, −54 % sur FFmpeg
-  seul), puis **mesure dans KPlayer** une fois implémenté : **10,85 → 6,3 ms/image
+  seul), puis **mesure dans RMPlayer** une fois implémenté : **10,85 → 6,3 ms/image
   (−42 %)** en 1080p→720p — la différence avec l'estimation est le coût de notre propre
   conversion et copie, qui ne disparaît pas.
 - `deinterlace_vaapi` fonctionne aussi ; **`procamp_vaapi` échoue sur ce pilote**
@@ -1394,7 +1403,7 @@ Coûts des filtres CPU mesurés (1080p, par image, au-dessus des 11,96 ms) : `eq
 | 2026-10-17 (s.18) | `tools/verif-cadrage.sh` (**10 contrôles** : dimensions, détection, chapitres, pixels du texte, position, taille, décalage, aspect) |
 | 2026-10-17 (s.17) | **Pistes embarquées** : inventaire audio/sous-titres, choix par langue préférée, **changement de piste audio à chaud**, sous-titres MKV/MP4 décodés (texte + minutages), menus dédiés, `--list-tracks` / `--audio-track` / `--sub-track` / `--dump-subs` |
 | 2026-10-17 (s.17) | `tools/verif-pistes.sh` (**16 contrôles**, dont mesure FFT du changement de piste et contrôle visuel de l'affichage) ; durée des cues corrigée (`pkt->duration`) |
-| 2026-10-17 (s.16) | **Parité audio PotPlayer** : normaliseur, mode nuit, réduction de bruit (3 niveaux), élargissement stéréo, crossfeed, karaoké, réverbération, décalage ±2 s, **correction de hauteur** (`atempo`) — chacun mesuré |
+| 2026-10-17 (s.16) | **Traitements audio étendus** : normaliseur, mode nuit, réduction de bruit (3 niveaux), élargissement stéréo, crossfeed, karaoké, réverbération, décalage ±2 s, **correction de hauteur** (`atempo`) — chacun mesuré |
 | 2026-10-17 (s.16) | **Vidéo** : netteté (`unsharp`), rotation 0/90/180/270°, miroir, zoom numérique 1–4× |
 | 2026-10-17 (s.16) | `tools/analyse-audio.py` (8 mesures) ; bancs d'essai portés à **29 contrôles audio** et **12 contrôles vidéo** |
 | 2026-10-17 (s.16) | **HDR volontairement absent** : inutile sur écrans SDR et dégradant sur ce build (mesuré) — documenté comme limite, pas comme oubli |
@@ -1439,7 +1448,7 @@ Coûts des filtres CPU mesurés (1080p, par image, au-dessus des 11,96 ms) : `eq
 | 2026-10-17 (s.22) | **Reconnexion d'un flux interrompu** : coupure ≠ fin de flux (le décodeur HLS rend `AVERROR_EOF` après avoir sauté tous les segments), 8 tentatives avec temporisation, reprise à l'image affichée, bandeau visible, abandon explicite affiché (§6.25) |
 | 2026-10-17 (s.22) | **Garde-temps d'E/S** (`AVIOInterruptCB`) : `rw_timeout` n'atteint pas les segments HLS ouverts en interne → blocage borné à 3 s par lecture (mesuré 3 003 ms) |
 | 2026-10-17 (s.22) | **Sonde en arrière-plan** avant chaque tentative : l'interface reste réactive face à un serveur muet |
-| 2026-10-17 (s.22) | Une **URL est acceptée en ligne de commande** (`kplayer https://…/flux.m3u8`) ; les positions de reprise ne sont plus mémorisées pour les flux |
+| 2026-10-17 (s.22) | Une **URL est acceptée en ligne de commande** (`rmplayer https://…/flux.m3u8`) ; les positions de reprise ne sont plus mémorisées pour les flux |
 | 2026-10-17 (s.22) | **`tools/verif-reseau.sh` 20/20** + `tools/serveur-hls.py` (serveur de test à pannes pilotées) + 9 tests unitaires ; suite complète **203 contrôles, 0 échec**, 40 tests unitaires |
 | 2026-10-17 (s.21) | **`tools/verif-horloge.sh` 18/18** + 10 tests unitaires sur l'horloge ; suite complète **183 contrôles, 0 échec**, 31 tests unitaires |
 | 2026-10-18 (s.27) | **Profils appliqués par règle** : chemin (`~/` accepté), extension (liste), résolution (`1920` = au moins, `>=`, `<`, `=`); première règle gagnante, règle orpheline ignorée, `--profil` prioritaire ; écran dédié dans les préférences (§6.30) |
@@ -1458,10 +1467,8 @@ Coûts des filtres CPU mesurés (1080p, par image, au-dessus des 11,96 ms) : `eq
 | 2026-10-19 (s.32) | **Mémoire de la taille et de la position de la fenêtre** (§6.38) : `interface.window_pos/size/maximized` relus au lancement, écriture temporisée 0,6 s, jamais en plein écran ni fenêtre réduite, géométrie hors écran recentrée ; `tools/verif-fenetre.sh` **9/9**, suite complète **331 contrôles, 0 échec**, **99 tests unitaires** |
 | 2026-10-19 (s.32) | 🔴 **La suite ne démarrait pas son écran virtuel** : `Xvfb :99` arrêté → 104 échecs sur 302 contrôles sans qu'une ligne de code ait bougé ; `tout-verifier.sh` le démarre désormais lui-même (piège 78) |
 | 2026-10-18 (s.31) | **Optimisations appliquées et mesurées** (§6.37) : échelle dans le GPU (`scale_vaapi`) **−42 %** (10,85 → 6,3 ms/image en 1080p→720p), désentrelacement matériel (`deinterlace_vaapi`) **−38 %** (11,05 → 6,8), **AV1 logiciel** opérationnel (`--enable-libdav1d`, le décodeur natif échouait) ; nouveau banc `bench-optimisation.sh` 4/4, 322 contrôles au total |
-| 2026-10-18 (s.31) | **`docs/POTPLAYER-VERS-KPLAYER.md`** : listing **complet** des réglages de PotPlayer (relevés dans `French.ini`, `Dialog(N)` cités), classé par les **catégories de PotPlayer**, avec pour chacun l'état dans KPlayer, la façon de le faire en Rust/Linux, l'effort et l'effet ; plan classé en 11 chantiers |
-| 2026-10-18 (s.31) | **Sous-titres : famille de police + position horizontale** (§6.36) : `subtitles.font_family` résolue par fontconfig et chargée dans une famille egui dédiée ; `subtitles.position_h_percent` (50 % = centre), ancrage début/centre/fin selon l'alignement ; ce qui manquait à `Dialog(383)` de PotPlayer |
+| 2026-10-18 (s.31) | **Sous-titres : famille de police + position horizontale** (§6.36) : `subtitles.font_family` résolue par fontconfig et chargée dans une famille egui dédiée ; `subtitles.position_h_percent` (50 % = centre), ancrage début/centre/fin selon l'alignement  |
 | 2026-10-18 (s.31) | **`tools/verif-soustitres.sh` 5/5** : 268/307/332 px de largeur selon la police, centre 262/638/1013 px selon la position, police inconnue sans écran vide, configuration ancienne toujours centrée ; suite complète **318 contrôles, 0 échec**, **95 tests unitaires** |
-| 2026-10-18 (s.30) | **`docs/COMPARAISON-POTPLAYER.md`** : inventaire réglage par réglage (8 catégories) face à PotPlayer, côté KPlayer lu dans le code, côté PotPlayer dans la documentation ; cinq manques classés valeur/effort et **programme de la session 31** inscrit au §8 |
 | 2026-10-18 (s.30) | 🔴 **Trois régressions corrigées**, trouvées par la suite complète : fin de playlist prise pour une coupure (erreur de préchargement désormais **reportée**), image en retard de 154 ms (préchargement borné à 8 paquets par tour), reconnexion inutile alors que la réserve était pleine (`reserve_disponible`) ; `verif-reseau.sh` **21/21** |
 | 2026-10-18 (s.29) | **Démarrage audio corrigé** (§6.33) : la carte attend que le tampon soit prérempli (2 blocs de silence à 70 et 96 ms, cause du banc intermittent) ; borne de 200 ms pour que le préremplissage ne puisse jamais figer la lecture ; `verif-horloge.sh` **19/19**, cinq passes consécutives |
 

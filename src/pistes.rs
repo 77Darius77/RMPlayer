@@ -1,6 +1,6 @@
 //! Mémorisation de la piste de sous-titres choisie à la main, média par média.
 //!
-//! Même mécanique que `positions.rs` (JSON dans `~/.cache/kplayer/`, relu au chargement,
+//! Même mécanique que `positions.rs` (JSON dans `~/.cache/rmplayer/`, relu au chargement,
 //! écrit à chaque choix) : perdre ce fichier ne coûte qu'un nouveau choix, pas un réglage.
 //! Activé par `subtitles.remember_track`.
 
@@ -49,7 +49,7 @@ impl PistesChoisies {
     }
 
     fn load_fichier(nom: &str) -> Self {
-        let path = dirs::cache_dir().map(|d| d.join("kplayer").join(nom));
+        let path = dirs::cache_dir().map(|d| d.join("rmplayer").join(nom));
         let entries = path
             .as_ref()
             .and_then(|p| std::fs::read_to_string(p).ok())

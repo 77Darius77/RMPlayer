@@ -22,11 +22,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-audio-pistes
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=warn
+export RUST_LOG=rmplayer=warn
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -36,9 +36,9 @@ for outil in python3 ffmpeg xdotool; do
 done
 [ -x "$KP" ] || { echo "binaire absent : compilez d'abord (cargo build --release)"; exit 2; }
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 
 # mk <nom> <piste>… : une piste = "langue|titre|fréquence|disposition" (disposition : 0 pour aucune)
 mk() {
@@ -118,7 +118,7 @@ echo "=== 6. Mémoire par film ==="
 export DISPLAY="$DISP"
 xdpyinfo >/dev/null 2>&1 || { echo "  · écran $DISP indisponible : contrôle de mémoire ignoré"; echo; echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="; [ "$FAIL" -eq 0 ]; exit; }
 arreter() {
-    for pid in $(pgrep -x kplayer 2>/dev/null); do
+    for pid in $(pgrep -x rmplayer 2>/dev/null); do
         aff=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
         [ "$aff" = "$DISP" ] && kill "$pid" 2>/dev/null
     done
@@ -134,7 +134,7 @@ seance() {  # seance <remember: true|false>
     "$KP" --fullscreen "$BASE/multi.mkv" >"$BASE/fenetre.log" 2>&1 &
     local pid=$!
     sleep 4.5
-    local id; id=$(xdotool search --pid "$pid" --name KPlayer 2>/dev/null | tail -1)
+    local id; id=$(xdotool search --pid "$pid" --name RMPlayer 2>/dev/null | tail -1)
     xdotool windowfocus "$id" 2>/dev/null; sleep 0.3
     xdotool key --window "$id" ctrl+j 2>/dev/null; sleep 1.2
     kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; sleep 0.5

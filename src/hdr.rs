@@ -162,7 +162,7 @@ impl Moteur {
 
 /// Variable d'environnement qui force le moteur (bancs, diagnostic) :
 /// `gpu`, `cpu` ou `aucun`.
-pub const VAR_MOTEUR: &str = "KPLAYER_HDR_MOTEUR";
+pub const VAR_MOTEUR: &str = "RMPLAYER_HDR_MOTEUR";
 
 /// Moteur forcé par l'environnement, s'il y en a un.
 pub fn moteur_force() -> Option<&'static str> {
@@ -329,7 +329,7 @@ pub fn plan(info: Option<&Info>, hdr: &HdrSettings) -> Plan {
     // Façade de test : contexte neutre (écran inconnu, sortie SDR). Le chemin réel
     // passe par `plan_avec`, avec la détection d'écran.
     // Moteur non forcé : les tests ne lisent jamais l'environnement du processus (ils
-    // tournent en parallèle ; poser `KPLAYER_HDR_MOTEUR` dans l'un faisait échouer les autres).
+    // tournent en parallèle ; poser `RMPLAYER_HDR_MOTEUR` dans l'un faisait échouer les autres).
     plan_force(info, hdr, &Contexte::default(), None)
 }
 
@@ -823,7 +823,7 @@ mod tests {
         let pq = detecter(16, 9, 10);
         let mut r = reglages();
         r.mode = HdrMode::Toujours;
-        // Moteur forcé : c'est le chemin du banc (`KPLAYER_HDR_MOTEUR=cpu`), passé en paramètre.
+        // Moteur forcé : c'est le chemin du banc (`RMPLAYER_HDR_MOTEUR=cpu`), passé en paramètre.
         let p = plan_force(Some(&pq), &r, &Contexte::default(), Some("cpu"));
         assert_eq!(p.moteur, Moteur::Cpu);
         assert!(p.etage.contains("zscale="), "zscale présent : {}", p.etage);

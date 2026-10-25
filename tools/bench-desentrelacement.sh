@@ -25,11 +25,11 @@
 # seul le PSNR face à l'origine le fait. C'est la même leçon que le détramage
 # (session 13), où la « rugosité » augmentait après filtrage.
 #
-# Usage : tools/bench-desentrelacement.sh [--sans-kplayer]
+# Usage : tools/bench-desentrelacement.sh [--sans-rmplayer]
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 BASE=/tmp/kp-bench-desent
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
@@ -214,13 +214,13 @@ done
 
 echo
 echo "=== 4. Vérification dans le lecteur (le réglage atteint bien FFmpeg) ==="
-if [ "${1:-}" = "--sans-kplayer" ] || [ ! -x "$KP" ]; then
+if [ "${1:-}" = "--sans-rmplayer" ] || [ ! -x "$KP" ]; then
     echo "  (lecteur non testé)"
 else
-    mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+    mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
     export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
     regler() {
-        python3 - "$BASE/conf/kplayer/config.json" "$1" "$2" <<'PY'
+        python3 - "$BASE/conf/rmplayer/config.json" "$1" "$2" <<'PY'
 import json, sys
 chemin, actif, filtre = sys.argv[1], sys.argv[2] == "1", sys.argv[3]
 try:
@@ -269,12 +269,12 @@ n0, nb, ny = net(aucun), net(bwdif), net(yadif)
 print(f"    netteté verticale : non filtré {n0:.0f} | bwdif {nb:.0f} "
       f"({100*nb/max(n0,1e-9):.0f} %) | yadif {ny:.0f} ({100*ny/max(n0,1e-9):.0f} %)")
 json.dump({"aucun": n0, "bwdif": nb, "yadif": ny, "ecart": float(np.abs(bwdif-yadif).mean())},
-          open(f"{base}/kplayer.json", "w"))
+          open(f"{base}/rmplayer.json", "w"))
 PY
     python3 - "$BASE" <<'PY'
 import json, sys
 base = sys.argv[1]
-k = json.load(open(f"{base}/kplayer.json"))
+k = json.load(open(f"{base}/rmplayer.json"))
 if k["bwdif"] > 0.8 * k["aucun"] and k["yadif"] < 0.2 * k["aucun"]:
     print("  ✔ bwdif conserve le détail fin des zones immobiles, yadif l'efface "
           f"(écart mesuré {k['ecart']:.1f} niveaux)")

@@ -1,9 +1,9 @@
 //! Interface utilisateur — egui 0.33
 //! 
-//! Interface inspirée de PotPlayer mais optimisée Linux :
+//! Interface optimisée Linux :
 //!   - Contrôles en bas (barre de progression, boutons, volume)
 //!   - OSD contextuel (infos média, statistiques)
-//!   - Raccourcis inspirés de PotPlayer, **tous personnalisables** (`raccourcis.rs`) :
+//!   - Raccourcis **tous personnalisables** (`raccourcis.rs`) :
 //!     la table effective est le seul endroit où une touche est décidée, et l'aide `F1`
 //!     en est construite — elle ne peut donc pas mentir
 //!   - Menu contextuel au clic droit sur l'image (session 25)
@@ -589,7 +589,7 @@ pub fn texte_sur(libelle: &str) -> String {
 
 impl App {
     pub fn new(config: Config) -> Self {
-        tracing::info!("KPlayer UI initialisée");
+        tracing::info!("RMPlayer UI initialisée");
         // Table construite AVANT le déplacement de `config` dans l'application.
         let raccourcis = TableauRaccourcis::construire(&config.raccourcis);
 
@@ -882,7 +882,7 @@ impl App {
 
         let dir = self.config.screenshots_dir();
         let name = format!(
-            "kplayer-{}.png",
+            "rmplayer-{}.png",
             chrono::Local::now().format("%Y%m%d-%H%M%S")
         );
         let path = dir.join(&name);
@@ -1907,7 +1907,7 @@ impl App {
     /// peut échouer (pas de bus, nom déjà pris) — un échec doit laisser le lecteur
     /// intact, ce que fait `mpris::Demarrage::Indisponible`.
     fn demarrer_mpris(&mut self, ctx: &egui::Context) {
-        match crate::mpris::demarrer("KPlayer") {
+        match crate::mpris::demarrer("RMPlayer") {
             crate::mpris::Demarrage::Actif(serveur) => {
                 // Réveil de l'interface : sans lui, une commande reçue pendant une
                 // pause n'était exécutée qu'au prochain événement (touche, souris).
@@ -1958,7 +1958,7 @@ impl App {
             titre,
             artiste,
             rang,
-            // MPRIS attend un volume de 0 à 1 ; KPlayer autorise jusqu'à 1,5.
+            // MPRIS attend un volume de 0 à 1 ; RMPlayer autorise jusqu'à 1,5.
             volume: (self.player.get_volume() as f64).clamp(0.0, 1.0),
             aleatoire: self.player.shuffle(),
             boucle: self.player.loop_enabled,
@@ -2908,7 +2908,7 @@ impl eframe::App for App {
             });
         }
 
-        // Thème : externe s'il est choisi et lisible, sinon sombre (comme PotPlayer) ou clair.
+        // Thème : externe s'il est choisi et lisible, sinon sombre ou clair.
         self.actualiser_theme_externe();
         match &self.theme_externe {
             Some((_, theme)) => ctx.set_visuals(theme.visuals()),
@@ -3231,7 +3231,7 @@ impl eframe::App for App {
                         // Panneau playlist (auparavant inatteignable)
                         Action::PanneauPlaylist => self.basculer_panneau_playlist(),
 
-                        // --- Bascule de fonctions (façon PotPlayer) ---
+                        // --- Bascule de fonctions ---
                         // Fenêtre toujours au-dessus des autres (via X11 : la
                         // commande d'eframe panique sur X11 en cas d'échec)
                         Action::ToujoursAuDessus => {
@@ -3304,7 +3304,7 @@ impl eframe::App for App {
                         // Piste audio suivante : même chemin que le menu Audio.
                         Action::PisteAudioSuivante => self.piste_audio_suivante(),
                         Action::SortieAudioSuivante => self.sortie_audio_suivante(),
-                        // Chapitres : comme PotPlayer (Page↑ / Page↓).
+                        // Chapitres (Page↑ / Page↓).
                         Action::ChapitrePrecedent => {
                             if self.player.previous_chapter().is_none() {
                                 self.annonce("Aucun chapitre précédent");
@@ -3351,7 +3351,7 @@ impl eframe::App for App {
                             let _ = self.config.save();
                         }
 
-                        // Préférences (comme F5 chez PotPlayer)
+                        // Préférences (F5)
                         Action::Preferences => {
                             self.show_settings = !self.show_settings;
                             self.refresh_audio_devices();
@@ -3983,7 +3983,7 @@ impl eframe::App for App {
                             }
                             ui.label(titre);
                         } else {
-                            ui.label("🎬 KPlayer");
+                            ui.label("🎬 RMPlayer");
                         }
                     }
                 });
@@ -3996,7 +3996,7 @@ impl eframe::App for App {
             if self.player.state() == PlayerState::Idle {
                 ui.centered_and_justified(|ui| {
                     ui.vertical_centered(|ui| {
-                        ui.label(egui::RichText::new("🎬 KPlayer").heading());
+                        ui.label(egui::RichText::new("🎬 RMPlayer").heading());
                         ui.label("Lecteur vidéo professionnel Linux");
                         ui.label("");
                         ui.label("💡 Glissez-déposez un fichier vidéo ici");
@@ -4154,7 +4154,7 @@ impl eframe::App for App {
             }
         });
         
-        // Barre de contrôles en bas (comme PotPlayer)
+        // Barre de contrôles en bas
         if self.config.interface.show_progress_bar
             && !self.ui_hidden
             && (!self.fullscreen || self.config.interface.controls_always_visible)
@@ -4842,7 +4842,7 @@ impl eframe::App for App {
                 |ui, _detachee| {
                     ui.label(
                         egui::RichText::new(
-                            "Les raccourcis sont calqués sur ceux de PotPlayer. \
+                            "Tous les raccourcis sont personnalisables (Préférences). \
                              F1 ferme cette fenêtre.",
                         )
                         .weak(),
@@ -4903,11 +4903,11 @@ impl eframe::App for App {
             let mut ouvert = self.show_about;
             let detachee = self.est_detachee("apropos");
             let retour = crate::fenetre::afficher(
-                ctx, "apropos", "À propos de KPlayer", detachee, &mut ouvert, [380.0, 380.0], true,
-                egui::Window::new("ℹ À propos de KPlayer").collapsible(false).resizable(false),
+                ctx, "apropos", "À propos de RMPlayer", detachee, &mut ouvert, [380.0, 380.0], true,
+                egui::Window::new("ℹ À propos de RMPlayer").collapsible(false).resizable(false),
                 |ui, _detachee| {
                     ui.vertical_centered(|ui| {
-                        ui.label(egui::RichText::new("🎬 KPlayer").heading());
+                        ui.label(egui::RichText::new("🎬 RMPlayer").heading());
                         ui.label("Lecteur vidéo professionnel Linux");
                         ui.label("Version 0.1.0");
                         ui.label("");
@@ -4918,7 +4918,7 @@ impl eframe::App for App {
                             ui.label("• cpal — audio natif PipeWire/PulseAudio");
                         });
                         ui.label("");
-                        ui.label("© 2026 KPlayer — MIT License");
+                        ui.label("© 2026 RMPlayer — MIT License");
                     });
                 },
             );

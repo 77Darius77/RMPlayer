@@ -217,7 +217,7 @@ pub struct VideoSettings {
     /// Faire la **réduction d'échelle dans le GPU** quand le décodage est matériel.
     ///
     /// Mesuré (1080p affiché en 720p) : 10,9 ms/image → **7,1 ms/image** (cf.
-    /// `docs/OPTIMISATION-COMPARATIF.md`). Ne s'applique qu'aux cas où aucun filtre
+    /// `docs/OPTIMISATION.md`). Ne s'applique qu'aux cas où aucun filtre
     /// CPU n'est demandé, et retombe silencieusement sur l'ancien chemin si le
     /// pilote refuse l'échelle matérielle. Laisser à `true` : c'est un repli sûr.
     #[serde(default = "default_vrai")]
@@ -508,7 +508,7 @@ pub struct AudioSettings {
     /// Égaliseur actif (filtre `superequalizer`).
     #[serde(default)]
     pub eq_enabled: bool,
-    // ---- Traitement audio (équivalents des réglages PotPlayer) ----
+    // ---- Traitement audio ----
     /// Langue audio préférée (métadonnée `language` du conteneur : `fre`, `eng`…).
     /// Vide = prendre la première piste (comportement historique).
     #[serde(default)]
@@ -521,7 +521,7 @@ pub struct AudioSettings {
     #[serde(default)]
     pub remember_track: bool,
     /// Normaliseur de volume (filtre `dynaudnorm`) : égalise le niveau perçu entre
-    /// les scènes calmes et les passages forts. C'est le « Normalizer » de PotPlayer.
+    /// les scènes calmes et les passages forts.
     #[serde(default)]
     pub normalizer: bool,
     /// Mode nuit / compression de dynamique (`acompressor` + `alimiter`) : réduit
@@ -986,12 +986,11 @@ pub struct SubtitleSettings {
     #[serde(default = "default_vrai")]
     pub use_embedded: bool,
 
-    // ---- Apparence du texte (comme les réglages de style de PotPlayer/VLC) ----
+    // ---- Apparence du texte ----
     /// Couleur du texte, en hexadécimal RRGGBB.
     #[serde(default = "default_sub_color")]
     pub color: String,
-    /// Interlettre, en points ajoutés entre deux caractères (filtre typographique,
-    /// comme « Interlettre » de `Dialog(383)` de PotPlayer).
+    /// Interlettre, en points ajoutés entre deux caractères (filtre typographique).
     ///
     /// Négatif = resserré, positif = aéré. Utile pour une police large sur un
     /// écran étroit, ou pour un sous-titre de karaoké qu'on veut plus lisible.
@@ -1029,8 +1028,7 @@ pub struct SubtitleSettings {
     ///
     /// 50 % = centre (valeur par défaut, comportement d'avant) ; 20 % place le
     /// texte au cinquième gauche, 80 % au cinquième droit. Combinée à `align`,
-    /// elle permet de poser un sous-titre là où l'image laisse de la place — le
-    /// réglage que PotPlayer expose sous « Position hori. (%) ».
+    /// elle permet de poser un sous-titre là où l'image laisse de la place.
     #[serde(default = "default_sub_position_h")]
     pub position_h_percent: f32,
     /// **Famille de police** des sous-titres (nom tel que le connaît fontconfig,
@@ -1155,7 +1153,7 @@ impl SubtitleSettings {
 #[serde(default)]
 pub struct InterfaceSettings {
     pub dark_theme: bool,
-    /// Nom d'un thème externe (`~/.config/kplayer/themes/<nom>.json`) ; vide = thème intégré.
+    /// Nom d'un thème externe (`~/.config/rmplayer/themes/<nom>.json`) ; vide = thème intégré.
     #[serde(default)]
     pub theme: String,
     /// Fenêtres flottantes ouvertes comme vraies fenêtres système plutôt que dans le lecteur
@@ -1363,7 +1361,7 @@ fn default_screenshots_dir() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PlaybackSettings {
-    /// Reprendre la lecture à la position quittée (`~/.cache/kplayer/positions.json`)
+    /// Reprendre la lecture à la position quittée (`~/.cache/rmplayer/positions.json`)
     pub resume: bool,
     /// **Pré-cache des flux réseau**, en millisecondes (0 = désactivé).
     ///
@@ -1954,7 +1952,7 @@ pub fn appliquer_regle(
 
 /// Fichier des profils (à côté de `config.json`).
 pub fn profiles_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("kplayer").join("profiles.json"))
+    dirs::config_dir().map(|d| d.join("rmplayer").join("profiles.json"))
 }
 
 /// Charge les profils enregistrés. Un fichier absent ou illisible donne une liste
@@ -2003,13 +2001,13 @@ pub fn save_profiles(liste: &[Profil]) -> Result<(), String> {
     Ok(())
 }
 
-/// Chemin du fichier de configuration (`$XDG_CONFIG_HOME/kplayer/config.json`).
+/// Chemin du fichier de configuration (`$XDG_CONFIG_HOME/rmplayer/config.json`).
 ///
 /// Sert à nommer le socket de l'instance unique (`instance.rs`) : deux sessions
 /// isolées — les bancs d'essai posent `XDG_CONFIG_HOME` — ne doivent pas se
 /// partager l'instance.
 pub fn config_path() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("kplayer").join("config.json"))
+    dirs::config_dir().map(|d| d.join("rmplayer").join("config.json"))
 }
 
 /// Sections reconnues au premier niveau d'un fichier de configuration.
@@ -2017,7 +2015,7 @@ const SECTIONS_CONFIG: &[&str] = &[
     "video", "raccourcis", "audio", "subtitles", "interface", "playback", "playlist", "regles",
 ];
 
-/// Vérifie qu'un texte est bien une configuration de KPlayer, sans rien écrire.
+/// Vérifie qu'un texte est bien une configuration de RMPlayer, sans rien écrire.
 ///
 /// Un `{}` ou un JSON étranger se relirait « avec succès » (tous les champs ont une valeur
 /// par défaut) et **remettrait tous les réglages à zéro sans rien dire** : on exige donc au
@@ -2030,7 +2028,7 @@ pub fn valider_config(texte: &str) -> Result<Config, String> {
     };
     if !SECTIONS_CONFIG.iter().any(|s| objet.contains_key(*s)) {
         return Err(format!(
-            "aucune section de KPlayer reconnue (attendu : {})",
+            "aucune section de RMPlayer reconnue (attendu : {})",
             SECTIONS_CONFIG.join(", ")
         ));
     }
@@ -2072,7 +2070,7 @@ impl Config {
     /// Charger la configuration depuis le fichier utilisateur
     pub fn load() -> Result<Self, String> {
         if let Some(config_dir) = dirs::config_dir() {
-            let config_path = config_dir.join("kplayer").join("config.json");
+            let config_path = config_dir.join("rmplayer").join("config.json");
             if config_path.exists() {
                 match std::fs::read_to_string(&config_path) {
                     Ok(content) => {
@@ -2131,11 +2129,11 @@ impl Config {
     /// Sauvegarder la configuration dans le fichier utilisateur
     pub fn save(&self) -> Result<(), String> {
         if let Some(config_dir) = dirs::config_dir() {
-            let kplayer_dir = config_dir.join("kplayer");
-            std::fs::create_dir_all(&kplayer_dir)
+            let rmplayer_dir = config_dir.join("rmplayer");
+            std::fs::create_dir_all(&rmplayer_dir)
                 .map_err(|e| format!("Erreur création répertoire config: {}", e))?;
 
-            let config_path = kplayer_dir.join("config.json");
+            let config_path = rmplayer_dir.join("config.json");
             let content = serde_json::to_string_pretty(self)
                 .map_err(|e| format!("Erreur sérialisation config: {}", e))?;
 

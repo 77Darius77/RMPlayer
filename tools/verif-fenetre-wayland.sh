@@ -3,13 +3,13 @@
 #
 # **Pourquoi un banc séparé.** Depuis Plasma 6.8, la session X11 n'existe plus. Or
 # Wayland ne donne pas la position d'une fenêtre à son client et lui interdit de se
-# placer : ce que KPlayer peut tenir change (la taille, oui ; la position, seulement
+# placer : ce que RMPlayer peut tenir change (la taille, oui ; la position, seulement
 # par une règle de fenêtre KWin). Le banc X11 (`verif-fenetre.sh`, sous Xvfb) ne
 # prouve donc rien de ce qui se passe sur le bureau réel.
 #
 # **Comment on mesure sans client de contrôle Wayland.** On charge un petit script
 # dans KWin par D-Bus ; il lit `frameGeometry`/`clientGeometry` de la fenêtre
-# « kplayer » et l'écrit dans le journal (un marqueur unique par mesure, pour ne
+# « rmplayer » et l'écrit dans le journal (un marqueur unique par mesure, pour ne
 # jamais lire une valeur d'une exécution précédente — piège rencontré : `tail -1`
 # sur 30 s de journal rendait la mesure du lancement d'avant).
 #
@@ -29,7 +29,7 @@
 #   Sortie 3 si aucun compositeur Wayland n'est joignable (banc IGNORÉ, non compté).
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 BASE=/tmp/kp-fenetre-wayland
 # Le fichier de règles est celui que **KWin** lit : jamais celui de l'état isolé du
@@ -67,9 +67,9 @@ MODE=$(timeout 15 qdbus6 org.kde.KWin /KWin org.kde.KWin.supportInformation 2>/d
 echo "  session : $WAYLAND_DISPLAY, KWin en mode ${MODE:-?}"
 
 # --- État isolé, et sauvegarde de la configuration KWin ---------------------
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 if [ -f "$REGLES" ]; then
     cp -a "$REGLES" "$BASE/kwinrulesrc.sauve"
 fi
@@ -93,10 +93,10 @@ fi
 
 # --- Outils de mesure -------------------------------------------------------
 SONDE_N=0
-# geometrie : imprime « <jeton> x y largeur hauteur » de la fenêtre kplayer, ou rien.
+# geometrie : imprime « <jeton> x y largeur hauteur » de la fenêtre rmplayer, ou rien.
 # La fenêtre est ciblée par le **PID du processus lancé par ce banc** : cibler la
-# classe « kplayer » toucherait aussi une fenêtre ouverte par l'utilisateur (et
-# `pkill -x kplayer` fermerait son lecteur).
+# classe « rmplayer » toucherait aussi une fenêtre ouverte par l'utilisateur (et
+# `pkill -x rmplayer` fermerait son lecteur).
 geometrie() {
     local pid="${1:?pid}"
     SONDE_N=$((SONDE_N + 1))
@@ -177,7 +177,7 @@ JS
 echo
 echo "=== 1. Sans règle KWin : taille enregistrée, position impossible ==="
 if ! lance sans-regle; then
-    ko "fenêtre KPlayer introuvable sous Wayland"
+    ko "fenêtre RMPlayer introuvable sous Wayland"
 else
     read -r X Y L H <<<"$(geometrie "$K_PID")"
     echo "  fenêtre : ${L}×${H} en ${X},${Y} (placement par le compositeur)"
@@ -203,7 +203,7 @@ fi
 echo
 echo "=== 2. Règle KWin installée : la fenêtre se place où on le demande ==="
 env -u XDG_CONFIG_HOME tools/regle-fenetre-kwin.sh --position 300,220 >/dev/null 2>&1
-if ! grep -q "^\[kplayer-geometrie\]" "$REGLES"; then
+if ! grep -q "^\[rmplayer-geometrie\]" "$REGLES"; then
     ko "la règle n'a pas été écrite dans $REGLES"
 else
     ok "règle écrite dans kwinrulesrc"
@@ -263,13 +263,13 @@ else
     echo
     echo "=== 5. Retrait de la règle : elle quitte le fichier et l'ordre ==="
     env -u XDG_CONFIG_HOME tools/regle-fenetre-kwin.sh --retirer >/dev/null 2>&1
-    if grep -q "^\[kplayer-geometrie\]" "$REGLES" 2>/dev/null; then
+    if grep -q "^\[rmplayer-geometrie\]" "$REGLES" 2>/dev/null; then
         ko "la règle est toujours dans le fichier"
     else
         ok "règle retirée du fichier"
     fi
-    if grep -q "kplayer-geometrie" "$REGLES" 2>/dev/null; then
-        ko "kplayer-geometrie figure encore dans Order (règle évaluée à vide)"
+    if grep -q "rmplayer-geometrie" "$REGLES" 2>/dev/null; then
+        ko "rmplayer-geometrie figure encore dans Order (règle évaluée à vide)"
     else
         ok "retirée aussi de l'ordre d'évaluation"
     fi

@@ -17,7 +17,7 @@
 # Usage : tools/audit-menus.sh [écran]
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 DISP="${1:-:92}"
 BASE=/tmp/kp-menus
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
@@ -25,10 +25,10 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export DISPLAY="$DISP"
 export XDG_CONFIG_HOME="$BASE/conf"
 export XDG_CACHE_HOME="$BASE/cache"
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 mkdir -p "$BASE"
 rm -rf "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
-mkdir -p "$XDG_CONFIG_HOME/kplayer" "$XDG_CACHE_HOME"
+mkdir -p "$XDG_CONFIG_HOME/rmplayer" "$XDG_CACHE_HOME"
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -70,7 +70,7 @@ sleep 2
 
 # --- Lancement ---------------------------------------------------------------
 rm -f "$BASE/fixe.json"
-python3 - "$BASE/conf/kplayer/config.json" <<'EOF'
+python3 - "$BASE/conf/rmplayer/config.json" <<'EOF'
 import json, sys, os
 os.makedirs(os.path.dirname(sys.argv[1]), exist_ok=True)
 json.dump({
@@ -83,7 +83,7 @@ EOF
 "$KP" "$BASE/media.mkv" "$SECONDE" >"$BASE/journal.log" 2>&1 &
 KPID=$!
 sleep 6
-WID=$(xdotool search --pid "$KPID" --name KPlayer 2>/dev/null | head -1)
+WID=$(xdotool search --pid "$KPID" --name RMPlayer 2>/dev/null | head -1)
 [ -z "$WID" ] && { echo "fenêtre introuvable"; exit 1; }
 xdotool windowmove "$WID" 0 0
 xdotool windowsize "$WID" 1280 720
@@ -290,7 +290,7 @@ clic() {
     # des menus parfaitement fonctionnels (constaté : « À propos » masquait tout).
     fermer_menus
     if [ "${nouvelles:-0}" -ge 1 ]; then
-        ok "$description (journal : $(propre | grep -vE "menu-item|menu-titre" | grep -E "$motif" | tail -1 | sed 's/^.*kplayer[^:]*: //' | cut -c1-90))"
+        ok "$description (journal : $(propre | grep -vE "menu-item|menu-titre" | grep -E "$motif" | tail -1 | sed 's/^.*rmplayer[^:]*: //' | cut -c1-90))"
     else
         # Deuxième tentative : le premier clic peut tomber pendant un repaint ou
         # sur une infobulle. On ne conclut à l'échec qu'après deux essais.
@@ -327,13 +327,13 @@ verifie_menu 5 "Préférences" 3
 
 echo "== Effet réel de chaque entrée =="
 # Fichier
-clic 0 "✕ Fermer" "KPlayer quitté" "Fichier ▸ Fermer ferme le lecteur"
+clic 0 "✕ Fermer" "RMPlayer quitté" "Fichier ▸ Fermer ferme le lecteur"
 # (le lecteur est fermé : on le relance pour la suite)
 sleep 1
 "$KP" "$BASE/media.mkv" "$SECONDE" >"$BASE/journal.log" 2>&1 &
 KPID=$!
 sleep 5
-WID=$(xdotool search --pid "$KPID" --name KPlayer 2>/dev/null | head -1)
+WID=$(xdotool search --pid "$KPID" --name RMPlayer 2>/dev/null | head -1)
 xdotool windowactivate --sync "$WID" 2>/dev/null || true
 xdotool mousemove 640 400; xdotool windowfocus --sync "$WID" 2>/dev/null || true
 sleep 1

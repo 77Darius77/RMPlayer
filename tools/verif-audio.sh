@@ -13,10 +13,10 @@
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 BASE=/tmp/kp-audio
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -86,8 +86,8 @@ ANALYSE="python3 tools/analyse-audio.py"
 config_essai() {  # config_essai <nom> '<json champs audio>'
     local nom="$1" audio_json="$2"
     local dossier="$BASE/$nom"
-    rm -rf "$dossier"; mkdir -p "$dossier/conf/kplayer" "$dossier/cache"
-    python3 - "$dossier/conf/kplayer/config.json" "$audio_json" <<'PY'
+    rm -rf "$dossier"; mkdir -p "$dossier/conf/rmplayer" "$dossier/cache"
+    python3 - "$dossier/conf/rmplayer/config.json" "$audio_json" <<'PY'
 import json, sys
 audio = json.loads(sys.argv[2])
 cfg = {

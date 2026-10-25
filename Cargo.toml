@@ -1,15 +1,15 @@
 [package]
-name = "kplayer"
+name = "rmplayer"
 version = "0.1.0"
 edition = "2021"
-description = "Lecteur vidéo professionnel Linux — qualité PotPlayer, 100% natif Rust"
+description = "Lecteur vidéo professionnel Linux — 100% natif Rust (RMPlayer : Rust Media Player)"
 license = "MIT"
 
 [dependencies]
 # FFmpeg FFI bindings (compatible FFmpeg 7.x du système)
 ffmpeg-sys-next = { version = "7.1", features = ["avcodec", "avformat", "avfilter", "swscale", "swresample"] }
 
-# UI ImGUI (léger comme PotPlayer)
+# UI ImGUI (légère)
 egui = "0.33"
 eframe = { version = "0.33", features = ["default_fonts", "wayland", "x11"] }
 egui_extras = { version = "0.33", features = ["image"] }

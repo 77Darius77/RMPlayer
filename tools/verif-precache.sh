@@ -18,11 +18,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-precache
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=debug
+export RUST_LOG=rmplayer=debug
 PORT=8911
 PANNE_DEBUT=9
 PANNE_DUREE=3
@@ -31,7 +31,7 @@ PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
 ko() { echo "  ✗ ÉCHEC : $1"; FAIL=$((FAIL+1)); }
 
-rm -rf "$BASE"; mkdir -p "$BASE/hls" "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/hls" "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
 
 # ---------------------------------------------------------------- contenu de test
@@ -94,7 +94,7 @@ PY
 
 # ------------------------------------------------------------- configuration
 regler() {  # regler <precache_ms>
-    python3 - "$BASE/conf/kplayer/config.json" "$1" <<'PY'
+    python3 - "$BASE/conf/rmplayer/config.json" "$1" <<'PY'
 import json, sys
 json.dump({
     "video": {"hardware_decoding": False, "scaling_method": "Lanczos"},
@@ -196,7 +196,7 @@ from datetime import datetime
 def position(path):
     ev = []
     for l in open(path, encoding='utf-8', errors='replace'):
-        m = re.search(r'(\S+Z)\s+DEBUG kplayer::player: Horloge: audio (\d+) ms', l)
+        m = re.search(r'(\S+Z)\s+DEBUG rmplayer::player: Horloge: audio (\d+) ms', l)
         if m:
             ev.append((datetime.fromisoformat(m.group(1).rstrip('Z')), int(m.group(2))))
     return ev
@@ -244,7 +244,7 @@ import re, sys
 from datetime import datetime
 ev = []
 for l in open(sys.argv[1], encoding='utf-8', errors='replace'):
-    m = re.search(r'(\S+Z)\s+DEBUG kplayer::player: Horloge: audio (\d+) ms', l)
+    m = re.search(r'(\S+Z)\s+DEBUG rmplayer::player: Horloge: audio (\d+) ms', l)
     if m:
         ev.append((datetime.fromisoformat(m.group(1).rstrip('Z')), int(m.group(2))))
 recul = max((ev[i-1][1] - ev[i][1] for i in range(1, len(ev))), default=0)
@@ -311,5 +311,5 @@ fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

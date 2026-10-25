@@ -21,7 +21,7 @@
 # Usage : tools/bench-optimisation.sh [écran]
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 BASE=/tmp/kp-optim
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
@@ -32,7 +32,7 @@ PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
 ko() { echo "  ✗ ÉCHEC : $1"; FAIL=$((FAIL+1)); }
 
-mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 
 # --- Médias de test (créés une fois) ------------------------------------------
 if [ ! -s "$BASE/h264_1080p.mp4" ]; then
@@ -54,7 +54,7 @@ if [ ! -s "$BASE/av1_720p.mkv" ]; then
 fi
 
 config() {  # config <gpu_scaling> <deinterlace> <materiel>
-    python3 - "$BASE/conf/kplayer/config.json" "$1" "$2" "$3" <<'PY'
+    python3 - "$BASE/conf/rmplayer/config.json" "$1" "$2" "$3" <<'PY'
 import json, sys
 json.dump({
     "video": {

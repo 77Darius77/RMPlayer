@@ -67,7 +67,7 @@ Contreparties assumées, vérifiées : le filtre du pilote est plus doux que Lan
 | **Association de fichiers** (s.33) | « Ouvrir avec », menu, icône ; **instance unique** (le fichier arrive dans la fenêtre ouverte) ; `--par-defaut` sur demande | `verif-association` 38/38 |
 | **Réglages** (s.34) | teinte, niveaux, adoucir (vidéo) ; interlettre et marges des sous-titres ; presets Cinéma/Podcast et équilibre de réverbération ; pause selon le focus | `verif-filtres` 20/20, `verif-soustitres` 7/7, `verif-audio` 34/34, `verif-focus` 6/6 |
 | **HDR** (s.35) | conversion tonale HDR→SDR (libplacebo/Vulkan ; **repli CPU borné** si Vulkan est refusé — ≤ 1080p30 converti par le CPU, au-delà image non convertie avec avis à l'écran, `docs/HDR.md`), tramage 10→8 bits, débanding GPU ; détecte PQ/HLG/BT.2020 **et la capacité de chaque écran par EDID** (passthrough branché mais impossible : fenêtre 8 bits — `docs/HDR.md`) | `verif-hdr` 29/29 |
-| **MPRIS** (s.34) | touches média et widget du bureau : `org.mpris.MediaPlayer2.kplayer`, état publié, Volume/Shuffle/LoopStatus/Rate réglables, commandes exécutées par l'interface (réveil même en pause) | `verif-mpris` 27/27 (module seul) + 8 contrôles d'intégration |
+| **MPRIS** (s.34) | touches média et widget du bureau : `org.mpris.MediaPlayer2.rmplayer`, état publié, Volume/Shuffle/LoopStatus/Rate réglables, commandes exécutées par l'interface (réveil même en pause) | `verif-mpris` 27/27 (module seul) + 8 contrôles d'intégration |
 | **Vignettes** (s.34) | survoler la barre de progression montre l'image de l'instant pointé (décodeur autonome, fil de travail, 320×180, 4 à 175 ms) | `verif-vignettes` 14/14 + 3 contrôles d'intégration |
 | **Playlist** (s.34) | lecture **aléatoire** (chaque élément une fois, `Ctrl+A`, 🔀, mémorisé) et **glisser-déposer** avec repère, ordre enregistré ; volet **borné** (300 px, max 420), lignes à interaction unique (clic = lire, glisser = déplacer), ✕ toujours visible, texte tronqué | `verif-playlist` 18/18 |
 
@@ -82,10 +82,9 @@ Réglages : `interface.window_pos/size/maximized`, `playback.shuffle`. Outils :
 MPRIS), la finition des réglages (⑥→⑨) **et le HDR** (⑩, session 35 : conversion tonale,
 tramage 10→8, débanding GPU). Il ne reste que l'**affichage sans rapatriement** (dmabuf/EGL),
 qui n'a de sens qu'avec une surface capable de HDR — la fenêtre est aujourd'hui en RGBA 8 bits
-SDR, et c'est dit dans `src/hdr.rs`. Voir **§11 de `docs/POTPLAYER-VERS-KPLAYER.md`**.
+SDR, et c'est dit dans `src/hdr.rs`. Voir `docs/HDR.md`.
 
-**Pour de nouvelles fonctions « à la PotPlayer »** : le reste à faire réel (vérifié dans le
-code, la matrice de `POTPLAYER-VERS-KPLAYER.md` étant périmée) est dans
+**Pour de nouvelles fonctions** : le reste à faire réel (vérifié dans le code) est dans
 **`docs/PROCHAINES-FONCTIONS.md`**, et la façon de les ajouter sans produire un faux « fait »
 dans **`docs/AJOUTER-UNE-FONCTION.md`**. Premiers candidats : fichiers récents, nombre de
 boucles A-B, export/import de la configuration, puis marges haut/bas et interligne des
@@ -113,10 +112,9 @@ seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 | Question | Fichier |
 |---|---|
 | Ce qui marche / ce qui reste, par domaine | `docs/ETAT-DU-PROJET.md` |
-| **Quelle fonction ajouter ensuite** (ce qui manque vraiment vs PotPlayer) | `docs/PROCHAINES-FONCTIONS.md` |
+| **Quelle fonction ajouter ensuite** (ce qui manque vraiment) | `docs/PROCHAINES-FONCTIONS.md` |
 | **Comment ajouter une fonction** (recette, pièges, bancs) | `docs/AJOUTER-UNE-FONCTION.md` |
-| Un réglage précis face à PotPlayer (colonnes de statut **périmées**, voir ci-dessus) | `docs/POTPLAYER-VERS-KPLAYER.md` (chercher `Dialog(N)`) |
-| Chiffres et plan d'optimisation | `docs/OPTIMISATION-COMPARATIF.md` |
+| Chiffres et plan d'optimisation | `docs/OPTIMISATION.md` |
 | API, structures, modules | `docs/ETAT-TECHNIQUE.md` |
 | Fonctionnalités et limites assumées | `docs/INVENTAIRE-FONCTIONNALITES.md` |
 | Sessions 2 à 31 (détail historique) | `docs/AVANCEMENT-ARCHIVE.md` |
@@ -138,7 +136,7 @@ tools/bench-optimisation.sh             # re-mesure les gains GPU et l'AV1
 ```
 
 Puis **committer** (`git add -A && git commit`, et `git tag session<N>` en fin de session), et
-éventuellement **archiver** : `tar czf sauvegardes/kplayer-<date>-session<N>.tar.gz src docs tools
+éventuellement **archiver** : `tar czf sauvegardes/rmplayer-<date>-session<N>.tar.gz src docs tools
 assets icon.png Cargo.toml Cargo.lock .cargo run.sh README.md .gitignore`
 (`assets/` et `icon.png` servent à `installer-association.sh` : les oublier donne une archive qui ne reconstruit pas l'association de fichiers — omission constatée à la session 36), et **vérifier** par extraction
 comparée (`diff -r`), pas seulement `gzip -t`.

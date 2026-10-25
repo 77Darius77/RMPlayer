@@ -24,11 +24,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-fenetre
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -42,18 +42,18 @@ done
 
 # Instance résiduelle : elle capterait la recherche de fenêtre (et le test
 # mesurerait la fenêtre d'une session précédente).
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 sleep 1
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 JOURNAL="$BASE/journal.txt"
 
 nettoyer() {
     [ -n "${K_PID:-}" ] && kill "$K_PID" 2>/dev/null
     [ -n "${XPID:-}" ] && kill "$XPID" 2>/dev/null
-    pkill -x kplayer 2>/dev/null || true
+    pkill -x rmplayer 2>/dev/null || true
 }
 trap nettoyer EXIT
 
@@ -73,7 +73,7 @@ lance() {
     "$KP" "$@" >>"$JOURNAL" 2>&1 &
     K_PID=$!
     for _ in $(seq 80); do
-        if xdotool search --pid "$K_PID" --name KPlayer >/dev/null 2>&1; then
+        if xdotool search --pid "$K_PID" --name RMPlayer >/dev/null 2>&1; then
             return 0
         fi
         sleep 0.25
@@ -86,7 +86,7 @@ arreter() {
     K_PID=""
     sleep 0.5
 }
-fenetre() { xdotool search --pid "$K_PID" --name KPlayer 2>/dev/null | tail -1; }
+fenetre() { xdotool search --pid "$K_PID" --name RMPlayer 2>/dev/null | tail -1; }
 # geom <id> : imprime « x y largeur hauteur » de la fenêtre.
 geom() {
     eval "$(xdotool getwindowgeometry --shell "$1")"

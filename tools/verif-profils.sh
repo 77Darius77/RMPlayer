@@ -11,17 +11,17 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-profils
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
 ko() { echo "  ✗ ÉCHEC : $1"; FAIL=$((FAIL+1)); }
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
 
 # Média de test : dégradé + texture, pour que netteté et luminosité se voient.
@@ -45,7 +45,7 @@ echo "=== 2. Écriture de deux profils et relecture ==="
 # Les profils sont écrits par l'application (interface) ; pour le banc d'essai, on les
 # écrit directement dans le fichier, puis on vérifie que le LECTEUR les relit — c'est
 # ce qui compte : le format doit être le sien.
-python3 - "$BASE/conf/kplayer/profiles.json" "$BASE/conf/kplayer/config.json" <<'PY'
+python3 - "$BASE/conf/rmplayer/profiles.json" "$BASE/conf/rmplayer/config.json" <<'PY'
 import json, sys
 
 # Configuration de base (réglages « neutres »).
@@ -108,7 +108,7 @@ echo
 echo "=== 4. Appliquer un profil change réellement l'image ==="
 config_actuelle() { python3 -c "
 import json
-c = json.load(open('$BASE/conf/kplayer/config.json'))
+c = json.load(open('$BASE/conf/rmplayer/config.json'))
 v = c['video']
 print(v.get('brightness', 0.0), v.get('contrast', 1.0), v.get('crop_top', 0),
       v.get('aspect', 'Auto'), v.get('sharpen', 0))
@@ -152,7 +152,7 @@ echo
 echo "=== 5. Le périphérique audio de la machine est préservé ==="
 # On met un périphérique factice dans la configuration, puis on applique un profil
 # qui, lui, n'en contient pas de particulier : la valeur doit survivre.
-python3 - "$BASE/conf/kplayer/config.json" <<'PY'
+python3 - "$BASE/conf/rmplayer/config.json" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))
 c["audio"]["device"] = "peripherique-de-la-machine"
@@ -161,7 +161,7 @@ PY
 $KP --profil "Net" --dump-audio /dev/null "$BASE/mire.mp4" > "$BASE/log_net.txt" 2>&1
 apres_dev=$(python3 -c "
 import json
-print(json.load(open('$BASE/conf/kplayer/config.json'))['audio']['device'])
+print(json.load(open('$BASE/conf/rmplayer/config.json'))['audio']['device'])
 ")
 echo "    périphérique après application : « $apres_dev »"
 if [ "$apres_dev" = "peripherique-de-la-machine" ]; then
@@ -174,7 +174,7 @@ echo
 echo "=== 6. Profil corrompu : le lecteur démarre quand même ==="
 # Un fichier de profils illisible ne doit jamais empêcher de lire un média : ce sont
 # des réglages de confort, pas une dépendance.
-echo '{"ceci": "n est pas une liste"}' > "$BASE/conf/kplayer/profiles.json"
+echo '{"ceci": "n est pas une liste"}' > "$BASE/conf/rmplayer/profiles.json"
 $KP --list-tracks "$BASE/mire.mp4" > "$BASE/log_corrompu.txt" 2>&1
 if grep -q "vidéo :" "$BASE/log_corrompu.txt"; then
     ok "un fichier de profils corrompu n'empêche pas la lecture"
@@ -191,7 +191,7 @@ fi
 
 echo
 echo "=== 7. Profils en double : dédoublonnés à la lecture ==="
-python3 - "$BASE/conf/kplayer/profiles.json" <<'PY'
+python3 - "$BASE/conf/rmplayer/profiles.json" <<'PY'
 import json, sys
 p = {"name": "Double", "description": "", "video": {"hardware_decoding": False},
      "audio": {}, "subtitles": {}}
@@ -211,7 +211,7 @@ echo "=== 8. Interface : la section « Profils » existe et s'ouvre ==="
 if DISPLAY=$DISP xdotool getdisplaygeometry >/dev/null 2>&1; then
     # Un profil est nécessaire pour que le bouton « Appliquer » existe : on en
     # installe un avant d'ouvrir l'interface.
-    python3 - "$BASE/conf/kplayer/profiles.json" <<'PY'
+    python3 - "$BASE/conf/rmplayer/profiles.json" <<'PY'
 import json, sys
 profil = {
     "name": "Essai", "description": "",
@@ -223,19 +223,19 @@ profil = {
 json.dump([profil], open(sys.argv[1], "w"), indent=2, ensure_ascii=False)
 PY
     # Configuration neutre, pour que l'application du profil ait un effet mesurable.
-    python3 - "$BASE/conf/kplayer/config.json" <<'PY'
+    python3 - "$BASE/conf/rmplayer/config.json" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))
 c["video"] = {"hardware_decoding": False, "scaling_method": "Lanczos"}
 c["audio"]["device"] = ""
 json.dump(c, open(sys.argv[1], "w"), indent=2)
 PY
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     DISPLAY=$DISP "$KP" --fullscreen "$BASE/mire.mp4" >"$BASE/ui.log" 2>&1 &
     kpid=$!
     sleep 5
-    wid=$(DISPLAY=$DISP xdotool search --pid "$kpid" --name KPlayer 2>/dev/null | head -1)
-    [ -z "$wid" ] && wid=$(DISPLAY=$DISP xdotool search --name KPlayer 2>/dev/null | head -1)
+    wid=$(DISPLAY=$DISP xdotool search --pid "$kpid" --name RMPlayer 2>/dev/null | head -1)
+    [ -z "$wid" ] && wid=$(DISPLAY=$DISP xdotool search --name RMPlayer 2>/dev/null | head -1)
     DISPLAY=$DISP xdotool windowactivate --sync "$wid" 2>/dev/null \
         || DISPLAY=$DISP xdotool windowfocus --sync "$wid" 2>/dev/null || true
     DISPLAY=$DISP xdotool mousemove 640 360; sleep 0.3
@@ -285,7 +285,7 @@ PY
         # Et la configuration doit avoir été écrite avec les valeurs du profil.
         enregistre=$(python3 -c "
 import json
-v = json.load(open('$BASE/conf/kplayer/config.json'))['video']
+v = json.load(open('$BASE/conf/rmplayer/config.json'))['video']
 print(round(v.get('crop_top', 0)), v.get('aspect', 'Auto'))
 ")
         echo "    configuration après application : recadrage haut / aspect = $enregistre"
@@ -330,5 +330,5 @@ fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

@@ -126,13 +126,13 @@ fn sauvegarde_configuration(app: &mut App, ui: &mut egui::Ui) {
         ui,
         "Exporter écrit un fichier .json qu'on peut copier sur une autre machine ; importer \
          remplace tous les réglages par ceux du fichier (refusé sans rien changer s'il n'est \
-         pas une configuration de KPlayer).",
+         pas une configuration de RMPlayer).",
     );
     ui.horizontal(|ui| {
         if ui.button("⬆ Exporter la configuration…").clicked() {
             if let Some(chemin) = rfd::FileDialog::new()
-                .set_file_name("kplayer-configuration.json")
-                .add_filter("Configuration KPlayer", &["json"])
+                .set_file_name("rmplayer-configuration.json")
+                .add_filter("Configuration RMPlayer", &["json"])
                 .save_file()
             {
                 match crate::config::exporter_config(&app.config, &chemin) {
@@ -146,7 +146,7 @@ fn sauvegarde_configuration(app: &mut App, ui: &mut egui::Ui) {
         }
         if ui.button("⬇ Importer une configuration…").clicked() {
             if let Some(chemin) = rfd::FileDialog::new()
-                .add_filter("Configuration KPlayer", &["json"])
+                .add_filter("Configuration RMPlayer", &["json"])
                 .pick_file()
             {
                 app.importer_configuration(&chemin);
@@ -718,8 +718,8 @@ fn dessiner_profils(app: &mut App, ui: &mut egui::Ui) {
         if let Some(i) = a_exporter {
             let profil = profils[i].clone();
             if let Some(chemin) = rfd::FileDialog::new()
-                .set_file_name(format!("kplayer-{}.json", profil.name))
-                .add_filter("Profil KPlayer", &["json"])
+                .set_file_name(format!("rmplayer-{}.json", profil.name))
+                .add_filter("Profil RMPlayer", &["json"])
                 .save_file()
             {
                 let contenu = serde_json::to_string_pretty(&profil).unwrap_or_default();
@@ -875,7 +875,7 @@ fn dessiner_profils(app: &mut App, ui: &mut egui::Ui) {
     sous_section(ui, "Importer un profil", |ui| {
         if ui.button("📂 Choisir un fichier .json…").clicked() {
             if let Some(chemin) = rfd::FileDialog::new()
-                .add_filter("Profil KPlayer", &["json"])
+                .add_filter("Profil RMPlayer", &["json"])
                 .pick_file()
             {
                 match std::fs::read_to_string(&chemin)
@@ -905,7 +905,7 @@ fn dessiner_profils(app: &mut App, ui: &mut egui::Ui) {
                 }
             }
         }
-        aide(ui, "Un fichier exporté depuis KPlayer (JSON). Le nom du fichier est libre.");
+        aide(ui, "Un fichier exporté depuis RMPlayer (JSON). Le nom du fichier est libre.");
     });
 
     sous_section(ui, "Sauvegarde de toute la configuration", |ui| {
@@ -921,7 +921,7 @@ fn dessiner_interface(app: &mut App, ui: &mut egui::Ui) {
         {
             let _ = app.config.save();
         }
-        // Thème externe : un fichier JSON par thème dans ~/.config/kplayer/themes/.
+        // Thème externe : un fichier JSON par thème dans ~/.config/rmplayer/themes/.
         let themes = crate::theme::lister();
         let mut choisi = app.config.interface.theme.clone();
         ligne(ui, "grille_theme_externe", "Thème externe", |ui| {
@@ -954,7 +954,7 @@ fn dessiner_interface(app: &mut App, ui: &mut egui::Ui) {
         aide(
             ui,
             "Un thème est un fichier .json (base dark/light, couleurs fond, zone, texte, accent en RRGGBB) \
-             dans ~/.config/kplayer/themes/. Un thème illisible est refusé avec la raison.",
+             dans ~/.config/rmplayer/themes/. Un thème illisible est refusé avec la raison.",
         );
         if ui
             .checkbox(
@@ -2279,7 +2279,7 @@ fn dessiner_audio(app: &mut App, ui: &mut egui::Ui) {
     });
 
 
-    // --- Traitement audio (équivalents des réglages PotPlayer) ---
+    // --- Traitement audio ---
     sous_section(ui, "Traitement", |ui| {
         let mut change = false;
 
@@ -2597,8 +2597,7 @@ fn dessiner_sous_titres(app: &mut App, ui: &mut egui::Ui) {
             }
         });
 
-        // --- Famille de police : la seule chose qui manquait encore par rapport à
-        // PotPlayer (« Sous-titres › Style police » : Police, Alphabet, Interlettre).
+        // --- Famille de police (Police, Alphabet, Interlettre).
         // Le nom est résolu par fontconfig au moment où il change, pas à chaque image.
         let mut famille = app.config.subtitles.font_family.clone();
         ligne(ui, "grille_police_subs", "Police", |ui| {
@@ -2768,8 +2767,7 @@ fn dessiner_sous_titres(app: &mut App, ui: &mut egui::Ui) {
             }
         });
 
-        // Interlettre et marges latérales (session 34) : les deux réglages de
-        // « Dialog(383) » de PotPlayer qui manquaient encore à cette section.
+        // Interlettre et marges latérales (session 34).
         let mut interlettre = app.config.subtitles.letter_spacing;
         ligne(ui, "grille_interlettre", "Interlettre", |ui| {
             if ui
@@ -3040,8 +3038,8 @@ fn dessiner_lecture(app: &mut App, ui: &mut egui::Ui) {
     sous_section(ui, "Système", |ui| {
         let mut auto = crate::systeme::autostart_actif();
         if ui
-            .checkbox(&mut auto, "Lancer KPlayer à l'ouverture de session")
-            .on_hover_text("Écrit (ou retire) ~/.config/autostart/kplayer.desktop")
+            .checkbox(&mut auto, "Lancer RMPlayer à l'ouverture de session")
+            .on_hover_text("Écrit (ou retire) ~/.config/autostart/rmplayer.desktop")
             .changed()
         {
             match crate::systeme::regler_autostart(auto) {

@@ -16,7 +16,7 @@ LOG=/tmp/audit-prefs.log
 ETAT=/tmp/audit-prefs-etat
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -24,8 +24,8 @@ ko() { echo "  ✗ ÉCHEC : $1"; FAIL=$((FAIL+1)); }
 nettoyer() { sed 's/\x1b\[[0-9;]*m//g' "$LOG"; }
 
 # --- État isolé : l'audit ne doit pas dépendre de la configuration de l'utilisateur ---
-rm -rf "$ETAT"; mkdir -p "$ETAT/conf/kplayer" "$ETAT/cache"
-python3 - "$ETAT/conf/kplayer/config.json" <<'PY'
+rm -rf "$ETAT"; mkdir -p "$ETAT/conf/rmplayer" "$ETAT/cache"
+python3 - "$ETAT/conf/rmplayer/config.json" <<'PY'
 import json, sys
 json.dump({
     "video": {"hardware_decoding": True, "scaling_method": "Lanczos", "deband": False,
@@ -46,12 +46,12 @@ json.dump({
 PY
 export XDG_CONFIG_HOME="$ETAT/conf" XDG_CACHE_HOME="$ETAT/cache"
 
-pkill -x kplayer 2>/dev/null; sleep 1
-DISPLAY=$DISP ./target/release/kplayer /media/blaise/LINUX_DATA/test-60s.mp4 >"$LOG" 2>&1 &
+pkill -x rmplayer 2>/dev/null; sleep 1
+DISPLAY=$DISP ./target/release/rmplayer /media/blaise/LINUX_DATA/test-60s.mp4 >"$LOG" 2>&1 &
 KPID=$!
 sleep 6
-WID=$(DISPLAY=$DISP xdotool search --pid "$KPID" --name KPlayer 2>/dev/null | head -1)
-[ -z "$WID" ] && WID=$(DISPLAY=$DISP xdotool search --name KPlayer | head -1)
+WID=$(DISPLAY=$DISP xdotool search --pid "$KPID" --name RMPlayer 2>/dev/null | head -1)
+[ -z "$WID" ] && WID=$(DISPLAY=$DISP xdotool search --name RMPlayer | head -1)
 if [ -z "$WID" ]; then echo "fenêtre introuvable"; kill "$KPID" 2>/dev/null; exit 1; fi
 eval "$(DISPLAY=$DISP xdotool getwindowgeometry --shell "$WID")"
 APP_W=$WIDTH; APP_H=$HEIGHT
@@ -325,5 +325,5 @@ fi
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
 kill "$KPID" 2>/dev/null || true
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

@@ -1,4 +1,4 @@
-# Optimisation — comparatif mesuré KPlayer / PotPlayer
+# Optimisation — mesures et plan
 
 Établi le 2026-10-18 (session 31). **Toutes les valeurs de ce document sont mesurées** sur
 cette machine, avec les binaires installés ; aucune n'est reprise d'une documentation.
@@ -10,15 +10,10 @@ La commande ou l'outil qui produit chaque chiffre est indiqué.
 
 | Élément | Valeur vérifiée |
 |---|---|
-| PotPlayer | `wine-test-pot/drive_c/Program Files/DAUM/PotPlayer/`, version **v260819** |
-| Moteur de PotPlayer | `ffcodec64.dll` (37 565 440 octets) → **Lavc63.8.101 / Lavf63.6.100** (ère FFmpeg 8.x) |
-| Décodeurs matériels de PotPlayer | chaînes présentes dans `ffcodec64.dll` : `DXVA` ×30, `d3d11va` ×23, `cuvid` ×101, `qsv` ×49, AMF + repli Vulkan |
-| Bibliothèques de PotPlayer | `libdav1d` (décodeur AV1 logiciel), `libplacebo` — présentes dans `ffcodec64.dll` |
 | Notre FFmpeg | `/opt/ffmpeg-7.1` → **7.1.3**, `Lavc61.19.101` / `Lavf61.7.100` |
 | Notre configuration FFmpeg | `--enable-gpl --enable-nonfree --enable-shared --disable-static --enable-pic` — **aucune bibliothèque externe** |
 | Nos accélérations | `-hwaccels` → **vaapi, drm, vulkan** ; `libdav1d`, `libplacebo`, `zscale` : **absents** |
-| Source de la mesure de coût | `kplayer --bench 200` et `ffmpeg` (le même 7.1.3), média **H.264 1080p 25 i/s**, 200 images, meilleure de 3 passes |
-| Analyse binaire | REA (`inspect_pe_resources`, Ghidra 12.1.4 disponible) + lecture directe des chaînes |
+| Source de la mesure de coût | `rmplayer --bench 200` et `ffmpeg` (le même 7.1.3), média **H.264 1080p 25 i/s**, 200 images, meilleure de 3 passes |
 
 > **Correction d'une affirmation antérieure** : j'avais écrit que notre build n'avait « ni
 > `hwcontext_vulkan` ». C'est **faux** : `-hwaccels` liste `vulkan` et `-init_hw_device
@@ -45,9 +40,8 @@ l'échelle CPU** (swscale) → **conversion RGBA** → téléversement de la tex
 
 **Le fait marquant** : le décodage matériel ne rapporte que **1 ms/image** dans notre
 chaîne. Ce n'est pas que VA-API soit inutile — c'est que les 12 ms sont presque toutes
-dans la **copie et la conversion**, pas dans le décodage. C'est exactement là qu'un moteur
-comme celui de PotPlayer (surfaces D3D11 conservées jusqu'à l'affichage) fait la
-différence.
+dans la **copie et la conversion**, pas dans le décodage. C'est exactement là que fait la
+différence un moteur qui conserve les surfaces du GPU jusqu'à l'affichage.
 
 ---
 
@@ -58,7 +52,7 @@ cas (c'est ce que notre affichage consomme) :
 
 | Chaîne | ms / image | Images produites |
 |---|---|---|
-| **A — ce que fait KPlayer** : `hwdownload` → échelle CPU Lanczos → RGBA | **9,95** | 200 |
+| **A — ce que fait RMPlayer** : `hwdownload` → échelle CPU Lanczos → RGBA | **9,95** | 200 |
 | **B — échelle dans le GPU** : `scale_vaapi` → `hwdownload` → RGBA | **4,60** | 200 |
 
 **−54 % sur l'étape dominante**, sans changer de matériel, sans recompiler FFmpeg : notre
@@ -84,15 +78,15 @@ redimensionnée), et désentrelacement — c'est-à-dire la majorité des lectur
 
 ---
 
-## 4. Ce que PotPlayer a et que nous n'avons pas (moteur)
+## 4. Ce qui manque au moteur
 
-| Élément | PotPlayer (mesuré dans `ffcodec64.dll`) | KPlayer |
-|---|---|---|
-| Version FFmpeg | **Lavc63.8 / Lavf63.6** (8.x) | Lavc61.19 (7.1.3) |
-| AV1 **logiciel** | `libdav1d` présent | **absent** → AV1 impossible sans VA-API |
-| Rendu GPU à filtres | `libplacebo` présent | **absent** (pas de `zscale` non plus) |
-| Décodage matériel | DXVA2, D3D11VA, CUVID, QSV, AMF (+ Vulkan) | VA-API (+ repli logiciel) |
-| Surfaces conservées jusqu'à l'affichage | oui (Direct3D) | non : rapatriement systématique |
+| Élément | État dans RMPlayer |
+|---|---|
+| Version FFmpeg | Lavc61.19 (7.1.3) |
+| AV1 **logiciel** | **absent** au moment de la mesure → AV1 impossible sans VA-API (corrigé depuis, §5) |
+| Rendu GPU à filtres | `libplacebo` **absent** (pas de `zscale` non plus) au moment de la mesure |
+| Décodage matériel | VA-API (+ repli logiciel) |
+| Surfaces conservées jusqu'à l'affichage | non : rapatriement systématique |
 
 Deux de ces écarts sont déjà dans la liste « priorité moyenne » (`gpu-next`, AV1 logiciel) ;
 ce document leur donne **un chiffre** et un **ordre**.
@@ -138,5 +132,3 @@ le GPU** qui compte.
   `--bench`, qui décode sans fenêtre. Il peut dominer en 4K.
 - Les chiffres valent pour **cette machine** (pilote VA-API Mesa, GPU intégré) : `procamp_vaapi`
   peut fonctionner ailleurs ; il faut refaire le test sur la cible avant de généraliser.
-- Les mesures PotPlayer sont **statiques** (son binaire) : je n'ai pas mesuré son débit réel
-  sous Wine, qui ne représenterait de toute façon pas ses performances natives.

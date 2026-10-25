@@ -22,11 +22,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-boucle-ab
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -48,15 +48,15 @@ gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/
     --method org.freedesktop.DBus.ListNames >/dev/null 2>&1 \
     || { echo "pas de bus de session — banc non exécutable ici"; exit 2; }
 
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 sleep 1
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 
 nettoyer() {
     [ -n "${K_PID:-}" ] && kill "$K_PID" 2>/dev/null
-    pkill -x kplayer 2>/dev/null || true
+    pkill -x rmplayer 2>/dev/null || true
 }
 trap nettoyer EXIT
 
@@ -89,13 +89,13 @@ mesure() {
     K_PID=$!
     for _ in $(seq 60); do
         gdbus call --session --dest org.freedesktop.DBus --object-path /org/freedesktop/DBus \
-            --method org.freedesktop.DBus.ListNames 2>/dev/null | grep -q org.mpris.MediaPlayer2.kplayer && break
+            --method org.freedesktop.DBus.ListNames 2>/dev/null | grep -q org.mpris.MediaPlayer2.rmplayer && break
         sleep 0.25
     done
     python3 - "$duree" <<'PY'
 import re, subprocess, sys, time
 duree = float(sys.argv[1])
-cmd = ["gdbus", "call", "--session", "--dest", "org.mpris.MediaPlayer2.kplayer",
+cmd = ["gdbus", "call", "--session", "--dest", "org.mpris.MediaPlayer2.rmplayer",
        "--object-path", "/org/mpris/MediaPlayer2", "--method",
        "org.freedesktop.DBus.Properties.Get", "org.mpris.MediaPlayer2.Player", "Position"]
 t0 = time.time(); serie = []

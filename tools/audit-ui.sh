@@ -13,7 +13,7 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 FILE1="${1:?usage: audit-ui.sh <fichier1> [fichier2] [écran]}"
 FILE2="${2:-}"
@@ -27,15 +27,15 @@ WIN_H=720
 # --- Garde : aucune instance résiduelle ne doit survivre ---
 # Une session précédente restée en plein écran capture les clics et fausse
 # entièrement l'audit (tous les boutons semblent inertes). On nettoie d'abord.
-# `pgrep -x kplayer` cible le nom exact du binaire : pas d'auto-détection du
+# `pgrep -x rmplayer` cible le nom exact du binaire : pas d'auto-détection du
 # script (contrairement à `pgrep -f`, qui matche toute ligne de commande).
-RESIDUELS=$(pgrep -x kplayer || true)
+RESIDUELS=$(pgrep -x rmplayer || true)
 if [ -n "$RESIDUELS" ]; then
     echo "Instances résiduelles détectées, arrêt avant test : $RESIDUELS"
     # shellcheck disable=SC2086
     kill -TERM $RESIDUELS 2>/dev/null || true
     sleep 2
-    RESTE=$(pgrep -x kplayer || true)
+    RESTE=$(pgrep -x rmplayer || true)
     if [ -n "$RESTE" ]; then
         echo "  (forçage) $RESTE"
         # shellcheck disable=SC2086
@@ -50,8 +50,8 @@ fi
 # 60 s, la lecture finissait pendant les premiers contrôles et tout l'audit échouait
 # pour une raison sans rapport avec le code. Ici : reprise désactivée, cache vide.
 ETAT=/tmp/audit-ui-etat
-rm -rf "$ETAT"; mkdir -p "$ETAT/conf/kplayer" "$ETAT/cache"
-python3 - "$ETAT/conf/kplayer/config.json" <<'PYCFG'
+rm -rf "$ETAT"; mkdir -p "$ETAT/conf/rmplayer" "$ETAT/cache"
+python3 - "$ETAT/conf/rmplayer/config.json" <<'PYCFG'
 import json, sys
 json.dump({
     "video": {"hardware_decoding": True, "scaling_method": "Lanczos", "deband": False,
@@ -68,25 +68,25 @@ json.dump({
 PYCFG
 export XDG_CONFIG_HOME="$ETAT/conf" XDG_CACHE_HOME="$ETAT/cache"
 
-DISPLAY=$DISP ./target/release/kplayer "$FILE1" $FILE2 >"$LOG" 2>&1 &
+DISPLAY=$DISP ./target/release/rmplayer "$FILE1" $FILE2 >"$LOG" 2>&1 &
 KPID=$!
 sleep 6
 
 # La fenêtre est identifiée par le PID du processus lancé : impossible de confondre
 # avec une autre instance.
-WID=$(DISPLAY=$DISP xdotool search --pid "$KPID" --name KPlayer 2>/dev/null | head -1)
+WID=$(DISPLAY=$DISP xdotool search --pid "$KPID" --name RMPlayer 2>/dev/null | head -1)
 if [ -z "$WID" ]; then
-    WID=$(DISPLAY=$DISP xdotool search --name KPlayer | head -1)
+    WID=$(DISPLAY=$DISP xdotool search --name RMPlayer | head -1)
 fi
 if [ -z "$WID" ]; then
-    echo "Fenêtre KPlayer introuvable" >&2
+    echo "Fenêtre RMPlayer introuvable" >&2
     kill "$KPID" 2>/dev/null
     exit 1
 fi
 echo "PID testé : $KPID — fenêtre : $WID"
-AUTRES=$(DISPLAY=$DISP xdotool search --name KPlayer | grep -vc "^$WID\$" || true)
+AUTRES=$(DISPLAY=$DISP xdotool search --name RMPlayer | grep -vc "^$WID\$" || true)
 if [ "$AUTRES" != "0" ]; then
-    echo "ATTENTION : $AUTRES autre(s) fenêtre(s) KPlayer présente(s) — l'audit peut être faussé" >&2
+    echo "ATTENTION : $AUTRES autre(s) fenêtre(s) RMPlayer présente(s) — l'audit peut être faussé" >&2
 fi
 # Taille et position imposées : les coordonnées deviennent reproductibles, même si
 # le gestionnaire de fenêtres agrandit la fenêtre à l'activation.
@@ -154,7 +154,7 @@ drag() {
     DISPLAY=$DISP xdotool mouseup 1; sleep 0.8
 }
 # `derniere` renvoie la dernière ligne applicative du journal
-derniere() { sed 's/\x1b\[[0-9;]*m//g' "$LOG" | grep -E "INFO kplayer::(player|ui)" | tail -1 | sed 's/.*INFO [a-z:]*: //'; }
+derniere() { sed 's/\x1b\[[0-9;]*m//g' "$LOG" | grep -E "INFO rmplayer::(player|ui)" | tail -1 | sed 's/.*INFO [a-z:]*: //'; }
 # `verifie <motif> <libellé> <action>` : exécute l'action puis contrôle le journal
 # `verifie <motif> <libellé> <action>` : une action peut produire PLUSIEURS lignes
 # de journal (chargement d'un média, rééchantillonnage…). On ne regarde donc pas
@@ -253,10 +253,10 @@ rafraichir_fenetre() {
         return 0
     fi
     local nouveau
-    nouveau=$(DISPLAY=$DISP xdotool search --pid "$KPID" --name KPlayer 2>/dev/null | tail -1)
-    [ -z "$nouveau" ] && nouveau=$(DISPLAY=$DISP xdotool search --name KPlayer 2>/dev/null | tail -1)
+    nouveau=$(DISPLAY=$DISP xdotool search --pid "$KPID" --name RMPlayer 2>/dev/null | tail -1)
+    [ -z "$nouveau" ] && nouveau=$(DISPLAY=$DISP xdotool search --name RMPlayer 2>/dev/null | tail -1)
     if [ -z "$nouveau" ]; then
-        echo "  ✗ la fenêtre du lecteur a disparu (aucune fenêtre KPlayer)" >&2
+        echo "  ✗ la fenêtre du lecteur a disparu (aucune fenêtre RMPlayer)" >&2
         return 1
     fi
     echo "  (fenêtre recréée : $WID → $nouveau, focus rendu)"
@@ -547,8 +547,8 @@ while [ "$i" -lt 25 ]; do
     i=$((i + 1))
 done
 if [ "$FERME" = 1 ]; then
-    QUITTE=$(sed 's/\x1b\[[0-9;]*m//g' "$LOG" | grep -c "KPlayer quitté")
-    echo "  ✔ Q ferme le lecteur (processus terminé ; journal : $QUITTE ligne « KPlayer quitté »)"
+    QUITTE=$(sed 's/\x1b\[[0-9;]*m//g' "$LOG" | grep -c "RMPlayer quitté")
+    echo "  ✔ Q ferme le lecteur (processus terminé ; journal : $QUITTE ligne « RMPlayer quitté »)"
     PASS=$((PASS + 1))
 else
     echo "  ✗ ÉCHEC : Q n'a pas fermé le lecteur — application gelée (interblocage)"

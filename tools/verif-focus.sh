@@ -23,10 +23,10 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:96}"
 BASE=/tmp/kp-pertefocus
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
-export XDG_RUNTIME_DIR=/tmp/kplayer-bench-pas-de-son
-export RUST_LOG=kplayer=info
+export XDG_RUNTIME_DIR=/tmp/rmplayer-bench-pas-de-son
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -95,8 +95,8 @@ donne_focus() {
 }
 
 ecrire_config() {  # ecrire_config <mode> <reprendre>
-    mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
-    python3 - "$BASE/conf/kplayer/config.json" "$1" "$2" <<'PY'
+    mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
+    python3 - "$BASE/conf/rmplayer/config.json" "$1" "$2" <<'PY'
 import json, sys
 # argv : 1 = chemin, 2 = mode, 3 = reprise
 json.dump({
@@ -112,11 +112,11 @@ PY
 
 lancer() {  # lancer <journal>
     export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     "$KP" "$BASE/media.mp4" >"$1" 2>&1 &
     KP_PID=$!
     for _ in $(seq 40); do
-        xdotool search --pid "$KP_PID" --name KPlayer >/dev/null 2>&1 && break
+        xdotool search --pid "$KP_PID" --name RMPlayer >/dev/null 2>&1 && break
         sleep 0.25
     done
     sleep 2.5
@@ -127,7 +127,7 @@ arreter() {
     KP_PID=""
     sleep 0.5
 }
-lecteur() { xdotool search --pid "$KP_PID" --name KPlayer 2>/dev/null | tail -1; }
+lecteur() { xdotool search --pid "$KP_PID" --name RMPlayer 2>/dev/null | tail -1; }
 # `en_pause` : vrai si la dernière transition connue est une mise en pause.
 en_pause() {
     local dernier

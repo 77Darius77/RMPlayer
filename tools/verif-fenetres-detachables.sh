@@ -3,7 +3,7 @@
 # raccourcis, À propos) peuvent devenir de VRAIES fenêtres système, déplaçables hors du lecteur.
 #
 # Principe : une fenêtre egui est dessinée DANS la fenêtre du lecteur : elle ne peut pas en sortir.
-# On mesure donc côté système (X11) : existe-t-il une fenêtre distincte, de titre « KPlayer — … » ?
+# On mesure donc côté système (X11) : existe-t-il une fenêtre distincte, de titre « RMPlayer — … » ?
 # peut-on la déplacer au-delà du bord de la fenêtre du lecteur, et y voit-on son contenu (pixels) ?
 # La géométrie du bouton est lue dans le journal (`fenetre-detacher <id> rect …`), pas devinée.
 #
@@ -25,11 +25,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-fenetres-detachables
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -41,16 +41,16 @@ done
 export DISPLAY="$DISP"
 xdpyinfo >/dev/null 2>&1 || { echo "écran $DISP indisponible — banc non exécutable ici"; exit 2; }
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 LOG="$BASE/journal.log"
 
 env -u LD_LIBRARY_PATH ffmpeg -hide_banner -loglevel error \
     -f lavfi -i "color=c=0x303060:s=320x180:r=10:d=120" -c:v libx264 -preset ultrafast -y "$BASE/film.mp4"
 
 arreter() {
-    for pid in $(pgrep -x kplayer 2>/dev/null); do
+    for pid in $(pgrep -x rmplayer 2>/dev/null); do
         aff=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
         [ "$aff" = "$DISP" ] && kill "$pid" 2>/dev/null
     done
@@ -75,7 +75,7 @@ lance() {
     "$KP" "$BASE/film.mp4" >"$LOG" 2>&1 &
     K_PID=$!
     sleep 5
-    K_ID=$(xdotool search --pid "$K_PID" --name "KPlayer" 2>/dev/null | tail -1)
+    K_ID=$(xdotool search --pid "$K_PID" --name "RMPlayer" 2>/dev/null | tail -1)
     xdotool windowmove "$K_ID" 0 0; xdotool windowsize "$K_ID" 1280 720
     xdotool windowactivate --sync "$K_ID" 2>/dev/null; xdotool mousemove 640 400; sleep 1
 }

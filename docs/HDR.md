@@ -4,7 +4,7 @@
 
 ## En une phrase
 
-**Le traitement du HDR est complet et mesuré ; sa *sortie* ne l'est pas.** KPlayer convertit
+**Le traitement du HDR est complet et mesuré ; sa *sortie* ne l'est pas.** RMPlayer convertit
 correctement HDR10 (PQ) et HLG vers un écran SDR, en le détectant par l'EDID ; il ne peut pas
 encore **afficher** du HDR, parce que la bibliothèque de fenêtrage ne sait pas produire autre
 chose que du RGBA 8 bits.
@@ -78,7 +78,7 @@ image** (20 refus en 5 s à 5 i/s ; 24 à 60 par seconde en lecture normale). La
 de repli portait la signature de la chaîne réduite, pas celle demandée. `verif-hdr` §12c le
 vérifie sur une vraie lecture.
 
-Le moteur CPU peut toujours être **forcé** (`KPLAYER_HDR_MOTEUR=cpu`) sans condition de
+Le moteur CPU peut toujours être **forcé** (`RMPLAYER_HDR_MOTEUR=cpu`) sans condition de
 budget : c'est un outil de diagnostic.
 
 ### Ce que coûte le moteur CPU (mesuré le 2026-10-24) — origine du budget
@@ -108,5 +108,5 @@ pas de secours : avec lui seul, `libplacebo` répond « Found no suitable device
 tools/verif-hdr.sh          # 36 contrôles, mires calibrées en nits, VA-API vs logiciel, EDID, Vulkan coupé
 tools/sante-hdr.sh         # ≈ 10 s : le GPU sert-il encore au HDR ? À lancer après une mise à jour de Mesa / pilote / noyau
 tools/etat-court.sh         # affiche « HDR (libplacebo) oui/non »
-kplayer --hdr-info film.mkv # métadonnées du flux + écrans lus + décision + explication
+rmplayer --hdr-info film.mkv # métadonnées du flux + écrans lus + décision + explication
 ```

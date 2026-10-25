@@ -14,11 +14,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-ass-clip
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -35,8 +35,8 @@ fi
 [ -s "$BASE/fond.mp4" ] || { echo "média de test non généré"; exit 1; }
 
 # ------------------------------------------------------------- configuration
-mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
-python3 - "$BASE/conf/kplayer/config.json" <<'PY'
+mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
+python3 - "$BASE/conf/rmplayer/config.json" <<'PY'
 import json, sys
 json.dump({
     "video": {"hardware_decoding": False, "scaling_method": "Lanczos"},
@@ -119,7 +119,7 @@ capture() {  # capture <nom> <balises> <texte> <attente_s>
     mkdir -p "$BASE/media_$nom"
     cp "$BASE/fond.mp4" "$BASE/media_$nom/fond.mp4"
     ecrire_ass "$BASE/media_$nom/fond.ass" "$balises" "$texte"
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     DISPLAY="$DISP" "$KP" --fullscreen "$BASE/media_$nom/fond.mp4" >"$BASE/$nom.log" 2>&1 &
     local kpid=$!
     sleep "$attente"
@@ -265,5 +265,5 @@ fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # verif-soustitres.sh — famille de police et position horizontale des sous-titres.
 #
-# Deux réglages ajoutés pour combler l'écart avec PotPlayer (« Sous-titres › Style
-# police » : Police, Alphabet, Interlettre, Position hori. (%)). Ils n'ont d'intérêt
+# Deux réglages : la famille de police et la position horizontale. Ils n'ont d'intérêt
 # que s'ils changent des PIXELS : c'est donc ce que le banc mesure, sur un fond uni,
 # avec un texte dont la largeur dépend fortement de la police.
 #
@@ -18,28 +17,28 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-soustitres
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
 ko() { echo "  ✗ ÉCHEC : $1"; FAIL=$((FAIL+1)); }
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache" "$BASE/media"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache" "$BASE/media"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
 
 # --- Garde : aucune instance de test résiduelle ne doit couvrir l'écran --------
 # Une capture d'écran (x11grab) prend **tout l'écran** : un lecteur laissé par un
 # essai précédent sur le même écran virtuel recouvre la fenêtre mesurée, et le banc
 # mesure ses pixels (constaté : taille 1075x651 « sous-titre » et couleur bleue,
-# c'étaient les barres de couleur d'un autre film). On arrête donc les kplayer qui
+# c'étaient les barres de couleur d'un autre film). On arrête donc les rmplayer qui
 # tournent **sur cet écran** — `DISPLAY` est lu dans /proc, pour ne jamais toucher
 # au lecteur de l'utilisateur (qui est sur :0 / Wayland).
 arreter_instances_de_test() {
-    for pid in $(pgrep -x kplayer 2>/dev/null); do
+    for pid in $(pgrep -x rmplayer 2>/dev/null); do
         affichage=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
         if [ "$affichage" = "$DISP" ]; then
             kill "$pid" 2>/dev/null
@@ -59,7 +58,7 @@ env -u LD_LIBRARY_PATH ffmpeg -hide_banner -loglevel error \
 printf '1\n00:00:00,000 --> 00:00:12,000\nMMMMMM liliii\n\n' > "$BASE/media/fond.srt"
 
 ecrire_config() {  # ecrire_config <famille> <position_h> [interlettre] [marge_g] [marge_d]
-    python3 - "$BASE/conf/kplayer/config.json" "$1" "$2" "${3:-0}" "${4:-0}" "${5:-0}" <<'PY'
+    python3 - "$BASE/conf/rmplayer/config.json" "$1" "$2" "${3:-0}" "${4:-0}" "${5:-0}" <<'PY'
 import json, sys
 json.dump({
     "video": {"hardware_decoding": False, "scaling_method": "Lanczos"},
@@ -82,7 +81,7 @@ PY
 capture() {  # capture <nom> <famille> <position_h> [interlettre] [marge_g] [marge_d]
     local nom="$1"
     ecrire_config "$2" "$3" "${4:-0}" "${5:-0}" "${6:-0}"
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     DISPLAY="$DISP" "$KP" --fullscreen "$BASE/media/fond.mp4" >"$BASE/$nom.log" 2>&1 &
     local pid=$!
     sleep 5
@@ -207,14 +206,14 @@ echo
 echo "=== 5. Valeurs par défaut : comportement d'origine (centre) ==="
 # Configuration sans les nouveaux champs : ils doivent prendre leurs défauts
 # (50 % et police vide), sinon un fichier existant changerait d'aspect.
-python3 - "$BASE/conf/kplayer/config.json" <<'PY'
+python3 - "$BASE/conf/rmplayer/config.json" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))
 for cle in ("font_family", "position_h_percent"):
     c["subtitles"].pop(cle, None)
 json.dump(c, open(sys.argv[1], "w"), indent=2)
 PY
-pkill -x kplayer 2>/dev/null; sleep 0.6
+pkill -x rmplayer 2>/dev/null; sleep 0.6
 DISPLAY="$DISP" "$KP" --fullscreen "$BASE/media/fond.mp4" >"$BASE/defaut.log" 2>&1 &
 pid=$!
 sleep 5
@@ -244,7 +243,7 @@ fi
 
 echo
 echo "=== 5. Interlettre : le texte s'élargit sans changer de place ==="
-# « Interlettre » et « marges L/R » complètent Dialog(383) (session 34). Une
+# « Interlettre » et « marges L/R » ont été ajoutés en session 34. Une
 # interlettre positive doit allonger la ligne ; à zéro, rien ne doit changer.
 capture interlettre-0 "" 50 0 0 0
 capture interlettre-6 "" 50 6 0 0
@@ -315,5 +314,5 @@ fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

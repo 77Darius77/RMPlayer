@@ -8,7 +8,7 @@
 # une touche média change réellement l'état du lecteur.
 #
 # Contrôles :
-#   1. le nom `org.mpris.MediaPlayer2.kplayer` apparaît sur le bus ;
+#   1. le nom `org.mpris.MediaPlayer2.rmplayer` apparaît sur le bus ;
 #   2. l'identité, le statut et les métadonnées sont ceux du protocole (chaînes
 #      exactes, durée et position en **microsecondes**) ;
 #   3. `CanGoNext`/`CanGoPrevious` reflètent l'état publié (pas une constante) ;
@@ -25,7 +25,7 @@
 # Usage : tools/verif-mpris.sh
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 BASE=/tmp/kp-mpris
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 
@@ -72,7 +72,7 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] || [ "$code_bus" -ne 0 ]; then
 fi
 
 rm -rf "$BASE"; mkdir -p "$BASE"
-P=org.mpris.MediaPlayer2.kplayer
+P=org.mpris.MediaPlayer2.rmplayer
 O=/org/mpris/MediaPlayer2
 prop() { gdbus call --session --dest "$P" --object-path "$O" \
     --method org.freedesktop.DBus.Properties.Get "$1" "$2" 2>&1; }
@@ -84,12 +84,12 @@ valeur() {
 }
 
 # Instance résiduelle : elle prendrait le nom sur le bus.
-pkill -f "kplayer --mpris-test" 2>/dev/null
+pkill -f "rmplayer --mpris-test" 2>/dev/null
 sleep 1
 
 "$KP" --mpris-test 25 >"$BASE/journal.txt" 2>&1 &
 TEST_PID=$!
-nettoyer() { kill "$TEST_PID" 2>/dev/null; pkill -f "kplayer --mpris-test" 2>/dev/null; }
+nettoyer() { kill "$TEST_PID" 2>/dev/null; pkill -f "rmplayer --mpris-test" 2>/dev/null; }
 trap nettoyer EXIT
 
 echo
@@ -117,7 +117,7 @@ fi
 echo
 echo "=== 2. Identité, statut, métadonnées (unités MPRIS) ==="
 ident=$(valeur "$(prop org.mpris.MediaPlayer2 Identity)")
-[ "$ident" = "KPlayer" ] && ok "Identity = KPlayer" || ko "Identity inattendu : $ident"
+[ "$ident" = "RMPlayer" ] && ok "Identity = RMPlayer" || ko "Identity inattendu : $ident"
 statut=$(valeur "$(prop org.mpris.MediaPlayer2.Player PlaybackStatus)")
 case "$statut" in
     Playing|Paused|Stopped) ok "PlaybackStatus = $statut (chaîne de la spécification)" ;;
@@ -129,8 +129,8 @@ if grep -q "xesam:title" <<<"$meta" && grep -q "Mire de test MPRIS" <<<"$meta"; 
 else
     ko "Metadata sans titre : $(echo "$meta" | cut -c1-100)"
 fi
-if grep -q "mpris:trackid.*org/kplayer/track/0" <<<"$meta"; then
-    ok "Metadata contient mpris:trackid (/org/kplayer/track/0)"
+if grep -q "mpris:trackid.*org/rmplayer/track/0" <<<"$meta"; then
+    ok "Metadata contient mpris:trackid (/org/rmplayer/track/0)"
 else
     ko "mpris:trackid absent ou inattendu"
 fi
@@ -177,7 +177,7 @@ done
 
 echo
 echo "=== 5. SetPosition : bon identifiant accepté, étranger ignoré ==="
-appel org.mpris.MediaPlayer2.Player.SetPosition /org/kplayer/track/0 12000000 >/dev/null
+appel org.mpris.MediaPlayer2.Player.SetPosition /org/rmplayer/track/0 12000000 >/dev/null
 appel org.mpris.MediaPlayer2.Player.SetPosition /org/mpris/MediaPlayer2/TrackList/9 9000000 >/dev/null
 sleep 1
 if grep -q "commande: Position(12000000)" "$BASE/journal.txt"; then
@@ -271,7 +271,7 @@ fi
 
 echo
 echo "=== 8. Sans bus de session : le module le dit et ne plante pas ==="
-sortie=$(DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/nexiste-pas-kplayer timeout 10 \
+sortie=$(DBUS_SESSION_BUS_ADDRESS=unix:path=/tmp/nexiste-pas-rmplayer timeout 10 \
     "$KP" --mpris-test 3 2>&1)
 code=$?
 if [ "$code" -eq 3 ]; then

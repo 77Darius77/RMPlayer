@@ -29,11 +29,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-peripheriques
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -46,12 +46,12 @@ pw-dump >/dev/null 2>&1 || { echo "PipeWire injoignable — banc non exécutable
 export DISPLAY="$DISP"
 xdpyinfo >/dev/null 2>&1 || { echo "écran $DISP indisponible — banc non exécutable ici"; exit 2; }
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 
 arreter() {
-    for pid in $(pgrep -x kplayer 2>/dev/null); do
+    for pid in $(pgrep -x rmplayer 2>/dev/null); do
         aff=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
         [ "$aff" = "$DISP" ] && kill "$pid" 2>/dev/null
     done
@@ -86,7 +86,7 @@ json.dump({"video": {"hardware_decoding": False}, "audio": {"device": sys.argv[2
            "playback": {"resume": False}, "playlist": []}, open(sys.argv[1], "w"), indent=2)
 PY
 }
-mpris() { gdbus call --session --dest org.mpris.MediaPlayer2.kplayer --object-path /org/mpris/MediaPlayer2 "$@" 2>/dev/null; }
+mpris() { gdbus call --session --dest org.mpris.MediaPlayer2.rmplayer --object-path /org/mpris/MediaPlayer2 "$@" 2>/dev/null; }
 pos_ms() { mpris --method org.freedesktop.DBus.Properties.Get org.mpris.MediaPlayer2.Player Position \
     | sed -n 's/.*int64 \([0-9-]*\).*/\1/p' | head -1 | awk '{printf "%d", $1/1000}'; }
 lance() {  # lance <périphérique>
@@ -95,7 +95,7 @@ lance() {  # lance <périphérique>
     "$KP" --fullscreen "$BASE/film.mp4" >"$BASE/dernier.log" 2>&1 &
     K_PID=$!
     sleep 4.5
-    K_ID=$(xdotool search --pid "$K_PID" --name KPlayer 2>/dev/null | tail -1)
+    K_ID=$(xdotool search --pid "$K_PID" --name RMPlayer 2>/dev/null | tail -1)
     xdotool windowfocus "$K_ID" 2>/dev/null; sleep 0.3
 }
 touche() { xdotool key --window "$K_ID" "$1" 2>/dev/null; sleep 1.5; }
@@ -193,10 +193,10 @@ else ko "après le changement : flux $etat, position ${p0} → ${p1} ms (film mu
 echo "=== 9. Choisir la sortie par un clic dans le menu Audio ==="
 # Géométrie lue dans le journal (comme audit-menus) : aucune coordonnée devinée.
 arreter; config "pw:kp_test_a"
-RUST_LOG=kplayer=info,kinterface=debug "$KP" "$BASE/film.mp4" >"$BASE/menu.log" 2>&1 &
+RUST_LOG=rmplayer=info,kinterface=debug "$KP" "$BASE/film.mp4" >"$BASE/menu.log" 2>&1 &
 K_PID=$!
 sleep 5
-K_ID=$(xdotool search --pid "$K_PID" --name KPlayer 2>/dev/null | head -1)
+K_ID=$(xdotool search --pid "$K_PID" --name RMPlayer 2>/dev/null | head -1)
 xdotool windowmove "$K_ID" 0 0; xdotool windowsize "$K_ID" 1280 720; xdotool windowactivate --sync "$K_ID" 2>/dev/null
 xdotool mousemove 640 400; sleep 1
 centre_de() {  # centre_de <motif de ligne> <n-ième (0 = premier, -1 = dernier)> : centre du rectangle journalisé

@@ -17,10 +17,10 @@
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 BASE=/tmp/kp-filtres
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -122,8 +122,8 @@ echo "clips de test :"; ls -la "$BASE/clips/"*.mp4 | awk '{print "    ", $NF, $5
 config_essai() {  # config_essai <nom> '<json champs video>'
     local nom="$1" video_json="$2"
     local dossier="$BASE/$nom"
-    rm -rf "$dossier"; mkdir -p "$dossier/conf/kplayer" "$dossier/cache"
-    python3 - "$dossier/conf/kplayer/config.json" "$video_json" <<'PY'
+    rm -rf "$dossier"; mkdir -p "$dossier/conf/rmplayer" "$dossier/cache"
+    python3 - "$dossier/conf/rmplayer/config.json" "$video_json" <<'PY'
 import json, sys
 chemin, video = sys.argv[1], json.loads(sys.argv[2])
 cfg = {
@@ -381,7 +381,7 @@ fi
 
 echo
 echo "=== 8. Teinte, niveaux, adoucissement (session 34) ==="
-# Ces trois réglages complètent `Dialog(384/386)` de PotPlayer. Chacun est mesuré :
+# Trois réglages de couleur et de netteté. Chacun est mesuré :
 # une couleur qui tourne, des noirs qui se recréent, du détail fin qui s'atténue.
 CLIP="$BASE/clips/ap.mp4"
 [ -s "$CLIP" ] || env -u LD_LIBRARY_PATH ffmpeg -hide_banner -loglevel error \
@@ -501,7 +501,7 @@ if command -v Xvfb >/dev/null; then
     sleep 1.5
     config_essai chaine-app '{"hue": 30.0, "niveaux_noir": 0.1, "adoucir": 2}'
     DISPLAY=$DISP_F XDG_CONFIG_HOME="$BASE/chaine-app/conf" XDG_CACHE_HOME="$BASE/chaine-app/cache" \
-        XDG_RUNTIME_DIR=/tmp/kplayer-bench-pas-de-son timeout 12 \
+        XDG_RUNTIME_DIR=/tmp/rmplayer-bench-pas-de-son timeout 12 \
         "$KP" "$BASE/clips/ap.mp4" >"$BASE/chaine-app/app.log" 2>&1
     kill "$XPID" 2>/dev/null
     chaine=$(sed 's/\x1b\[[0-9;]*m//g' "$BASE/chaine-app/app.log" | grep -o "Chaîne de filtres vidéo: .*" | head -1)

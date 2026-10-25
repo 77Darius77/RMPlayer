@@ -1,4 +1,4 @@
-//! Thèmes externes : des fichiers JSON dans `~/.config/kplayer/themes/` qui remplacent les
+//! Thèmes externes : des fichiers JSON dans `~/.config/rmplayer/themes/` qui remplacent les
 //! couleurs de l'interface. Le thème intégré (clair / sombre d'egui) reste le défaut ; un thème
 //! illisible est ignoré avec un message, jamais une interface cassée.
 //!
@@ -24,9 +24,9 @@ pub struct Theme {
     pub accent: Option<String>,
 }
 
-/// `$XDG_CONFIG_HOME/kplayer/themes`.
+/// `$XDG_CONFIG_HOME/rmplayer/themes`.
 pub fn dossier() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("kplayer").join("themes"))
+    dirs::config_dir().map(|d| d.join("rmplayer").join("themes"))
 }
 
 /// Noms (sans `.json`) des thèmes présents, triés.

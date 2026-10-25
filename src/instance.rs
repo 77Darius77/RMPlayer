@@ -1,14 +1,14 @@
 //! Instance unique — « ouvrir avec » arrive dans la fenêtre déjà ouverte
 //!
 //! **Le problème.** Un fichier ouvert depuis le gestionnaire de fichiers doit être
-//! lu : si KPlayer tourne déjà, lancer un second processus donnerait deux fenêtres,
+//! lu : si RMPlayer tourne déjà, lancer un second processus donnerait deux fenêtres,
 //! deux lectures concurrentes du même fichier de position, et l'impression que le
 //! clic n'a rien fait. Le comportement attendu est celui des lecteurs de bureau :
 //! le fichier arrive dans la fenêtre existante.
 //!
 //! **Pourquoi pas X11.** Sous X11, un tel mécanisme se fait par propriété de
 //! fenêtre ou par D-Bus. Or Plasma 6.8 n'a plus de session X11 (page mémoire
-//! `kplayer-wayland-plasma68`) et une propriété de fenêtre X11 n'existe pas sous
+//! `rmplayer-wayland-plasma68`) et une propriété de fenêtre X11 n'existe pas sous
 //! Wayland. D-Bus demanderait une crate (`zbus`) et nommerait un service ; un
 //! **socket Unix** fait le travail avec la bibliothèque standard seule, sans
 //! dépendance et sans configuration de bus.
@@ -33,7 +33,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 /// Variable d'environnement qui désactive la mécanique (utile aux bancs).
-pub const DESACTIVATION: &str = "KPLAYER_INSTANCE_UNIQUE";
+pub const DESACTIVATION: &str = "RMPLAYER_INSTANCE_UNIQUE";
 
 /// Ce que le démarrage a donné.
 pub enum Demarrage {
@@ -66,7 +66,7 @@ impl Instance {
         }
         match std::env::var(DESACTIVATION) {
             Ok(v) if matches!(v.trim(), "0" | "off" | "non" | "false" | "") => {
-                return Demarrage::Desactive("variable KPLAYER_INSTANCE_UNIQUE")
+                return Demarrage::Desactive("variable RMPLAYER_INSTANCE_UNIQUE")
             }
             _ => {}
         }
@@ -120,7 +120,7 @@ impl Instance {
         let drapeau = arrete.clone();
         let chemin_fil = chemin.clone();
         std::thread::Builder::new()
-            .name("kplayer-instance".into())
+            .name("rmplayer-instance".into())
             .spawn(move || {
                 for flux in ecoute.incoming() {
                     if drapeau.load(Ordering::Relaxed) {
@@ -199,7 +199,7 @@ impl Drop for Instance {
     }
 }
 
-/// Chemin du socket : `$XDG_RUNTIME_DIR/kplayer-<empreinte de la configuration>.sock`.
+/// Chemin du socket : `$XDG_RUNTIME_DIR/rmplayer-<empreinte de la configuration>.sock`.
 ///
 /// L'empreinte porte sur le **dossier de configuration** : deux sessions isolées
 /// (les bancs posent `XDG_CONFIG_HOME`) ne se parlent jamais.
@@ -216,12 +216,12 @@ fn chemin_socket() -> Option<PathBuf> {
             Some(if run.is_dir() {
                 run.display().to_string()
             } else {
-                format!("/tmp/kplayer-{uid}")
+                format!("/tmp/rmplayer-{uid}")
             })
         })?;
     let dossier = PathBuf::from(runtime);
     if !dossier.is_dir() {
-        // /tmp/kplayer-<uid> n'existe pas encore : on le crée, privé.
+        // /tmp/rmplayer-<uid> n'existe pas encore : on le crée, privé.
         if dossier.starts_with("/tmp") {
             std::fs::create_dir_all(&dossier).ok()?;
             use std::os::unix::fs::PermissionsExt;
@@ -233,7 +233,7 @@ fn chemin_socket() -> Option<PathBuf> {
     let config = crate::config::config_path()
         .map(|p| p.display().to_string())
         .unwrap_or_default();
-    Some(dossier.join(format!("kplayer-{}.sock", empreinte(&config))))
+    Some(dossier.join(format!("rmplayer-{}.sock", empreinte(&config))))
 }
 
 /// Empreinte courte et stable d'une chaîne (sans dépendance de hachage externe).
@@ -271,7 +271,7 @@ fn repond(chemin: &Path) -> bool {
         && reponse.trim() == PONG
 }
 
-/// Retire les sockets `kplayer-*.sock` du dossier d'exécution dont l'instance est
+/// Retire les sockets `rmplayer-*.sock` du dossier d'exécution dont l'instance est
 /// morte.
 ///
 /// **Pourquoi ce balayage.** Un processus tué par `SIGTERM` ou `SIGKILL` n'exécute
@@ -291,7 +291,7 @@ fn nettoyer_sockets_orphelins(dossier: &Path, le_notre: &Path) {
     for entree in entrees.flatten() {
         let chemin = entree.path();
         let nom = entree.file_name().to_string_lossy().to_string();
-        if !nom.starts_with("kplayer-") || !nom.ends_with(".sock") {
+        if !nom.starts_with("rmplayer-") || !nom.ends_with(".sock") {
             continue;
         }
         if repond(&chemin) {
@@ -343,12 +343,12 @@ mod tests {
     fn l_empreinte_est_stable_et_discriminante() {
         // Même entrée, même valeur : c'est ce qui permet au socket de garder le
         // même nom d'une session à l'autre.
-        assert_eq!(empreinte("/home/x/.config/kplayer"), empreinte("/home/x/.config/kplayer"));
+        assert_eq!(empreinte("/home/x/.config/rmplayer"), empreinte("/home/x/.config/rmplayer"));
         assert_ne!(empreinte("/a"), empreinte("/b"));
         assert_eq!(empreinte("").len(), 16);
         // Valeur figée : si l'algorithme changeait, les sockets d'une version
         // précédente seraient orphelins sans que personne ne le voie.
-        assert_eq!(empreinte("kplayer"), "b6dcc233c3cc71e3");
+        assert_eq!(empreinte("rmplayer"), "d8d48c0657964f7d");
     }
 
     #[test]
@@ -363,8 +363,8 @@ mod tests {
     fn le_socket_depend_du_dossier_de_configuration() {
         // Deux configurations isolées ne doivent pas partager de socket : sans
         // cela, un banc volerait les fichiers de l'utilisateur.
-        let a = format!("kplayer-{}.sock", empreinte("/tmp/banc-a"));
-        let b = format!("kplayer-{}.sock", empreinte("/tmp/banc-b"));
+        let a = format!("rmplayer-{}.sock", empreinte("/tmp/banc-a"));
+        let b = format!("rmplayer-{}.sock", empreinte("/tmp/banc-b"));
         assert_ne!(a, b);
     }
 }

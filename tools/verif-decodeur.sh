@@ -20,10 +20,10 @@
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 BASE=/tmp/kp-decodeur
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=warn
+export RUST_LOG=rmplayer=warn
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -46,8 +46,8 @@ for f in h264.mp4 vp9.webm av1.mkv mpeg2.mpg; do
 done
 
 config() {  # config <nom> '<json decoders>'
-    local d="$BASE/$1"; rm -rf "$d"; mkdir -p "$d/conf/kplayer" "$d/cache"
-    python3 - "$d/conf/kplayer/config.json" "$2" <<'PY'
+    local d="$BASE/$1"; rm -rf "$d"; mkdir -p "$d/conf/rmplayer" "$d/cache"
+    python3 - "$d/conf/rmplayer/config.json" "$2" <<'PY'
 import json, sys
 json.dump({"video": {"hardware_decoding": False, "decoders": json.loads(sys.argv[2])},
            "audio": {"device": "", "volume_max": 150}, "subtitles": {"auto_load": False},

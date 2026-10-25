@@ -24,7 +24,7 @@
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 BASE=/tmp/kp-vignettes
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 
 PASS=0; FAIL=0

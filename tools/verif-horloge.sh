@@ -21,7 +21,7 @@
 # Usage : tools/verif-horloge.sh        (nécessite ffmpeg, Xvfb, xdotool, pactl)
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 BASE=/tmp/kp-horloge
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -87,14 +87,14 @@ Xvfb :97 -screen 0 1280x800x24 >/tmp/xvfb-horloge.log 2>&1 &
 XPID=$!
 sleep 2
 
-# lecteur <journal> <durée_s> <arguments…> : lance KPlayer, attend, l'arrête.
+# lecteur <journal> <durée_s> <arguments…> : lance RMPlayer, attend, l'arrête.
 # Les positions mémorisées sont effacées : sans cela, la « reprise de lecture »
 # replacerait chaque essai là où le précédent s'est arrêté (mesures non
 # reproductibles), et masquerait l'effet de `--seek`.
 lecteur() {
     local journal="$1" duree="$2"; shift 2
-    rm -f "$journal" "$XDG_CACHE_HOME/kplayer/positions.json"
-    RUST_LOG=kplayer=debug "$KP" "$@" >"$journal" 2>&1 &
+    rm -f "$journal" "$XDG_CACHE_HOME/rmplayer/positions.json"
+    RUST_LOG=rmplayer=debug "$KP" "$@" >"$journal" 2>&1 &
     local pid=$!
     sleep "$duree"
     kill "$pid" 2>/dev/null
@@ -304,11 +304,11 @@ fi
 
 # --- 5. Pause / reprise : pas de saut de synchronisation ---------------------
 echo "== 5. Pause puis reprise (touche Espace) =="
-rm -f "$BASE/pause.log" "$XDG_CACHE_HOME/kplayer/positions.json"
-RUST_LOG=kplayer=debug "$KP" "$BASE/av.mp4" >"$BASE/pause.log" 2>&1 &
+rm -f "$BASE/pause.log" "$XDG_CACHE_HOME/rmplayer/positions.json"
+RUST_LOG=rmplayer=debug "$KP" "$BASE/av.mp4" >"$BASE/pause.log" 2>&1 &
 LECTEUR_PID=$!
 sleep 4
-WID=$(xdotool search --name "KPlayer" 2>/dev/null | head -1)
+WID=$(xdotool search --name "RMPlayer" 2>/dev/null | head -1)
 if [ -n "${WID:-}" ]; then
     eval "$(xdotool getwindowgeometry --shell "$WID" 2>/dev/null)"
     xdotool mousemove $((X + WIDTH / 2)) $((Y + HEIGHT / 2))

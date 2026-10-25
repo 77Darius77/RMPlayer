@@ -11,12 +11,12 @@ DISP=:99
 #
 # **Pourquoi.** Deux suites lancées en parallèle (une restée d'un essai précédent,
 # une nouvelle) se disputent le même écran virtuel : les bancs qui capturent l'écran
-# mesurent la fenêtre de l'autre, ceux qui tuent « kplayer » tuent l'instance de
+# mesurent la fenêtre de l'autre, ceux qui tuent « rmplayer » tuent l'instance de
 # l'autre, et les résultats deviennent faux sans qu'aucun message ne le dise —
 # constaté en session 34 (un banc de sous-titres image mesurait les barres de
 # couleur d'un autre film). `flock` sur un fichier de verrou règle le problème et
 # le dit clairement.
-VERROU=/tmp/kplayer-suite.lock
+VERROU=/tmp/rmplayer-suite.lock
 exec 9>"$VERROU"
 if ! flock -n 9; then
     echo "Une suite de vérification tourne déjà (verrou $VERROU)."
@@ -93,6 +93,7 @@ run verif-saut-pause tools/verif-saut-pause.sh "$DISP"
 run verif-audio-pistes tools/verif-audio-pistes.sh "$DISP"
 run verif-peripheriques tools/verif-peripheriques.sh "$DISP"
 run verif-fenetres-detachables tools/verif-fenetres-detachables.sh "$DISP"
+run verif-migration tools/verif-migration.sh
 run verif-filtres tools/verif-filtres.sh
 run verif-couleur tools/verif-couleur.sh
 run verif-decodeur tools/verif-decodeur.sh

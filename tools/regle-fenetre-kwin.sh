@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# regle-fenetre-kwin.sh — règle de fenêtre KWin pour retrouver KPlayer à sa place
+# regle-fenetre-kwin.sh — règle de fenêtre KWin pour retrouver RMPlayer à sa place
 #                        sous Wayland (Plasma 6.8 et suivants).
 #
 # **Pourquoi ce script existe.** Depuis Plasma 6.8 (octobre 2026), la session X11
 # n'existe plus : Plasma démarre toujours sous Wayland. Or le protocole Wayland ne
 # donne pas la position d'une fenêtre à son client, et un client ne peut pas se
-# placer lui-même : KPlayer ne peut donc plus mémoriser que la **taille** et l'état
+# placer lui-même : RMPlayer ne peut donc plus mémoriser que la **taille** et l'état
 # agrandi (il le fait, voir `docs/AVANCEMENT.md` §6.38). Le placement relève du
 # compositeur — KWin le fait par **règle de fenêtre**, le mécanisme officiel
 # (Plasma 6.8 en livre une pour Steam).
 #
-# La règle posée ici ne règle que la **position**, fenêtre « kplayer », politique
+# La règle posée ici ne règle que la **position**, fenêtre « rmplayer », politique
 # « Apply » : la fenêtre s'ouvre à la position enregistrée dans la règle, à chaque
 # lancement. Pour adopter la place où on vient de la mettre : déplacer la fenêtre,
 # puis `--depuis-fenetre` (la position est lue sur la fenêtre ouverte).
@@ -29,13 +29,13 @@
 #   tools/regle-fenetre-kwin.sh --retirer            # supprime la règle
 #
 # Le fichier `~/.config/kwinrulesrc` est **sauvegardé** avant modification
-# (`kwinrulesrc.avant-kplayer-<date>.bak`). Rien n'est fait si la session n'est pas
+# (`kwinrulesrc.avant-rmplayer-<date>.bak`). Rien n'est fait si la session n'est pas
 # KWin/Wayland : la commande le dit et sort sans toucher à la configuration.
 set -u
 
 CMD="${1:-installer}"
 POSITION="240,200"
-GROUPE="kplayer-geometrie"
+GROUPE="rmplayer-geometrie"
 REGLES="${XDG_CONFIG_HOME:-$HOME/.config}/kwinrulesrc"
 
 while [ $# -gt 0 ]; do
@@ -94,7 +94,7 @@ if [ "$CMD" = "etat" ]; then
         sed -n "/^\[$GROUPE\]/,/^\[/p" "$REGLES" | sed '$d'
         ok "règle présente"
     else
-        info "aucune règle KPlayer : la position n'est pas restituée sous Wayland"
+        info "aucune règle RMPlayer : la position n'est pas restituée sous Wayland"
     fi
     exit 0
 fi
@@ -102,7 +102,7 @@ fi
 # --- Retrait -----------------------------------------------------------------
 if [ "$CMD" = "retirer" ]; then
     [ -f "$REGLES" ] || { info "aucun fichier de règles"; exit 0; }
-    cp -a "$REGLES" "$REGLES.avant-retrait-kplayer.bak"
+    cp -a "$REGLES" "$REGLES.avant-retrait-rmplayer.bak"
     python3 - "$REGLES" "$GROUPE" <<'PY'
 import configparser, sys
 chemin, groupe = sys.argv[1], sys.argv[2]
@@ -117,7 +117,7 @@ with open(chemin, "w", encoding="utf-8") as f:
     cp.write(f, space_around_delimiters=False)
 PY
     qdbus6 org.kde.KWin /KWin reconfigure >/dev/null 2>&1
-    ok "règle retirée (KWin reconfiguré) ; sauvegarde : $REGLES.avant-retrait-kplayer.bak"
+    ok "règle retirée (KWin reconfiguré) ; sauvegarde : $REGLES.avant-retrait-rmplayer.bak"
     exit 0
 fi
 
@@ -126,18 +126,18 @@ fi
 # fait charger un qui lit `frameGeometry` et l'écrit dans le journal, avec un
 # marqueur unique (sinon on relirait la mesure d'une exécution précédente).
 if [ "$CMD" = "depuis-fenetre" ]; then
-    if ! pgrep -x kplayer >/dev/null; then
-        ko "aucune fenêtre KPlayer ouverte : lancer le lecteur d'abord"
+    if ! pgrep -x rmplayer >/dev/null; then
+        ko "aucune fenêtre RMPlayer ouverte : lancer le lecteur d'abord"
         exit 2
     fi
     jeton="REGLE_$$_$(date +%s%N)"
-    js=$(mktemp /tmp/regle-kplayer-XXXXXX.js)
+    js=$(mktemp /tmp/regle-rmplayer-XXXXXX.js)
     cat > "$js" <<JS
 function main() {
     const ws = workspace.windowList();
     for (let i = 0; i < ws.length; i++) {
         const w = ws[i];
-        if (String(w.resourceClass).indexOf("kplayer") >= 0) {
+        if (String(w.resourceClass).indexOf("rmplayer") >= 0) {
             print("$jeton " + Math.round(w.frameGeometry.x) + "," + Math.round(w.frameGeometry.y));
         }
     }
@@ -173,13 +173,13 @@ if abs(x) > 100000 or abs(y) > 100000:
     sys.exit("position invraisemblable (au-delà de 100 000 points)")
 PY
 
-[ -f "$REGLES" ] && cp -a "$REGLES" "$REGLES.avant-kplayer-$(date +%Y%m%d-%H%M%S).bak"
+[ -f "$REGLES" ] && cp -a "$REGLES" "$REGLES.avant-rmplayer-$(date +%Y%m%d-%H%M%S).bak"
 
 # Écriture par `kwriteconfig6` (le même outil que Plasma) : le fichier reste un INI
 # valide, y compris pour les groupes déjà présents.
 k() { kwriteconfig6 --file "$REGLES" --group "$GROUPE" --key "$1" "$2"; }
-k Description "KPlayer — position (Wayland)"
-k wmclass "kplayer"
+k Description "RMPlayer — position (Wayland)"
+k wmclass "rmplayer"
 k wmclassmatch 1          # ExactMatch
 k types 1                 # fenêtres normales seulement
 # Politique Apply (3) : la valeur est appliquée à l'ouverture, et l'utilisateur
@@ -222,6 +222,6 @@ sleep 2
 echo
 sed -n "/^\[$GROUPE\]/,/^\[/p" "$REGLES" | sed '$d' | sed 's/^/  /'
 echo
-ok "règle installée : la prochaine fenêtre KPlayer se placera en ${POSITION}"
+ok "règle installée : la prochaine fenêtre RMPlayer se placera en ${POSITION}"
 info "pour adopter une autre place : déplacer la fenêtre, puis $0 --depuis-fenetre"
 info "vérifier : tools/verif-fenetre-wayland.sh   —   annuler : $0 --retirer"

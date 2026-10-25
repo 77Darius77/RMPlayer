@@ -2,12 +2,12 @@
 # Diagnostic : les touches atteignent-elles la fenêtre sous Xvfb ?
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib XDG_RUNTIME_DIR=/tmp/kplayer-bench-pas-de-son
+export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib XDG_RUNTIME_DIR=/tmp/rmplayer-bench-pas-de-son
 
 Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb-diag.log 2>&1 &
 XPID=$!
 sleep 2
-DISPLAY=:99 RUST_LOG=kplayer=info ./target/release/kplayer /media/blaise/LINUX_DATA/test-60s.mp4 >/tmp/diag.log 2>&1 &
+DISPLAY=:99 RUST_LOG=rmplayer=info ./target/release/rmplayer /media/blaise/LINUX_DATA/test-60s.mp4 >/tmp/diag.log 2>&1 &
 KPID=$!
 sleep 5
 
@@ -17,8 +17,8 @@ DISPLAY=:99 xdotool search --name "" 2>/dev/null | while read -r w; do
         "$(DISPLAY=:99 xdotool getwindowgeometry --shell "$w" 2>/dev/null | tr '\n' ' ')"
 done
 echo "--- focus actuel : $(DISPLAY=:99 xdotool getwindowfocus 2>&1)"
-WID=$(DISPLAY=:99 xdotool search --name KPlayer | head -1)
-echo "--- fenêtre KPlayer : ${WID:-aucune}"
+WID=$(DISPLAY=:99 xdotool search --name RMPlayer | head -1)
+echo "--- fenêtre RMPlayer : ${WID:-aucune}"
 
 echo "--- test 1 : key --window"
 DISPLAY=:99 xdotool key --window "$WID" i; sleep 2

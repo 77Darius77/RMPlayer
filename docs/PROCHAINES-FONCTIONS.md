@@ -1,22 +1,13 @@
-# Prochaines fonctions — ce qui manque réellement par rapport à PotPlayer
+# Prochaines fonctions — ce qui manque réellement
 
 *Établi le 2026-10-24 (session 36). À lire avant de choisir quoi implémenter ; la recette est
 dans [`AJOUTER-UNE-FONCTION.md`](AJOUTER-UNE-FONCTION.md).*
 
 ## Pourquoi ce document existe
 
-La matrice de [`POTPLAYER-VERS-KPLAYER.md`](POTPLAYER-VERS-KPLAYER.md) (§1 à §9) date de la
-session 31 : **ses colonnes de statut sont périmées**. Elle marque encore ❌ des choses faites
-depuis — teinte, niveaux, adoucir, association de fichiers, MPRIS, lecture aléatoire, pause à
-la perte de focus, mémoire de la fenêtre, HDR, interlettre, marges latérales, vignettes. Se
-fier à elle ferait refaire du travail. **Ce document remplace ses colonnes de statut** ; le
-§11 de ce même fichier reste la trace du plan des sessions 32-35 (tout y est fait sauf ⑪).
-
-**Comment les statuts ont été établis.** Pour chaque ligne ❌ ou 🟡 de la matrice, recherche du
-réglage dans `src/config.rs` (un champ de `Config` qui n'existe pas = fonction absente) et
-recoupement avec `docs/ETAT-COURT.md`. Aucune de ces fonctions n'a été essayée dans PotPlayer :
-le périmètre vient du catalogue de ses réglages, pas d'un tour de ses menus (voir « Ce que ce
-document ne couvre pas »).
+Le reste à faire est établi **dans le code**, pas dans une liste figée : pour chaque fonction
+candidate, recherche du réglage dans `src/config.rs` (un champ de `Config` qui n'existe pas =
+fonction absente) et recoupement avec `docs/ETAT-COURT.md`.
 
 **Les efforts sont indicatifs** (petit = moins d'une session, moyen = une session, gros = plus).
 **L'ordre est un jugement**, expliqué plus bas ; rien n'a été arbitré avec vous.
@@ -25,22 +16,22 @@ document ne couvre pas »).
 
 ## Lot 1 — petit, attendu à l'usage, testable sans interface
 
-| # | Fonction | PotPlayer | Où | Comment le prouver | Effort |
-|---|---|---|---|---|---|
-| A1 ✅ | **Fichiers récents** (fait s.37, `verif-recents` 7/7) : liste bornée, menu, « effacer » | `Dialog` 3127 | `playback.recent` ; menu dans `ui.rs` | ouvrir 3 fichiers : `config.json` contient 3 entrées, la plus récente d'abord, sans doublon ni dépassement de la borne | petit |
-| A2 ✅ | **Boucle A-B : nombre de boucles et délai** (fait s.37, `verif-boucle-ab` 6/6, option `--boucle-ab A B`) | `Dialog(453)` | `loop_a_ms` / `loop_b_ms` dans `player.rs` ; 2 champs `playback.*` | N boucles puis arrêt (retours comptés au journal **et** par la position), délai mesuré entre deux passages | petit |
-| A3 ✅ | **Exporter / importer la configuration** (fait s.37, `verif-config-io` 12/12) | 2096 | bouton dans les préférences + `--export-config` / `--import-config` en ligne de commande | aller-retour : exporter, modifier, importer → fichier identique octet pour octet ; fichier invalide refusé sans écraser | petit |
+| # | Fonction | Où | Comment le prouver | Effort |
+|---|---|---|---|---|
+| A1 ✅ | **Fichiers récents** (fait s.37, `verif-recents` 7/7) : liste bornée, menu, « effacer » | `playback.recent` ; menu dans `ui.rs` | ouvrir 3 fichiers : `config.json` contient 3 entrées, la plus récente d'abord, sans doublon ni dépassement de la borne | petit |
+| A2 ✅ | **Boucle A-B : nombre de boucles et délai** (fait s.37, `verif-boucle-ab` 6/6, option `--boucle-ab A B`) | `loop_a_ms` / `loop_b_ms` dans `player.rs` ; 2 champs `playback.*` | N boucles puis arrêt (retours comptés au journal **et** par la position), délai mesuré entre deux passages | petit |
+| A3 ✅ | **Exporter / importer la configuration** (fait s.37, `verif-config-io` 12/12) | bouton dans les préférences + `--export-config` / `--import-config` en ligne de commande | aller-retour : exporter, modifier, importer → fichier identique octet pour octet ; fichier invalide refusé sans écraser | petit |
 
 ## Lot 2 — style des sous-titres (FAIT s.37 : `verif-soustitres-style` 9/9, `verif-soustitres-langues` 10/10) (même méthode que `verif-soustitres.sh` : mesure sur les pixels)
 
-| # | Fonction | PotPlayer | Où | Effort |
-|---|---|---|---|---|
-| B1 ✅ | **Marges haut et bas** réglables (aujourd'hui 12 px fixes + position en %) | marges, 2079-2081 | `subtitles.margin_top/bottom_percent`, à côté de `margin_left/right_percent` | petit |
-| B2 ✅ | **Interligne** réglable (aujourd'hui 1,25 × la taille, fixe) | interligne | `subtitles.line_spacing` | petit |
-| B3 ✅ | **Second contour** et **ombre** (couleur, transparence, décalage) | `Dialog` 383 | `subtitles.outline2_*`, `shadow_*` ; rendu dans `ui.rs` | moyen |
-| B4 ✅ | **Échelle X / Y** du texte | style police | `subtitles.scale_x/y` | moyen |
-| B5 ✅ | **Fondu** d'apparition et de disparition | fondu | `subtitles.fade_ms` ; alpha par image | petit |
-| B6 ✅ | **Langues préférées avec priorité**, durées mini/maxi d'affichage, **piste mémorisée** | 2079 | `subtitles.preferred_languages`, `min_duration_ms`, `max_duration_ms` ; seul `default_language` existe | moyen |
+| # | Fonction | Où | Effort |
+|---|---|---|---|
+| B1 ✅ | **Marges haut et bas** réglables (aujourd'hui 12 px fixes + position en %) | `subtitles.margin_top/bottom_percent`, à côté de `margin_left/right_percent` | petit |
+| B2 ✅ | **Interligne** réglable (aujourd'hui 1,25 × la taille, fixe) | `subtitles.line_spacing` | petit |
+| B3 ✅ | **Second contour** et **ombre** (couleur, transparence, décalage) | `subtitles.outline2_*`, `shadow_*` ; rendu dans `ui.rs` | moyen |
+| B4 ✅ | **Échelle X / Y** du texte | `subtitles.scale_x/y` | moyen |
+| B5 ✅ | **Fondu** d'apparition et de disparition | `subtitles.fade_ms` ; alpha par image | petit |
+| B6 ✅ | **Langues préférées avec priorité**, durées mini/maxi d'affichage, **piste mémorisée** | `subtitles.preferred_languages`, `min_duration_ms`, `max_duration_ms` ; seul `default_language` existe | moyen |
 
 ## Lot 3 — vidéo (FAIT s.37 sauf C4) (même méthode que `verif-filtres.sh`)
 
@@ -51,7 +42,7 @@ document ne couvre pas »).
 | C3 ✅ | **Étendre à l'écran / rogner** (fait s.37 : aspect « Rogner », `verif-affichage` 5/5) (aujourd'hui : recadrage seulement) | cadrage dans `player.rs` / `ui.rs` | moyen |
 | C4 ⛔ | **Plein écran : autres moniteurs en noir** — NON FAIT, volontairement : sous Wayland (la seule session de cette machine) un client ne peut ni placer ni lister ses fenêtres sur un autre écran, et Xvfb ne reproduit pas ce cas ; une fonction qu'on ne peut pas mesurer ici ne serait pas une fonction (recette §1) | fenêtres noires, `main.rs` / `x11.rs` | moyen (piège Wayland : pas de positionnement client) |
 
-## Lot 4 — fonction PotPlayer hors du catalogue des réglages (FAIT s.37)
+## Lot 4 — fonctions hors du catalogue des réglages (FAIT s.37)
 
 | # | Fonction | Où | Effort |
 |---|---|---|---|
@@ -60,15 +51,15 @@ document ne couvre pas »).
 Confirmé absent dans le code : aucun terme `bookmark`, `signet` ou `favori` dans `src/`.
 **Deux différences avec `positions.rs`** à ne pas copier : il stocke **une** position par
 média (`HashMap<String, u64>`), alors qu'un signet est une **liste** par média ; et il écrit dans
-`~/.cache/kplayer/`, un cache qu'on peut effacer sans perdre de réglage — des signets
+`~/.cache/rmplayer/`, un cache qu'on peut effacer sans perdre de réglage — des signets
 doivent vivre avec la configuration, pas dans le cache.
 
 ## Lot 5 — système et intégration (FAIT s.37)
 
 | # | Fonction | Remarque | Effort |
 |---|---|---|---|
-| E1 ✅ | **Souris : actions avec Ctrl / Maj / Alt** (fait s.37, `verif-souris` 4/4 : Ctrl+molette = ±5 s, Maj+molette = vitesse, personnalisable et capturable dans les préférences) | PotPlayer `Dialog(458)` ; aujourd'hui molette = volume / seek, clic milieu, double-clic | moyen |
-| E2 ✅ | **Choix manuel du décodeur** (fait s.37, `verif-decodeur` 7/7 : décodeur par codec, repli sur le défaut s'il ne s'ouvre pas) | `Dialog(423)` ; utile surtout pour forcer le logiciel quand VA-API se comporte mal | moyen |
+| E1 ✅ | **Souris : actions avec Ctrl / Maj / Alt** (fait s.37, `verif-souris` 4/4 : Ctrl+molette = ±5 s, Maj+molette = vitesse, personnalisable et capturable dans les préférences) | avant : molette = volume / seek, clic milieu, double-clic | moyen |
+| E2 ✅ | **Choix manuel du décodeur** (fait s.37, `verif-decodeur` 7/7 : décodeur par codec, repli sur le défaut s'il ne s'ouvre pas) | utile surtout pour forcer le logiciel quand VA-API se comporte mal | moyen |
 | E3 ✅ | **Icône de notification** (fait s.37, `verif-tray` 7/7 : crate `ksni`, clic = afficher/masquer, menu lecture/suivant/précédent/quitter) (StatusNotifier) | `ksni` / D-Bus | moyen |
 | E4 ✅ | **Démarrage automatique** (fait s.37, `verif-systeme` : `--autostart on|off|status`) | un `.desktop` dans `~/.config/autostart` | petit |
 | E5 ✅ | **Priorité du processus** (fait s.37, `verif-systeme` : nice mesuré sur tous les fils ; les fils de shaders de Mesa restent à 19) | `setpriority` ; utile en 4K seulement | petit |
@@ -81,7 +72,7 @@ doivent vivre avec la configuration, pas dans le cache.
 | F1 | ~~**Repli HDR automatique vers le moteur CPU**~~ | **fait (s.36), borné** : l'étage CPU remplace l'étage GPU refusé si la source tient dans 62 Mpx/s (≤ 1080p30) ; au-delà, image non convertie et avis à l'écran. Budget et mesures dans `docs/HDR.md` ; `verif-hdr` §12 (36/36). Corrigé au passage : l'échec de Vulkan était rejoué à chaque image dès qu'un autre filtre était actif |
 | F2 | **Passthrough HDR / sortie 10 bits** (⑪) | NON FAIT : bloqué par winit (aucune API de couleur) ; inatteignable ici : 3 écrans, tous SDR — rien à mesurer |
 | F3 | **Langue d'interface** (fluent / `.po`) | NON FAIT : traduire toute l'interface est un chantier à part, sans valeur pour un usage francophone ; aucune mesure honnête possible sans relire chaque libellé |
-| F4 ✅ | **Thèmes externes** | fait s.37, `verif-theme` 6/6 : fichiers JSON dans `~/.config/kplayer/themes/`, thème illisible refusé et réglage remis à « intégré » |
+| F4 ✅ | **Thèmes externes** | fait s.37, `verif-theme` 6/6 : fichiers JSON dans `~/.config/rmplayer/themes/`, thème illisible refusé et réglage remis à « intégré » |
 | F5 | **WarpSharp**, **mouvement flou**, **contour flou**, **ruby**, **alphabet** | **alphabet : fait s.37** (`subtitles.encoding`, `verif-soustitres-langues` §6 — et correction d'un défaut : un fichier non UTF-8, soit la plupart des anciens sous-titres français, n'était pas chargé du tout). Le reste NON FAIT : WarpSharp absent du FFmpeg compilé, mouvement/contour flous coûteux et d'usage marginal |
 | F6 | **Téléchargement de sous-titres en ligne**, **enregistrement / transcodage** | NON FAIT : service tiers et clé d'API à choisir (décision qui vous revient), enregistrement déclaré hors périmètre dans `INVENTAIRE-FONCTIONNALITES.md` |
 
@@ -94,7 +85,7 @@ doivent vivre avec la configuration, pas dans le cache.
    terrain sans risque.
 2. **B1 + B2 ensemble** (marges haut/bas et interligne) : même mécanisme que les marges
    latérales et l'interlettre faits en session 34, donc le chemin est connu ; puis B5.
-3. **D1 (marque-pages)** : la seule fonction « de tous les jours » de PotPlayer qui manque
+3. **D1 (marque-pages)** : la seule fonction « de tous les jours » qui manque
    entièrement, et `positions.rs` donne le modèle de stockage.
 4. **C1 puis C2** : deux lignes de filtre chacune, mais C1 touche la couleur — à mesurer avec
    les mires déjà utilisées par `verif-hdr.sh`.
@@ -104,12 +95,11 @@ doivent vivre avec la configuration, pas dans le cache.
 
 ## Ce que ce document ne couvre pas
 
-- **Les menus de PotPlayer** (lecture, navigation, outils, gestion de la liste) n'ont pas été
-  parcourus : seul le catalogue des réglages l'a été. D1 est la seule fonction hors catalogue
-  identifiée ; il y en a sans doute d'autres, qu'un relevé des menus de PotPlayer ferait
-  apparaître.
-- **La qualité de rendu** de chaque fonction, par rapport à PotPlayer, n'est pas comparée ; seul
-  l'effet mesuré (pixels, son, position) l'est.
+- **Les menus** (lecture, navigation, outils, gestion de la liste) n'ont pas été parcourus
+  systématiquement : seuls les réglages l'ont été. D1 est la seule fonction hors réglages
+  identifiée ; il y en a sans doute d'autres.
+- **La qualité de rendu** de chaque fonction n'est pas évaluée ; seul l'effet mesuré (pixels, son,
+  position) l'est.
 - **Les efforts** sont des ordres de grandeur, pas des engagements.
 
 ## Défauts constatés en s.37 (hors lots)

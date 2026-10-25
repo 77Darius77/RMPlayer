@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Détecte les zones cliquables de la barre de contrôles dans une capture KPlayer.
+"""Détecte les zones cliquables de la barre de contrôles dans une capture RMPlayer.
 
 La barre occupe les dernières lignes de la fenêtre ; les commandes se distinguent du
 fond par un écart de niveau. Sortie : une ligne par zone (centre horizontal, en pixels).
