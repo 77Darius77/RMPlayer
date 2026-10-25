@@ -5,9 +5,10 @@
 > chiffres mesurés, chantiers suivants. Ce document-ci est la vue détaillée (par domaine,
 > règles du projet, sauvegarde) : on le consulte par recherche, pas en entier.
 
-**Point d'entrée unique.** Dernière mise à jour : **2026-10-18** (fin de session 31).
-Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux` — **aucun contrôle de version** (voir
-« Sauvegarde » en fin de document).
+**Vue détaillée.** Dernière mise à jour : **2026-10-25** (session 37).
+Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`, sous **git** (branche `main`, une branche
+`fonction/<nom>` par fonction, étiquettes `session36`…) et publié sur
+<https://github.com/77Darius77/RMPlayer> (voir « Versions et sauvegardes » en fin de document).
 
 **Documents voisins** : `docs/OPTIMISATION.md` (coûts mesurés et plan d'optimisation),
 `docs/INVENTAIRE-FONCTIONNALITES.md` (ce qui marche, limite, a été retiré), `docs/AVANCEMENT.md`
@@ -16,43 +17,42 @@ Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux` — **aucun contrôle de vers
 | | |
 |---|---|
 | Objet | Lecteur vidéo pour Linux, en Rust, sur FFmpeg 7.1 (`/opt/ffmpeg-7.1`) |
-| Code | 25 299 lignes, 19 modules (`src/`) |
-| Binaire | `target/release/rmplayer` (52 Mo, rapport de crash exploitable) |
+| Code | 29 281 lignes, 27 modules (`src/`) |
+| Binaire | `target/release/rmplayer` (≈ 52 Mo, rapport de crash exploitable) |
 | Lancement | `./run.sh film.mp4` (ou icône / ligne de commande avec `--no-hwdec`, `--fullscreen`) |
 | Compilation | `cargo build --release` — **0 avertissement** |
-| Audit de l'interface | `tools/audit-ui.sh` — **54/54** (contrôle statique des interblocages, vivacité après chaque touche, fermeture par `Q`) |
-| Vérification de l'horloge | `tools/verif-horloge.sh` — **19/19** (carte son maître, préremplissage, tampon, seek, 2×, pause, repli) |
-| Vérification de la personnalisation | `tools/verif-personnalisation.sh` — **19/19** (clic droit, raccourcis réaffectés, repère de recadrage, miroir horizontal) |
-| Audit des menus | `tools/audit-menus.sh` — **31/31** (6 menus : présence, lisibilité, effet réel de 19 entrées) |
-| Vérification des sous-titres image | `tools/verif-sousimages.sh` — **10/10** (décodage, géométrie, couleur, extinction, non-régression du texte) |
-| Vérification du réseau | `tools/verif-reseau.sh` — **21/21** (coupure 503, serveur tué, connexion fermée, serveur muet, abandon, fin normale, panne de 4 s absorbée par la réserve) |
-| Audit des préférences | `tools/audit-prefs.sh` — **10/10** (bornage à l'écran, dépliage, défilement, égaliseur) |
-| Vérification des filtres | `tools/verif-filtres.sh` — **16/16** (dont netteté, rotation, zoom, `bwdif` contre `yadif`) |
-| Vérification de l'audio | `tools/verif-audio.sh` — **29/29** (9 traitements mesurés) |
-| Vérification des pistes | `tools/verif-pistes.sh` — **16/16** (inventaire, bascule à chaud, sous-titres) |
-| Vérification du cadrage | `tools/verif-cadrage.sh` — **10/10** (recadrage, aspect, style des sous-titres, chapitres) |
-| Vérification ASS | `tools/verif-ass.sh` — **17/17** (position, couleur, alignement, `\move`, `\t`, karaoké) |
-| Vérification ASS — découpe et rotation | `tools/verif-ass-clip.sh` — **11/11** (`\clip` à la frontière mesurée, `\iclip`, `\frz` 90°, `\org`) |
-| Vérification des profils | `tools/verif-profils.sh` — **17/17** (application réelle, persistance, robustesse) |
-| Vérification des règles de profil | `tools/verif-regles.sh` — **24/24** (chemin, extension, résolution, ordre, orphelines, interface) |
-| Vérification du pré-cache réseau | `tools/verif-precache.sh` — **9/9** (avance des requêtes, coupure de 3 s absorbée, reprise en continuité, garde-fous) |
-| Optimisations GPU et AV1 | `tools/bench-optimisation.sh` — **4/4** (échelle GPU −42 %, désentrelacement GPU −38 %, géométrie intacte, AV1 logiciel) |
-| Vérification des sous-titres (style) | `tools/verif-soustitres.sh` — **5/5** (famille de police mesurée, position horizontale, police inconnue, non-régression) |
-| Mémoire de la fenêtre | `tools/verif-fenetre.sh` — **9/9** (taille, position et état agrandi restitués ; hors écran recentrée ; plein écran n'écrase rien) |
-| HDR (conversion tonale, tramage, débanding, détection écran) | `tools/verif-hdr.sh` — **36/36** (mires en nits : détection, signature de conversion, deux opérateurs, moteur CPU forcé, HLG, tramage, débanding, VA-API = logiciel, Vulkan coupé : repli CPU borné par un budget, sinon image non convertie ; avis à l'écran ; pas de reconstruction à chaque image) |
-| Pause selon le focus | `tools/verif-focus.sh` — **11/11** (pause mesurée sur l'image et dans le journal ; deux fenêtres réelles : jamais / perte de focus / réduite, reprise et respect d'une pause volontaire) |
-| MPRIS (touches média du bureau) | `tools/verif-mpris.sh` — **27/27** (module seul : propriétés, unités µs, commandes, SetPosition filtré, PropertiesChanged, nom rendu, sans bus) + 8 contrôles d'intégration dans `verif-playlist.sh` |
-| Vignettes de la barre de progression | `tools/verif-vignettes.sh` — **14/14** (module seul : taille, position réelle, deux positions → deux images, coût, sortie réutilisée, largeur non multiple de 32, hors durée) + 3 contrôles d'intégration dans `verif-playlist.sh` |
-| Playlist : aléatoire et glisser-déposer | `tools/verif-playlist.sh` — **18/18** (ordre restauré, glissement réel à la souris, ordre conservé après relance, quatre avances → quatre fichiers distincts, règle de profil suivie, volet borné à 300 px avec des noms longs, clic sur une ligne, ✕ qui retire) |
-| Association de fichiers | `tools/verif-association.sh` — **38/38** (installateur, `Exec` réellement lancé, types MIME connus, instance unique, socket orphelin, désinstallation, `~/.local` de l'utilisateur intact) |
-| Mémoire de la fenêtre — Wayland | `tools/verif-fenetre-wayland.sh` — **12/12** (taille restituée, aucune position inventée, règle KWin appliquée puis retirée ; mesure par script KWin, fenêtre ciblée par PID) |
-| Comparaison des désentrelaceurs | `tools/bench-desentrelacement.sh` — `bwdif` 45,8 dB contre `yadif` 43,4 dB (image immobile), 11,2 contre 13,2 ms/image 1080p |
-| Suite complète | `tools/tout-verifier.sh` — démarre l'écran virtuel si besoin, **verrouille** (une seule suite à la fois), enchaîne les 26 bancs et imprime le total |
-| **Total** | **629 contrôles, 0 échec** (41 bancs), plus **164 tests unitaires** (`cargo test`) |
+| Tests unitaires | 176 (`cargo test --release`, stables d'une exécution à l'autre) |
+| Bancs de contrôle | 44, lancés par `tools/tout-verifier.sh` ; **liste et description de chacun** : `README.md` (§ Outils) ; dernier résultat de la suite complète : `docs/DERNIERE-SUITE.txt` |
+| Vérification ciblée | `tools/verif-rapide.sh <sujet…>` (`--liste` donne les sujets) : ne rejoue que les bancs concernés par une modification |
+| Suite complète | `tools/tout-verifier.sh` — démarre l'écran virtuel si besoin, **verrouille** (une seule suite à la fois), pose l'environnement des bancs (`env-bancs.sh`), ~50 min |
 
 ---
 
 ## 1. Ce qui fonctionne (vérifié en fonctionnement, pas seulement écrit)
+
+**Sessions 35 à 37 (état courant).** Chaque ligne renvoie au banc qui la mesure
+(`README.md`, § Outils) ; le détail est dans `docs/AVANCEMENT.md` (pièges 118 à 128).
+
+- **HDR** (s.35-36) : conversion tonale HDR→SDR par `libplacebo` (Vulkan), repli CPU **borné**
+  (≤ 1080p30) si Vulkan est refusé, avis à l'écran ; pas de *passthrough* (fenêtre 8 bits).
+- **Lots 1 à 6** de `docs/PROCHAINES-FONCTIONS.md` (s.37) : fichiers récents, répétition A-B
+  réglable, export/import de la configuration, style des sous-titres (contour, ombre,
+  interligne, marges, échelle, fondu), langues par priorité, encodage imposé, matrice et plage de
+  couleur, mode « rogner » et glisser l'image, décodeur par codec, cadence maximale, signets,
+  souris avec Ctrl / Maj / Alt, icône de zone de notification, démarrage automatique, priorité
+  du processus, thèmes externes.
+- **Saut en pause** (s.37) : l'image et la réplique de sous-titre suivent un saut même en pause.
+- **Pistes audio** (s.37) : langues par priorité, commentaires et audiodescriptions écartés,
+  piste « par défaut » du fichier, mémoire par film, `Ctrl+J`.
+- **Sortie audio** (s.37) : les vraies sorties PipeWire par leur nom, changement **en cours de
+  lecture** sans coupure (menu Audio, préférences, `Ctrl+Maj+J`) ; l'ancien choix ne servait à
+  rien (piège 124).
+- **Fenêtres détachables** (s.37) : Préférences, Statistiques, Aide, À propos en vraies fenêtres
+  système, mémorisées (`interface.detached_windows`).
+- **Renommage RMPlayer** (s.37) : binaire, MPRIS, dossiers de configuration ; l'ancien dossier
+  `kplayer` est copié au premier lancement (`src/migration.rs`).
+
+*Les paragraphes ci-dessous, plus anciens, restent exacts ; ils décrivent les sessions 21 à 34.*
 
 **Lecture** : ouverture MP4/MKV/AVI/MOV/WMV/FLV/WebM, décodage **matériel VA-API** avec
 repli logiciel automatique, mise à l'échelle au choix (5 méthodes, appliquées par
@@ -166,11 +166,11 @@ alignement, gras), **décalage des sous-titres** ±10 s, **ouverture d'une URL**
 RTSP, SMB), avance **image par image** (`,` `.`).
 
 **Pistes embarquées** : inventaire des pistes audio et de sous-titres du conteneur (MKV,
-MP4…), choix de la piste audio **par langue préférée** et **changement à chaud** depuis le
+MP4…), choix de la piste audio **par langues prioritaires** et **changement à chaud** depuis le
 menu *Audio*, sous-titres du fichier décodés (texte + minutages) avec priorité au fichier
 externe s'il y en a un.
 
-**Son** : sortie cpal (PipeWire/PulseAudio/ALSA), choix du périphérique, volume, volume
+**Son** : sortie cpal (PipeWire/PulseAudio/ALSA), choix de la sortie par son nom (voir plus haut), volume, volume
 maximal, muet, **égaliseur 18 bandes** (5 profils + courbe personnalisée), **normaliseur
 de volume**, **mode nuit**, **réduction de bruit** (3 niveaux), **élargissement stéréo**,
 **crossfeed**, **karaoké**, **réverbération**, **décalage ±2 s**, **correction de hauteur
@@ -198,56 +198,45 @@ méthode) ; barre de progression 25 % → 15 149 ms, 75 % → 44 550 ms.
 
 ## 2. Travail restant
 
-État au **2026-10-18, fin de session 29**. La même liste, avec le détail du *pourquoi*, est
-dans `docs/AVANCEMENT.md` §8 — **c'est la référence** ; cette section n'en donne que la vue
-d'ensemble.
+État au **2026-10-25** (session 37). **La référence est `docs/PROCHAINES-FONCTIONS.md`** : pour
+chaque fonction non faite, la raison, ligne par ligne. Vue d'ensemble :
 
-### Priorité haute (ce qui se ressent en usage normal)
+### Non fait, avec la raison
 
-[La liste des priorités hautes est **vide**.] Les trois points qui l'occupaient sont faits :
-**sous-titres image** PGS/DVD (session 23, §6.26), **reconnexion d'un flux** (session 22,
-§6.25), **horloge audio maître** (session 21, §6.24).
-
-### Priorité moyenne
-
-- **Rendu GPU type `gpu-next`** (libplacebo) : le FFmpeg de `/opt` est compilé sans aucune
-  bibliothèque externe (`--enable-gpl --enable-nonfree` seuls) → ni `vf_libplacebo` ni
-  `hwcontext_vulkan`. Vulkan et `libplacebo338` sont installés, mais pas les en-têtes
-  (`libplacebo-dev`) et il n'y a pas de sources FFmpeg : recompilation nécessaire.
-  Côté lecteur, le branchement est court ; l'outillage est lourd. Rouvrirait aussi l'HDR.
-- ~~**AV1 en décodage logiciel**~~ **fait (session 31)** : FFmpeg 7.1.3 recompilé avec
-  `--enable-libdav1d` ; AV1 se décode en logiciel (179 i/s en 720p), le décodeur natif de
-  FFmpeg 7.1 échouant sur un AV1 réel. Vérifié par `tools/bench-optimisation.sh`.
-- **Réordonnancement de la playlist par glisser-déposer** : `egui` 0.33 fournit
-  `dnd_drag_source` / `dnd_drop_zone` ; à brancher sur le panneau `L`, avec persistance et
-  mise à jour de l'index courant. Effort court.
-- **Transcodage à la volée / extraction d'extraits** : effort **variable selon la demande** —
-  court pour un remux `-c copy` ou un export audio (les briques existent), moyen pour un
-  transcodage pendant la lecture (seconde chaîne d'encodage, file bornée), long pour une
-  file de traitements avec reprise. Hors périmètre historique : à cadrer avant de commencer.
+- **C4 — plein écran sur plusieurs moniteurs** (autres écrans noircis) : non mesurable sous
+  Wayland (la seule session de la machine).
+- **F2 — passthrough HDR** : inatteignable, la fenêtre est rendue en RGBA 8 bits (`docs/HDR.md`).
+- **F3 — langue d'interface**, **F6** (sous-titres en ligne, enregistrement), reste de **F5** :
+  hors périmètre actuel.
+- **Piste audio externe** (`.mka`, `.ac3` à côté du film) ; **reprise après perte du
+  périphérique de sortie** (PipeWire reroute le flux : rien d'observable ici) ; **renommer un
+  signet** ; encodage imposé pour les sous-titres **intégrés** (il ne vaut que pour les externes).
+- **Transcodage à la volée / extraction d'extraits** : hors du périmètre historique (« lecture »),
+  à cadrer avant de commencer.
 
 ### Limites assumées (constatées, sans chantier prévu)
 
-- **ASS fins détails** : `\p` (dessins vectoriels), `\fscx`/`\fscy`, `\blur`/`\be`,
-  `\frx`/`\fry` (rotations 3D), `\t` par fragment, découpage exact d'un `\clip` vectoriel.
-  Ignorés proprement ; aucun n'est planifié.
+- **ASS fins détails** : `\p` (dessins vectoriels), `\fscx`/`\fscy`, `\blur`/`\be`, `\frx`/`\fry`
+  (rotations 3D), `\t` par fragment, découpage exact d'un `\clip` vectoriel. Ignorés proprement.
 - **`firequalizer`** : `superequalizer` 18 bandes couvre l'usage courant.
 - **Volume maximal** : plafonné à 300 % (au-delà, `cpal` écrête).
 
-### Écarté volontairement (mesure à l'appui, pas un oubli)
+### Dette de vérification connue
 
-- **Mappage tonal HDR** : `tonemap` exige un signal linéaire ; `zscale` absent et
-  `colorspace` refuse `smpte2084`. Sur un flux PQ, `tonemap` seul donne une image plate
-  (**43/1023** au lieu de 504), et les écrans sont SDR. À rouvrir avec le chantier
-  `gpu-next`, qui apporte la linéarisation correcte.
+- `verif-focus` mode 2 (fenêtre réduite) exige un gestionnaire de fenêtres : non couvert.
+- Une vingtaine de bancs anciens n'ont pas été relus ligne par ligne ; environ 35 bancs
+  individuels ne chargent pas `env-bancs.sh` (ils ne sont fiables que lancés par
+  `tout-verifier.sh` ou `verif-rapide.sh`).
+- La position de la vignette est auto-déclarée (non mesurée à l'écran).
+- Le comportement d'un flux épinglé sur une enceinte Bluetooth qui s'éteint puis se rallume en
+  cours de lecture n'est pas mesuré.
 
-### Fait, et qui figurait ici comme « à faire » (liste tenue à jour)
+### Fait, et qui figurait ici comme « à faire »
 
-- **Pré-cache des flux réseau** (s.30) — il n'existait pas ; il est mesuré.
-
+- Rendu GPU `libplacebo` + Vulkan, mappage tonal HDR, AV1 logiciel (`libdav1d`), glisser-déposer de
+  la playlist, pré-cache des flux, fichiers récents, signets, … (sessions 30 à 37).
 - Filtres `libavfilter` (s.13), égaliseur (s.15), traitements audio + géométrie (s.16),
-  **hauteur conservée à vitesse ≠ 1** via `atempo` (s.16), pistes embarquées (s.17),
-  chapitres / bandes noires / aspect / style des sous-titres / URL (s.18),
+  pistes embarquées (s.17), chapitres / bandes noires / aspect / style des sous-titres / URL (s.18),
   profils + rendu ASS statique (s.19), animations ASS + karaoké (s.20).
 - ~~Élucider l'arrêt du 2026-10-16 à 23:11~~ — résolu (s.12, §6.22) : ce n'était pas un
   plantage mais un **gel** (`Q` interbloquait le contexte egui), suivi d'un **arrêt forcé
@@ -257,65 +246,45 @@ d'ensemble.
 
 ## 3. Comment vérifier soi-même
 
+**Ne lancer les bancs que par `tools/tout-verifier.sh` ou `tools/verif-rapide.sh`** : ils chargent
+`tools/env-bancs.sh` (Python avec numpy/PIL, session X11, écran virtuel 1500×900). Un banc lancé
+seul hérite de l'environnement de l'appelant et peut échouer sans qu'une ligne de code soit en cause.
+
 ```bash
 cd /media/blaise/LINUX_DATA/lecteur-linux
+export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 
-# Audit complet de l'interface (boutons, raccourcis, fenêtres, gel) — 54 contrôles
-tools/audit-ui.sh /chemin/video1.mp4 /chemin/video2.mp4
+cargo test --release                       # 176 tests unitaires
+tools/verif-rapide.sh --liste              # les sujets de vérification ciblée
+tools/verif-rapide.sh ui peripheriques     # seulement ce qu'une modification touche
+tools/tout-verifier.sh                     # toute la suite (~50 min, verrou, un seul à la fois)
 
 # Interblocages garantis : appels ctx.* depuis une fermeture de saisie egui
 tools/check-ctx-reentrance.py
-
 # Le détecteur de gel détecte-t-il vraiment ? (gel volontaire puis reprise)
 tools/test-vivacite.sh
-
-# Les filtres d'image changent-ils réellement l'image ? (9 contrôles chiffrés)
-tools/verif-filtres.sh
-
-# L'égaliseur change-t-il réellement le son ? (17 contrôles au spectre)
-tools/verif-audio.sh
-
-# La cadence suit-elle la carte son ? (18 contrôles : tampon, seek, 2×, pause, replis)
-tools/verif-horloge.sh
-
-# Un flux interrompu repart-il ? (20 contrôles ; sert un HLS local et simule les pannes)
-tools/verif-reseau.sh
-
-# Les sous-titres image (PGS/DVD) sont-ils vraiment rendus ? (10 contrôles, pixels mesurés)
-tools/verif-sousimages.sh
-
-# Les menus sont-ils complets, lisibles et fonctionnels ? (31 contrôles)
-tools/audit-menus.sh
-
-# Clic droit, raccourcis personnalisés, repère de recadrage, miroir horizontal (13 contrôles)
-tools/verif-personnalisation.sh
-
-# Un profil s'applique-t-il vraiment selon le dossier, l'extension, la résolution ? (24 contrôles)
-tools/verif-regles.sh
-
-# Toute la suite (14 bancs) d'un coup
-tools/tout-verifier.sh
+# HDR : le chemin GPU fonctionne-t-il encore ? (après une mise à jour Mesa / pilote / noyau, ~10 s)
+tools/sante-hdr.sh
 
 # Profondeur du tampon sans effet sur la synchronisation image/son (option de mesure)
 ./target/release/rmplayer film.mp4 --audio-buffer 400
-
 # Coût des filtres, et image de contrôle à la résolution native
 ./target/release/rmplayer --bench 300 film.mp4
 ./target/release/rmplayer --dump-frame 5000 /tmp/image.png film.mp4
+# Les sorties audio vues par le lecteur
+./target/release/rmplayer --list-audio
 
 # Comparaison décodage matériel / logiciel (charge CPU)
 tools/bench-hwdec.sh /chemin/video.mp4 12
-
 # Lecture sur écran X virtuel + capture PNG (validation visuelle)
 tools/capture-lecteur.sh /chemin/video.mp4 /tmp/capture.png 8
-
 # Journal détaillé (journaux FFmpeg, touches reçues, géométrie des fenêtres)
 RUST_LOG=rmplayer=info,kinterface=debug,ffmpeg=debug ./run.sh film.mkv
 ```
 
-Configuration : `~/.config/rmplayer/config.json` (6 sections, **toutes appliquées**).
-Positions de reprise : `~/.cache/rmplayer/positions.json`. Rapports de crash :
-`~/.cache/rmplayer/crash.log` (dernier arrêt) et `crash.1.log` (le précédent).
+Configuration : `~/.config/rmplayer/config.json` (**toutes les sections appliquées**). Signets et
+thèmes : `~/.config/rmplayer/`. Positions de reprise : `~/.cache/rmplayer/positions.json`.
+Rapports de crash : `~/.cache/rmplayer/crash.log` (dernier arrêt) et `crash.1.log` (le précédent).
 
 ---
 
@@ -346,6 +315,18 @@ Positions de reprise : `~/.cache/rmplayer/positions.json`. Rapports de crash :
 12. **Un `SIGABRT` n'est pas forcément un plantage** : KWin « force à quitter » une fenêtre
    gelée (SIGABRT puis SIGKILL). Lire `si_code`/`si_pid`/`sender` dans
    `~/.cache/rmplayer/crash.log` (rapport précédent : `crash.1.log`).
+13. **Une fonction, c'est un effet mesuré** : écrire d'abord le banc et le voir échouer, avec un
+   **témoin positif** ; le moteur doit lire le champ ; mesurer des pixels, du son ou une
+   position, jamais une ligne de journal. Recette : `docs/AJOUTER-UNE-FONCTION.md`.
+14. **Un test ne touche jamais à l'environnement du processus** (`std::env::set_var`) : les tests
+   tournent en parallèle (piège 116).
+15. **Ne jamais tronquer ni supprimer un fichier hors du projet** sans accord explicite ; écrire un
+   fichier de mémoire par fichier temporaire puis `mv`, jamais en place sur un disque plein.
+16. **Ne tester que ce qu'une modification concerne** (`verif-rapide.sh`) ; la suite complète est
+   réservée aux changements transversaux (renommage, moteur) ou à une demande explicite.
+17. **Ne pas recompiler ni modifier un script pendant qu'une suite tourne** (piège 111).
+18. **`pkill -f` / `pgrep -f` se trouvent eux-mêmes** (piège 126) ; **`wait` nu attend aussi le
+   lecteur** lancé en arrière-plan (piège 125).
 
 ---
 
@@ -375,53 +356,34 @@ Positions de reprise : `~/.cache/rmplayer/positions.json`. Rapports de crash :
 | 24 | **Menus audités** : six menus inspectés et ordonnés, 19 entrées vérifiées par leur effet ; glyphes non dessinés corrigés (police de secours + `texte_sur`), « Fermer » ferme la fenêtre, volume borné par le réglage, 7 entrées désormais tracées ; `audit-menus.sh` **31/31** |
 | 23 | 🔴 **Sous-titres image PGS/DVD rendus** : décodage en RGBA (palette 0xAARRGGBB), composition à l'échelle de l'image, extinction par composition vide, budget mémoire par octets ; correction d'un défaut de cadrage des sous-titres (zone du widget ≠ zone de l'image) ; `verif-sousimages.sh` **10/10** |
 | 22 | 🔴 **Flux réseau rouvrable** : coupure ≠ fin de flux (le décodeur HLS renvoie `AVERROR_EOF` quand tous les segments échouent), reconnexion avec temporisation, reprise à l'image affichée, bandeau visible, garde-temps d'E/S (`interrupt_callback`), sonde en arrière-plan ; `verif-reseau.sh` **20/20** |
+| 27–31 | profils par règle, `\clip` / `\iclip` / `\frz`, `bwdif`, pré-cache des flux, échelle GPU et AV1 logiciel (détail : `AVANCEMENT-ARCHIVE.md`) |
+| 32–34 | mémoire de la fenêtre, association de fichiers et instance unique, playlist aléatoire et glisser-déposer, vignettes, MPRIS, finition des réglages (`AVANCEMENT.md` §6.38 à §6.44) |
+| 35–36 | HDR (conversion tonale, repli CPU borné), revue externe, git (étiquettes `session36…`), recette `AJOUTER-UNE-FONCTION.md` |
+| 37 | lots 1 à 6, saut en pause, pistes audio, **sortie audio PipeWire**, **fenêtres détachables**, **renommage RMPlayer**, dépôt GitHub (pièges 118 à 128) |
 | 21 | 🔴 **Horloge audio maître** : la cadence suit les échantillons consommés par la carte son (plus le temps mural) ; alimentation du tampon découplée de l'affichage (file de **paquets** vidéo, pas d'images) ; garde-fou de blocage ; option `--audio-buffer` ; 10 tests unitaires ; `verif-horloge.sh` **18/18** |
 
 ---
 
-## 6. Sauvegarde
+## 6. Versions et sauvegardes
 
-Ce dossier **n'est pas** sous contrôle de version : une archive horodatée est déposée dans
-`sauvegardes/` à chaque étape importante.
-
-| Archive | Contenu | Vérifiée |
-|---|---|---|
-| `sauvegardes/kplayer-2026-10-18-session26.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 26** (recadrage validable) | ✅ archive valide (gzip), 55 fichiers, **16 775 lignes**, restauration vérifiée sur `src`, `tools` et `docs` |
-| `sauvegardes/kplayer-2026-10-18-session25.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 25** (personnalisation) | ✅ archive valide (gzip), 55 fichiers, **16 557 lignes**, restauration vérifiée sur `src`, `tools` et `docs` |
-| `sauvegardes/kplayer-2026-10-17-session24.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 24** (menus audités) | ✅ archive valide (gzip), 53 fichiers, **14 928 lignes**, restauration vérifiée sur `src`, `tools` et `docs` |
-| `sauvegardes/kplayer-2026-10-17-session23.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 23** (sous-titres image) | ✅ archive valide (gzip), 51 fichiers, **14 657 lignes**, restauration vérifiée sur `src`, `tools` et `docs` |
-| `sauvegardes/kplayer-2026-10-17-session22.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 22** (flux réseau rouvrable) | ✅ archive valide (gzip), 49 fichiers, **14 082 lignes de code**, restauration vérifiée sur `src`, `tools` et `docs` |
-| `sauvegardes/kplayer-2026-10-17-session21.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 21** (horloge audio maître) | ✅ archive valide (gzip), 47 fichiers, **13 357 lignes de code**, restauration vérifiée sur `src`, `tools` et `docs` |
-| `sauvegardes/kplayer-2026-10-17.tar.gz` | état **fin de session 11** (avant la correction du gel) | ✅ archive valide (gzip), 26 fichiers, restauration testée |
-| `sauvegardes/kplayer-2026-10-17-session12.tar.gz` | état **fin de session 12** (gel corrigé) | ✅ archive valide (gzip), 34 fichiers, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session13.tar.gz` | état **fin de session 13** (filtres) | ✅ archive valide (gzip), 36 fichiers, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session14.tar.gz` | état **fin de session 14** (préférences en sections) | ✅ archive valide (gzip), 38 fichiers, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session15.tar.gz` | état **fin de session 15** (égaliseur audio) | ✅ archive valide (gzip), 39 fichiers, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session16.tar.gz` | état **fin de session 16** (traitements audio et vidéo étendus) | ✅ archive valide (gzip), 40 fichiers, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session20.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 20** (animations ASS) | ✅ archive valide (gzip), 46 fichiers, **12 633 lignes de code**, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session19.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 19** (profils + ASS) | ✅ archive valide (gzip), 46 fichiers, **11 979 lignes de code**, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session18.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 18** (personnalisation avancée) | ✅ archive valide (gzip), 42 fichiers, **10 277 lignes de code**, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session17.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 17** (pistes embarquées) | ✅ archive valide (gzip), 41 fichiers, **9 284 lignes de code**, restauration vérifiée (`diff -r src` et `diff -r tools`) |
-
-**Sans `target/`** (artefacts de compilation, reconstruits par `cargo build --release`).
+Le projet est sous **git** : `main` est l'état vérifié, chaque fonction vit dans une branche
+`fonction/<nom>` fusionnée avec `--no-ff`, chaque fin de session est étiquetée (`session36`,
+`session37`…). Dépôt publié : <https://github.com/77Darius77/RMPlayer>. Des **archives**
+horodatées complètent le dépôt dans `sauvegardes/` (non suivi par git ; `ls sauvegardes/`). Les
+archives antérieures au renommage s'appellent `kplayer-AAAA-MM-JJ-…`.
 
 ```bash
-# sauvegarder à nouveau (à faire après chaque étape importante)
+# archiver (sans target/) — assets/ et icon.png servent à installer-association.sh
 cd /media/blaise/LINUX_DATA/lecteur-linux
-mkdir -p sauvegardes
-tar czf "sauvegardes/rmplayer-$(date +%F).tar.gz" \
-    src docs tools Cargo.toml Cargo.lock .cargo run.sh README.md .gitignore
+tar czf "sauvegardes/rmplayer-$(date +%F)-session<N>.tar.gz" \
+    src docs tools assets icon.png Cargo.toml Cargo.lock .cargo run.sh README.md LICENSE .gitignore
+
+# vérifier : intégrité ET contenu (diff -r), pas seulement gzip -t
+gzip -t sauvegardes/rmplayer-AAAA-MM-JJ-session<N>.tar.gz && echo valide
 
 # restaurer
-tar xzf sauvegardes/rmplayer-AAAA-MM-JJ.tar.gz -C /chemin/de/restauration
-
-# vérifier une archive
-gzip -t sauvegardes/rmplayer-AAAA-MM-JJ.tar.gz && echo valide
+tar xzf sauvegardes/rmplayer-AAAA-MM-JJ-session<N>.tar.gz -C /chemin/de/restauration
 ```
-
-> **Recommandation** : initialiser un dépôt Git dans ce dossier donnerait un historique
-> complet et des sauvegardes différentielles, là où cette archive ne capture qu'un instant
-> (l'archive reste utile comme filet de sécurité immédiat).
 
 *Documentation détaillée : `docs/AVANCEMENT.md` (sessions, bugs, pièges),
 `docs/INVENTAIRE-FONCTIONNALITES.md` (marche / limites / retiré),

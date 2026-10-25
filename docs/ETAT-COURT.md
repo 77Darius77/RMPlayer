@@ -59,7 +59,7 @@ Contreparties assumées, vérifiées : le filtre du pilote est plus doux que Lan
 (PSNR 30,7 dB) → la case à cocher rend Lanczos ; `procamp_vaapi` n'existe pas sur ce pilote
 → luminosité/contraste/saturation restent sur le CPU.
 
-## Fait récemment (sessions 32-34)
+## Fait récemment (sessions 32-37)
 
 | Chantier | Ce qui marche | Preuve |
 |---|---|---|
@@ -70,6 +70,11 @@ Contreparties assumées, vérifiées : le filtre du pilote est plus doux que Lan
 | **MPRIS** (s.34) | touches média et widget du bureau : `org.mpris.MediaPlayer2.rmplayer`, état publié, Volume/Shuffle/LoopStatus/Rate réglables, commandes exécutées par l'interface (réveil même en pause) | `verif-mpris` 27/27 (module seul) + 8 contrôles d'intégration |
 | **Vignettes** (s.34) | survoler la barre de progression montre l'image de l'instant pointé (décodeur autonome, fil de travail, 320×180, 4 à 175 ms) | `verif-vignettes` 14/14 + 3 contrôles d'intégration |
 | **Playlist** (s.34) | lecture **aléatoire** (chaque élément une fois, `Ctrl+A`, 🔀, mémorisé) et **glisser-déposer** avec repère, ordre enregistré ; volet **borné** (300 px, max 420), lignes à interaction unique (clic = lire, glisser = déplacer), ✕ toujours visible, texte tronqué | `verif-playlist` 18/18 |
+| **Lots 1 à 6** (s.37) | fichiers récents, A-B réglable, export/import, style des sous-titres, langues, couleur, rogner/glisser, signets, souris, décodeur par codec, icône de notification, démarrage automatique, priorité, cadence, thèmes, encodage | un banc par fonction (`README.md`, § Outils) |
+| **Saut en pause, pistes audio** (s.37) | l'image suit un saut même en pause ; piste audio choisie par priorités de langues, commentaires écartés, `Ctrl+J` | `verif-saut-pause` 5/5, `verif-audio-pistes` 11/11 |
+| **Sortie audio** (s.37) | les vraies sorties PipeWire par leur nom, changement en cours de lecture (menu, préférences, `Ctrl+Maj+J`) | `verif-peripheriques` 17/17 |
+| **Fenêtres détachables** (s.37) | Préférences, Statistiques, Aide, À propos en vraies fenêtres système, mémorisées | `verif-fenetres-detachables` 24/24 |
+| **Renommage RMPlayer** (s.37) | binaire `rmplayer`, MPRIS, dossiers `~/.config/rmplayer` ; l'ancien dossier `kplayer` est copié au premier lancement ; dépôt GitHub | `verif-migration` 7/7 |
 
 Réglages : `interface.window_pos/size/maximized`, `playback.shuffle`. Outils :
 `installer-association.sh`, `regle-fenetre-kwin.sh`. Détail et mesures : §6.38 à §6.40 de
@@ -86,9 +91,9 @@ SDR, et c'est dit dans `src/hdr.rs`. Voir `docs/HDR.md`.
 
 **Pour de nouvelles fonctions** : le reste à faire réel (vérifié dans le code) est dans
 **`docs/PROCHAINES-FONCTIONS.md`**, et la façon de les ajouter sans produire un faux « fait »
-dans **`docs/AJOUTER-UNE-FONCTION.md`**. Premiers candidats : fichiers récents, nombre de
-boucles A-B, export/import de la configuration, puis marges haut/bas et interligne des
-sous-titres, puis marque-pages.
+dans **`docs/AJOUTER-UNE-FONCTION.md`**. Les **lots 1 à 6** y sont faits (s.37) ; il y reste, avec la raison de chacun : C4 (autres
+moniteurs), F2 (passthrough HDR), F3 (langue d'interface), F6, le reste de F5, la piste audio
+externe.
 
 ## Les sept pièges qui coûtent une session si on les oublie
 
@@ -104,7 +109,7 @@ sous-titres, puis marque-pages.
 7. **Deux suites de vérification en parallèle rendent des résultats faux sans le dire** : un
    banc qui capture l'écran mesure la fenêtre de l'autre. `tout-verifier.sh` prend un verrou.
 
-Les **123 pièges**, avec le détail de chacun, sont en **§4 de `docs/AVANCEMENT.md`** — c'est la
+Les **128 pièges**, avec le détail de chacun, sont en **§4 de `docs/AVANCEMENT.md`** — c'est la
 seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 
 ## Où lire quoi (uniquement sur question précise)
@@ -124,13 +129,13 @@ seule section longue qu'il vaut la peine de parcourir avant d'écrire du code.
 
 ```bash
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
-cargo test --release                    # 164 tests
+cargo test --release                    # 176 tests
 tools/verif-rapide.sh <sujet>           # module touché : hdr, playlist, vignettes, mpris, ui…
 tools/sante-hdr.sh                      # ≈ 10 s, après une mise à jour Mesa/pilote/noyau : Vulkan, libplacebo, VA-API
 tools/verif-hdr.sh                      # HDR seul (36 contrôles, mires en nits)
 tools/verif-mpris.sh                    # le module seul (27 contrôles, --mpris-test)
 tools/verif-vignettes.sh                # le module seul (14 contrôles, ~20 s)
-tools/tout-verifier.sh                  # 41 bancs, 629 contrôles, 0 échec attendu (~50 min)
+tools/tout-verifier.sh                  # tous les bancs, 0 échec attendu (~50 min) ; seulement si le changement est transversal
 tools/etat-court.sh                     # remet cette fiche à jour (après la suite)
 tools/bench-optimisation.sh             # re-mesure les gains GPU et l'AV1
 ```

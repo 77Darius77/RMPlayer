@@ -73,9 +73,11 @@ le code a décidé, pas ce que l'utilisateur voit).
 
 ## 6. Brancher le banc dans la suite
 
-- `tools/tout-verifier.sh` : une ligne `run <nom> tools/<banc>.sh` (le compte « 26 bancs » de la
-  fiche se recalcule tout seul avec `grep -c '^run '`).
-- `tools/verif-rapide.sh` : une entrée dans `bancs_pour` pour pouvoir le rejouer seul.
+- `tools/tout-verifier.sh` : une ligne `run <nom> tools/<banc>.sh ["$DISP"]` (le compte de bancs
+  de la fiche se recalcule tout seul avec `grep -c '^run '`).
+- `tools/verif-rapide.sh` : **trois endroits** pour pouvoir le rejouer seul — une entrée dans
+  `bancs_pour`, le nom du sujet dans la liste affichée par `--liste`, et, si le banc prend un
+  écran en argument, son nom dans le `case` qui le lui passe (sinon il est lancé sans écran).
 - **Passer par ces deux points d'entrée** : ils chargent `tools/env-bancs.sh` (Python avec
   `numpy` et `PIL`, session X11, écran virtuel 1500×900). Un banc lancé directement hérite de
   l'environnement de l'appelant et peut échouer sans que le code soit en cause (piège 114).

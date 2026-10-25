@@ -12,7 +12,7 @@ La commande ou l'outil qui produit chaque chiffre est indiqué.
 |---|---|
 | Notre FFmpeg | `/opt/ffmpeg-7.1` → **7.1.3**, `Lavc61.19.101` / `Lavf61.7.100` |
 | Notre configuration FFmpeg | `--enable-gpl --enable-nonfree --enable-shared --disable-static --enable-pic` — **aucune bibliothèque externe** |
-| Nos accélérations | `-hwaccels` → **vaapi, drm, vulkan** ; `libdav1d`, `libplacebo`, `zscale` : **absents** |
+| Nos accélérations (**au moment de la mesure, session 31**) | `-hwaccels` → **vaapi, drm, vulkan** ; `libdav1d`, `libplacebo`, `zscale` : **absents** — le FFmpeg a été recompilé depuis (`libdav1d` en s.31, `libplacebo` + `libzimg` + Vulkan en s.35) |
 | Source de la mesure de coût | `rmplayer --bench 200` et `ffmpeg` (le même 7.1.3), média **H.264 1080p 25 i/s**, 200 images, meilleure de 3 passes |
 
 > **Correction d'une affirmation antérieure** : j'avais écrit que notre build n'avait « ni
