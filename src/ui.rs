@@ -397,6 +397,108 @@ fn combinaison_souris(evt: &egui::Event) -> Option<crate::raccourcis::Combinaiso
 }
 
 #[cfg(test)]
+mod tests_curseur_recadrage {
+    use super::*;
+
+    /// Une image egui : le curseur de bord est dessiné avec une largeur de 250 px (500 valeurs, soit
+    /// 2 valeurs par pixel d'écran), les événements donnés sont injectés, et on renvoie son rectangle.
+    fn image(
+        ctx: &egui::Context,
+        valeur: &mut u32,
+        evenements: Vec<egui::Event>,
+    ) -> egui::Rect {
+        image_large(ctx, valeur, evenements, 250.0)
+    }
+
+    fn image_large(
+        ctx: &egui::Context,
+        valeur: &mut u32,
+        evenements: Vec<egui::Event>,
+        largeur: f32,
+    ) -> egui::Rect {
+        let ecran = egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(600.0, 200.0));
+        let entree = egui::RawInput { screen_rect: Some(ecran), events: evenements, ..Default::default() };
+        let mut rect = egui::Rect::NOTHING;
+        let _ = ctx.run(entree, |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                ui.spacing_mut().slider_width = largeur;
+                rect = curseur_bord(ui, valeur, "").rect;
+            });
+        });
+        rect
+    }
+
+    fn bouton(pos: egui::Pos2, enfonce: bool) -> egui::Event {
+        egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed: enfonce,
+            modifiers: Default::default(),
+        }
+    }
+
+    /// Glisse la souris par demi-pixels (une valeur par mouvement) et relève les valeurs obtenues.
+    fn valeurs_en_glissant() -> (egui::Context, u32, egui::Pos2, std::collections::BTreeSet<u32>) {
+        let ctx = egui::Context::default();
+        let mut valeur = 0u32;
+        let rect = image(&ctx, &mut valeur, vec![]);
+        let y = rect.center().y;
+        let depart = egui::pos2(rect.left() + 20.0, y);
+        image(&ctx, &mut valeur, vec![egui::Event::PointerMoved(depart)]);
+        image(&ctx, &mut valeur, vec![bouton(depart, true)]);
+        let mut vues = std::collections::BTreeSet::new();
+        let mut fin = depart;
+        for pas in 0..200 {
+            fin = egui::pos2(depart.x + pas as f32 * 0.5, y);
+            image(&ctx, &mut valeur, vec![egui::Event::PointerMoved(fin)]);
+            vues.insert(valeur);
+        }
+        image(&ctx, &mut valeur, vec![bouton(fin, false)]);
+        (ctx, valeur, fin, vues)
+    }
+
+    #[test]
+    fn le_curseur_de_recadrage_atteint_chaque_valeur_sans_aimantation() {
+        let (_, _, _, vues) = valeurs_en_glissant();
+        let milieu: Vec<u32> = vues.iter().copied().filter(|v| (50..=150).contains(v)).collect();
+        // Sans aimantation, presque toutes les 101 valeurs de 50 à 150 sont atteintes (l'arrondi au pixel
+        // physique en laisse quelques-unes) ; avec l'aimantation, une sur cinq au mieux.
+        assert!(
+            milieu.len() >= 90,
+            "{} valeurs atteintes sur 101 entre 50 et 150 : {milieu:?}",
+            milieu.len()
+        );
+    }
+
+    #[test]
+    fn les_fleches_du_clavier_deplacent_le_curseur_de_un_en_un() {
+        let ctx = egui::Context::default();
+        let mut valeur = 100u32;
+        let touche = |cle, enfonce| egui::Event::Key {
+            key: cle,
+            physical_key: None,
+            pressed: enfonce,
+            repeat: false,
+            modifiers: Default::default(),
+        };
+        // 100 points de large pour 500 valeurs : un point d'écran vaut 5 valeurs, et un appui doit
+        // pourtant n'en valoir qu'une.
+        let mut passe = |evenements| {
+            image_large(&ctx, &mut valeur, evenements, 100.0);
+        };
+        passe(vec![]);
+        passe(vec![touche(egui::Key::Tab, true)]);
+        passe(vec![touche(egui::Key::Tab, false)]);
+        passe(vec![touche(egui::Key::ArrowRight, true)]);
+        passe(vec![touche(egui::Key::ArrowRight, false)]);
+        passe(vec![touche(egui::Key::ArrowRight, true)]);
+        passe(vec![touche(egui::Key::ArrowRight, false)]);
+        passe(vec![touche(egui::Key::ArrowLeft, true)]);
+        assert_eq!(valeur, 101, "deux flèches droite puis une gauche : 100 → 102 → 101");
+    }
+}
+
+#[cfg(test)]
 mod tests_souris {
     use super::*;
 
@@ -584,6 +686,13 @@ fn ligne_menu(ui: &mut egui::Ui, actif: bool, libelle: impl Into<egui::WidgetTex
     let reponse = ui.selectable_label(actif, texte);
     journaliser_entree(&nom, reponse.rect, actif);
     reponse
+}
+
+/// Curseur d'un bord du recadrage, de 0 à 500 pixels. Le magnétisme d'egui (`smart_aim`) est coupé :
+/// il aimantait la valeur sur les multiples de 5 ou de 10, et un pixel précis devenait impossible à régler.
+/// Les flèches du clavier avancent déjà d'une valeur à la fois (verrouillé par un test).
+fn curseur_bord(ui: &mut egui::Ui, valeur: &mut u32, nom: &str) -> egui::Response {
+    ui.add(egui::Slider::new(valeur, 0..=500).smart_aim(false).text(nom))
 }
 
 /// Case à cocher de menu dont la géométrie est journalisée.
@@ -1189,18 +1298,10 @@ impl App {
                 let mut bas = v.crop_bottom;
                 let mut gauche = v.crop_left;
                 let mut droite = v.crop_right;
-                change |= ui
-                    .add(egui::Slider::new(&mut haut, 0..=500).text("haut"))
-                    .changed();
-                change |= ui
-                    .add(egui::Slider::new(&mut bas, 0..=500).text("bas"))
-                    .changed();
-                change |= ui
-                    .add(egui::Slider::new(&mut gauche, 0..=500).text("gauche"))
-                    .changed();
-                change |= ui
-                    .add(egui::Slider::new(&mut droite, 0..=500).text("droite"))
-                    .changed();
+                change |= curseur_bord(ui, &mut haut, "haut").changed();
+                change |= curseur_bord(ui, &mut bas, "bas").changed();
+                change |= curseur_bord(ui, &mut gauche, "gauche").changed();
+                change |= curseur_bord(ui, &mut droite, "droite").changed();
                 v.crop_top = haut;
                 v.crop_bottom = bas;
                 v.crop_left = gauche;

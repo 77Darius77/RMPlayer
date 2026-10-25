@@ -557,7 +557,7 @@ fonctions pures (détection, profondeur, plan, tramage, débanding, noms d'opér
 
 ### Sessions 36 et 37 — résumé
 
-Le détail de chaque défaut trouvé est dans les **pièges 114 à 138** (§4) ; les fonctions sont
+Le détail de chaque défaut trouvé est dans les **pièges 114 à 139** (§4) ; les fonctions sont
 décrites dans `docs/PROCHAINES-FONCTIONS.md` (lots 1 à 6) et mesurées par les bancs du README.
 
 - **Session 36** : revue externe, bancs rendus autonomes (`env-bancs.sh`), repli CPU **borné** du
@@ -1330,6 +1330,13 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      `verif-dvd` §10 (vrai disque, décodage matériel demandé, écart moyen 49 → 0,0 avec le logiciel).
      **Leçon** : un banc dont la configuration désactive une option de l'utilisateur ne prouve rien sur elle —
      tester aussi avec ses réglages par défaut.
+139. 🟡 **Recadrage : le curseur sautait de 10 en 10.** Les quatre curseurs du menu contextuel (0–500) gardaient le
+     magnétisme par défaut d'egui (`smart_aim`), qui aimante la valeur sur les nombres ronds ; avec un curseur
+     court, impossible de régler un pixel précis. Corrigé : `curseur_bord` coupe `smart_aim`. Gardes (tests
+     unitaires `tests_curseur_recadrage`) : en glissant par demi-pixels, 96 valeurs sur 101 sont atteintes entre
+     50 et 150 (37 avant) ; les flèches du clavier avancent d'une valeur (egui le faisait déjà pour les entiers).
+     Limite : à la souris, un curseur court couvre plusieurs valeurs par pixel d'écran — le réglage exact
+     se fait aux flèches (clic puis ← →) ou en saisissant la valeur.
 
 ## 5. Reste à faire
 
