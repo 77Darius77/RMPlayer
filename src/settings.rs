@@ -326,15 +326,23 @@ pub fn window(ctx: &egui::Context, app: &mut App) -> bool {
     let ecran = ctx.content_rect();
     let hauteur_max = (ecran.height() - 100.0).max(260.0);
 
-    let reponse = egui::Window::new("⚙ Préférences")
-        .open(&mut ouvert)
-        .collapsible(true)
-        .resizable(true)
-        .default_pos([24.0, 24.0])
-        .default_size([540.0, hauteur_max.min(660.0)])
-        .min_width(430.0)
-        .max_height(hauteur_max)
-        .show(ctx, |ui| {
+    let detachee = app.est_detachee("preferences");
+    let retour = crate::fenetre::afficher(
+        ctx,
+        "preferences",
+        "Préférences",
+        detachee,
+        &mut ouvert,
+        [560.0, 680.0],
+        false, // le corps défile déjà (ScrollArea ci-dessous)
+        egui::Window::new("⚙ Préférences")
+            .collapsible(true)
+            .resizable(true)
+            .default_pos([24.0, 24.0])
+            .default_size([540.0, hauteur_max.min(660.0)])
+            .min_width(430.0)
+            .max_height(hauteur_max),
+        |ui, detachee| {
             // Bandeau fixe (résumé + actions) : il ne défile pas, d'où le filet qui
             // le sépare clairement du contenu — sans lui, le texte défilant venait
             // coller aux boutons « tout déplier / tout replier ».
@@ -344,38 +352,48 @@ pub fn window(ctx: &egui::Context, app: &mut App) -> bool {
 
             // Le corps défile : c'est lui qui absorbe l'ajout de sections.
             //
-            // ATTENTION : ne PAS déduire cette hauteur de `ui.available_height()`.
-            // La fenêtre se dimensionne sur son contenu, qui est justement cette zone
-            // défilante : `available_height` dépend donc de la taille choisie à
-            // l'image précédente, et la fenêtre se réduisait à chaque image
-            // (constaté : contenu coupé au milieu de la troisième section).
-            // La borne est fixée sur la hauteur de l'écran, hors de cette boucle.
-            let hauteur_corps = (hauteur_max - 100.0).max(180.0);
-            // `auto_shrink` vertical = true : la zone prend la hauteur du CONTENU,
-            // plafonnée par `max_height`. La hauteur de la fenêtre est donc une
-            // fonction directe du contenu (aucun retour sur elle-même), et elle
-            // cesse de grandir dès que le plafond est atteint — c'est là que le
-            // défilement prend le relais, avec une barre visible.
-            egui::ScrollArea::vertical()
-                .id_salt("preferences_sections")
-                .auto_shrink([false, true])
-                .max_height(hauteur_corps)
-                .show(ui, |ui| {
-                    for section in SECTIONS {
-                        dessiner_section(ui, section, app);
-                        ui.add_space(4.0);
-                    }
-                });
-        });
+            // ATTENTION : ne PAS déduire cette hauteur de `ui.available_height()` pour la
+            // fenêtre RATTACHÉE. Elle se dimensionne sur son contenu, qui est justement cette
+            // zone défilante : `available_height` dépend donc de la taille choisie à
+            // l'image précédente, et la fenêtre se réduisait à chaque image (constaté :
+            // contenu coupé au milieu de la troisième section). La borne est fixée sur la
+            // hauteur de l'écran, hors de cette boucle.
+            // Détachée, c'est la fenêtre système qui impose sa taille : la hauteur disponible
+            // est stable, et la zone la remplit.
+            let corps = |ui: &mut egui::Ui, app: &mut App| {
+                for section in SECTIONS {
+                    dessiner_section(ui, section, app);
+                    ui.add_space(4.0);
+                }
+            };
+            if detachee {
+                egui::ScrollArea::vertical()
+                    .id_salt("preferences_sections")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| corps(ui, app));
+            } else {
+                // `auto_shrink` vertical = true : la zone prend la hauteur du CONTENU,
+                // plafonnée par `max_height`. La hauteur de la fenêtre est donc une
+                // fonction directe du contenu (aucun retour sur elle-même), et elle
+                // cesse de grandir dès que le plafond est atteint — c'est là que le
+                // défilement prend le relais, avec une barre visible.
+                let hauteur_corps = (hauteur_max - 100.0).max(180.0);
+                egui::ScrollArea::vertical()
+                    .id_salt("preferences_sections")
+                    .auto_shrink([false, true])
+                    .max_height(hauteur_corps)
+                    .show(ui, |ui| corps(ui, app));
+            }
+        },
+    );
+    if retour.bascule {
+        app.basculer_detachee("preferences");
+    }
 
-    if let Some(r) = &reponse {
+    if let Some(r) = retour.rect {
         // Géométrie journalisée (debug) : l'audit s'en sert pour cliquer le ✕ sans
         // deviner les pixels, et pour vérifier que la fenêtre tient dans l'écran.
-        tracing::debug!(
-            target: "kinterface",
-            "fenetre preférences rect {:?}",
-            r.response.rect
-        );
+        tracing::debug!(target: "kinterface", "fenetre preférences rect {:?}", r);
     }
     ouvert
 }

@@ -921,6 +921,23 @@ impl App {
         }
     }
 
+    /// La fenêtre flottante `id` est-elle ouverte comme fenêtre système (voir `fenetre::afficher`) ?
+    pub(crate) fn est_detachee(&self, id: &str) -> bool {
+        self.config.interface.detached_windows.iter().any(|d| d == id)
+    }
+
+    /// Détache ou rattache la fenêtre `id` et mémorise le choix.
+    pub(crate) fn basculer_detachee(&mut self, id: &str) {
+        let liste = &mut self.config.interface.detached_windows;
+        if let Some(rang) = liste.iter().position(|d| d == id) {
+            liste.remove(rang);
+        } else {
+            liste.push(id.to_string());
+        }
+        let _ = self.config.save();
+        tracing::info!(target: "kinterface", "fenêtre « {} » : {}", id, if self.est_detachee(id) { "détachée" } else { "rattachée" });
+    }
+
     /// Relit les sorties PipeWire si la liste est ancienne (ou si `force`).
     pub(crate) fn actualiser_sorties_audio(&mut self, force: bool) {
         let perimee = self
@@ -4727,11 +4744,11 @@ impl eframe::App for App {
             // `.open()` est indispensable : sans lui, egui ne dessine AUCUN
             // bouton de fermeture (✕) et la fenêtre ne peut plus être fermée.
             let mut ouvert = self.show_statistics;
-            let reponse = egui::Window::new("📊 Statistiques de lecture")
-                .open(&mut ouvert)
-                .collapsible(true)
-                .resizable(false)
-                .show(ctx, |ui| {
+            let detachee = self.est_detachee("statistiques");
+            let retour = crate::fenetre::afficher(
+                ctx, "statistiques", "Statistiques de lecture", detachee, &mut ouvert, [420.0, 440.0], true,
+                egui::Window::new("📊 Statistiques de lecture").collapsible(true).resizable(false),
+                |ui, _detachee| {
                     if let Some(info) = self.player.media_info() {
                         ui.label(format!("Fichier: {}", info.filename));
                         if let Some(path) = self.player.current_path() {
@@ -4793,12 +4810,16 @@ impl eframe::App for App {
                     } else {
                         ui.label("Aucun média chargé");
                     }
-                });
+                },
+            );
+            if retour.bascule {
+                self.basculer_detachee("statistiques");
+            }
             // Géométrie de la fenêtre journalisée (niveau debug) : elle sert à l'audit
             // de l'interface pour cliquer précisément sur le bouton de fermeture, sans
             // heuristique sur les pixels.
-            if let Some(r) = &reponse {
-                tracing::debug!(target: "kinterface", "fenetre statistiques rect {:?}", r.response.rect);
+            if let Some(r) = retour.rect {
+                tracing::debug!(target: "kinterface", "fenetre statistiques rect {:?}", r);
             }
             // Fermeture par le ✕ de la fenêtre : on la journalise comme celle
             // déclenchée par Échap, sinon l'action est invisible en diagnostic.
@@ -4814,12 +4835,11 @@ impl eframe::App for App {
             // `.open()` est indispensable : sans lui, egui ne dessine AUCUN
             // bouton de fermeture (✕) et la fenêtre ne peut plus être fermée.
             let mut ouvert = self.show_shortcuts;
-            let reponse = egui::Window::new("⌨ Aide des raccourcis")
-                .open(&mut ouvert)
-                .collapsible(true)
-                .resizable(false)
-                .default_width(460.0)
-                .show(ctx, |ui| {
+            let detachee = self.est_detachee("aide");
+            let retour = crate::fenetre::afficher(
+                ctx, "aide", "Aide des raccourcis", detachee, &mut ouvert, [500.0, 560.0], true,
+                egui::Window::new("⌨ Aide des raccourcis").collapsible(true).resizable(false).default_width(460.0),
+                |ui, _detachee| {
                     ui.label(
                         egui::RichText::new(
                             "Les raccourcis sont calqués sur ceux de PotPlayer. \
@@ -4856,12 +4876,16 @@ impl eframe::App for App {
                         .small()
                         .weak(),
                     );
-                });
+                },
+            );
+            if retour.bascule {
+                self.basculer_detachee("aide");
+            }
             // Géométrie de la fenêtre journalisée (niveau debug) : elle sert à l'audit
             // de l'interface pour cliquer précisément sur le bouton de fermeture, sans
             // heuristique sur les pixels.
-            if let Some(r) = &reponse {
-                tracing::debug!(target: "kinterface", "fenetre aide rect {:?}", r.response.rect);
+            if let Some(r) = retour.rect {
+                tracing::debug!(target: "kinterface", "fenetre aide rect {:?}", r);
             }
             // Fermeture par le ✕ de la fenêtre : on la journalise comme celle
             // déclenchée par Échap, sinon l'action est invisible en diagnostic.
@@ -4877,11 +4901,11 @@ impl eframe::App for App {
             // `.open()` est indispensable : sans lui, egui ne dessine AUCUN
             // bouton de fermeture (✕) et la fenêtre ne peut plus être fermée.
             let mut ouvert = self.show_about;
-            let reponse = egui::Window::new("ℹ À propos de KPlayer")
-                .open(&mut ouvert)
-                .collapsible(false)
-                .resizable(false)
-                .show(ctx, |ui| {
+            let detachee = self.est_detachee("apropos");
+            let retour = crate::fenetre::afficher(
+                ctx, "apropos", "À propos de KPlayer", detachee, &mut ouvert, [380.0, 380.0], true,
+                egui::Window::new("ℹ À propos de KPlayer").collapsible(false).resizable(false),
+                |ui, _detachee| {
                     ui.vertical_centered(|ui| {
                         ui.label(egui::RichText::new("🎬 KPlayer").heading());
                         ui.label("Lecteur vidéo professionnel Linux");
@@ -4896,12 +4920,16 @@ impl eframe::App for App {
                         ui.label("");
                         ui.label("© 2026 KPlayer — MIT License");
                     });
-                });
+                },
+            );
+            if retour.bascule {
+                self.basculer_detachee("apropos");
+            }
             // Géométrie de la fenêtre journalisée (niveau debug) : elle sert à l'audit
             // de l'interface pour cliquer précisément sur le bouton de fermeture, sans
             // heuristique sur les pixels.
-            if let Some(r) = &reponse {
-                tracing::debug!(target: "kinterface", "fenetre a-propos rect {:?}", r.response.rect);
+            if let Some(r) = retour.rect {
+                tracing::debug!(target: "kinterface", "fenetre a-propos rect {:?}", r);
             }
             // Fermeture par le ✕ de la fenêtre : on la journalise comme celle
             // déclenchée par Échap, sinon l'action est invisible en diagnostic.

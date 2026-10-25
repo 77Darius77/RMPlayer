@@ -510,6 +510,7 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-tray.sh [écran]` | **Icône de notification** (StatusNotifierItem) pilotée par D-Bus — 7 contrôles |
 | `verif-theme.sh [écran]` | **Thèmes externes** : pixel de la barre de menus, thème illisible refusé — 6 contrôles |
 | `verif-saut-pause.sh [écran]` | **Saut en pause** : l'image (teinte qui dit l'instant) et la réplique intégrée suivent un saut, le pas à pas change l'image — 5 contrôles |
+| `verif-fenetres-detachables.sh [écran]` | **Fenêtres détachables** : Préférences, Statistiques, Aide, À propos deviennent de vraies fenêtres système (fenêtre distincte, déplacée hors du lecteur, contenu visible, rattachement, Échap, mémoire du choix, ancienne configuration) — 24 contrôles |
 | `verif-peripheriques.sh [écran]` | **Sortie audio** : deux sorties PipeWire factices ; le 440 Hz arrive sur la sortie choisie (enregistrement de son moniteur), changement en cours de lecture (raccourci et clic de menu), retour au défaut, ancien réglage ALSA, sortie disparue — 17 contrôles |
 | `verif-audio-pistes.sh [écran]` | **Pistes audio** : langues par priorité, commentaires écartés, piste par défaut, source mono, mémoire par film — mesuré au son — 11 contrôles |
 | `verif-mpris.sh` | **MPRIS** (module seul, mode `--mpris-test`, sans fenêtre) : nom sur le bus, métadonnées en µs, commandes reçues, `SetPosition` filtré par piste, réglages Volume/Shuffle/LoopStatus/Rate, `PropertiesChanged`, nom rendu, absence de bus gérée — 27 contrôles |

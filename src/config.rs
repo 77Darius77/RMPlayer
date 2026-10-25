@@ -1158,6 +1158,10 @@ pub struct InterfaceSettings {
     /// Nom d'un thème externe (`~/.config/kplayer/themes/<nom>.json`) ; vide = thème intégré.
     #[serde(default)]
     pub theme: String,
+    /// Fenêtres flottantes ouvertes comme vraies fenêtres système plutôt que dans le lecteur
+    /// (`preferences`, `statistiques`, `aide`, `apropos`). Voir `fenetre::afficher`.
+    #[serde(default)]
+    pub detached_windows: Vec<String>,
     /// Afficher l'OSD (bandeau d'informations temporaire)
     pub show_osd: bool,
     /// Durée d'affichage de l'OSD, en millisecondes
@@ -1562,6 +1566,7 @@ impl Default for InterfaceSettings {
         Self {
             dark_theme: true,
             theme: String::new(),
+            detached_windows: Vec::new(),
             show_osd: true,
             osd_duration: 3000,
             show_progress_bar: true,
@@ -2620,6 +2625,19 @@ mod tests {
         assert!(ancienne.recent.is_empty());
         assert!(!ancienne.resume);
         assert_eq!(ancienne.precache_ms, default_precache_ms());
+    }
+
+    #[test]
+    fn les_fenetres_detachees_se_relisent_et_un_ancien_fichier_les_laisse_rattachees() {
+        let c: Config = serde_json::from_str(
+            r#"{"interface": {"detached_windows": ["preferences", "aide"]}}"#,
+        )
+        .unwrap();
+        assert_eq!(c.interface.detached_windows, ["preferences", "aide"]);
+        // Un config.json d'avant ce champ : aucune fenêtre détachée, et le reste se relit.
+        let ancien: Config = serde_json::from_str(r#"{"interface": {"show_osd": false}}"#).unwrap();
+        assert!(ancien.interface.detached_windows.is_empty());
+        assert!(!ancien.interface.show_osd);
     }
 
     #[test]

@@ -1175,6 +1175,18 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      shell qui les lance : la commande tue son propre shell (code de sortie 144) sans rien afficher.
      Utiliser `pkill -x <nom>` (nom exact) ou le trou de regex (`pkill -f "[m]otif"`).
 
+127. 🟠 **Fenêtres flottantes prisonnières du lecteur — détachables (s.37).** Une `egui::Window` est
+     dessinée DANS la fenêtre du lecteur : elle ne sort pas, et une petite fenêtre la rogne. Les
+     Préférences, Statistiques, Aide des raccourcis et À propos peuvent devenir de vraies fenêtres
+     système (`src/fenetre.rs` : un contenu, deux enveloppes — `egui::Window` ou viewport immédiat).
+     Bouton « ⧉ Détacher » / « ⧉ Rattacher », Échap ferme la fenêtre détachée, choix mémorisé dans
+     `interface.detached_windows`. Mesuré côté système par `verif-fenetres-detachables` (24 contrôles) :
+     fenêtre X distincte, déplacée à cheval sur le bord du lecteur, contenu visible. **Pièges de
+     l'instrument** : `xdotool search --name KPlayer` renvoie aussi les fenêtres détachées
+     (« KPlayer — Préférences ») — fixer l'identifiant de la fenêtre principale AU LANCEMENT, avec
+     `tail -1` et `windowfocus` avant d'envoyer une touche. Non fait : la boîte « Ouvrir une adresse »
+     (saisie rapide modale) et les menus déroulants de la barre restent dans le lecteur.
+
 ## 5. Reste à faire
 
 État au **2026-10-19, fin de session 32**. Chaque ligne dit *pourquoi* ce n'est pas fait,
