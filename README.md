@@ -93,7 +93,9 @@ continue alors sans son (avertissement « lecture vidéo seule »).
 | `↑`, `Molette↑` | Volume + |
 | `↓`, `Molette↓` | Volume − |
 | `M` | Couper / rétablir le son |
-| `Ctrl+L` | Lecture en boucle |
+| `Ctrl+L` | Répéter le fichier (bascule) |
+| `Ctrl+Maj+L` | Répétition : aucune / un fichier / toute la playlist |
+| `Ctrl+Maj+C` | Lecture continue (enchaîner les fichiers) |
 | `Ctrl+A` | Lecture aléatoire (playlist) |
 | `Ctrl+R` | Reprise à la position quittée |
 | `A` | Répétition A-B : point A |
@@ -301,8 +303,15 @@ adresse » restent dans le lecteur. Mesuré côté système : `tools/verif-fenet
 
 ### Au quotidien
 
-- **Fichiers récents** (menu *Fichier*, 10 entrées, « effacer ») ; **lecture aléatoire** et
-  **glisser-déposer** dans la playlist ; reprise à la position quittée.
+- **Fichiers récents** (menu *Fichier*, 10 entrées, « effacer ») ; reprise à la position quittée.
+- **À la fin d'un fichier** (menu *Lecture*, panneau de playlist, *Préférences ▸ Lecture*, MPRIS) :
+  - **répétition** — aucune (la liste s'arrête à sa fin), **un fichier** (relu en boucle) ou **toute la
+    playlist** (retour au début) : `Ctrl+Maj+L` les fait défiler, `Ctrl+L` relit le fichier ; ce sont
+    les trois valeurs `LoopStatus` de MPRIS ;
+  - **lecture continue** (`Ctrl+Maj+C`) — les fichiers s'enchaînent ; coupée, la lecture s'arrête après
+    chaque fichier ;
+  - **lecture aléatoire** (`Ctrl+A`) — chaque élément une fois par tour, puis arrêt (ou nouveau tour si
+    la playlist se répète) ; **glisser-déposer** pour réordonner la liste.
 - **Signets** par média : `Ctrl+B` pose, `Ctrl+Maj+→/←` navigue, `Ctrl+Maj+B` supprime,
   `Ctrl+Maj+N` **renomme** celui de la position (ou le crayon ✎ du menu *Lecture ▸ Signets*) ;
   conservés d'une session à l'autre.
@@ -600,6 +609,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-soustitres.sh [écran]` | **Style des sous-titres** : trois familles de police mesurées (largeurs 268/307/332 px), position horizontale 20/50/80 %, police inconnue, non-régression — 5 contrôles |
 | `installer-association.sh [--par-defaut] [--etat] [--retirer]` | **« Ouvrir avec » RMPlayer** : lanceur `.desktop`, icône, cache des types MIME ; `--par-defaut` l'impose pour les formats qu'il gère |
 | — | **revue externe** : `docs/BRIEF-REVUE-EXTERNE.md` — ce qu'on demande à un relecteur extérieur, budget de lecture, six vérifications qui valent mieux que la lecture, deux pièges à faux positifs |
+| `verif-modes-lecture.sh [écran]` | **Fin de fichier** : trois clips, séquence des titres lue sur MPRIS — enchaînement, lecture continue coupée, répéter le fichier, répéter la playlist, aléatoire avec et sans répétition, ancienne configuration — 7 contrôles |
 | `verif-capture.sh [écran]` | **Captures** : format écrit (signature et décodage du fichier), qualité JPEG qui agit (taille et écart de pixels), WebP identique au PNG, taille native, modèle de nom, ancienne configuration — 9 contrôles |
 | `verif-hdr-saut.sh [écran]` | **HDR après un saut** : la fenêtre est filmée pendant des sauts (en lecture, en pause, cinq rapprochés) et pendant une répétition A-B ; chaque image est classée convertie / non convertie — 5 contrôles |
 | `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, moteur CPU forcé, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision, **Vulkan coupé** (repli CPU borné, avis, pas de reconstruction à chaque image) — 36 contrôles |

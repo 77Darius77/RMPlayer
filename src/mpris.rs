@@ -57,17 +57,10 @@ pub fn statut_mpris(etat: Lecture) -> &'static str {
     }
 }
 
-/// Mode de boucle MPRIS : `None`, `Track` ou `Playlist`.
-///
-/// RMPlayer ne sait faire que « relire la playlist » (`loop_enabled`) : on annonce
-/// donc `Playlist` ou `None`, jamais `Track` — annoncer un mode qu'on n'applique pas
-/// ferait mentir le bureau, qui proposerait un choix sans effet.
-pub fn boucle_mpris(actif: bool) -> &'static str {
-    if actif {
-        "Playlist"
-    } else {
-        "None"
-    }
+/// Mode de boucle MPRIS : `None`, `Track` ou `Playlist` — les trois modes de répétition de RMPlayer
+/// (`RepeatMode`) correspondent exactement, chacun est appliqué.
+pub fn boucle_mpris(mode: crate::config::RepeatMode) -> &'static str {
+    mode.mpris()
 }
 
 /// Identifiant de piste MPRIS pour un rang de playlist.
@@ -112,7 +105,7 @@ pub enum Commande {
     /// modifiable : un client peut vouloir ralentir la lecture).
     Vitesse(f64),
     Aleatoire(bool),
-    Boucle(bool),
+    Repetition(crate::config::RepeatMode),
     Quitter,
     /// Ramener la fenêtre au premier plan.
     Avant,
@@ -131,7 +124,7 @@ pub struct Etat {
     /// Volume, de 0 à 1 (MPRIS ; RMPlayer autorise jusqu'à 1,5 en interne).
     pub volume: f64,
     pub aleatoire: bool,
-    pub boucle: bool,
+    pub repetition: crate::config::RepeatMode,
     pub vitesse: f64,
     pub peut_precedent: bool,
     pub peut_suivant: bool,
@@ -148,7 +141,7 @@ impl Default for Etat {
             rang: 0,
             volume: 1.0,
             aleatoire: false,
-            boucle: false,
+            repetition: crate::config::RepeatMode::Aucune,
             vitesse: 1.0,
             peut_precedent: false,
             peut_suivant: false,
@@ -163,7 +156,7 @@ struct Partage {
     /// Connexion gardée pour émettre `PropertiesChanged`.
     connexion: Mutex<Option<Connection>>,
     /// Dernier état publié, pour ne signaler que les changements réels.
-    publie: Mutex<Option<(String, String, u64, bool, bool)>>,
+    publie: Mutex<Option<(String, String, u64, bool, crate::config::RepeatMode)>>,
     /// Contexte egui, pour **réveiller l'interface** quand une commande arrive.
     ///
     /// **Pourquoi c'est indispensable** : hors lecture, egui reste passif — il ne
@@ -276,7 +269,7 @@ impl Lecteur {
 
     #[zbus(property)]
     fn loop_status(&self) -> String {
-        boucle_mpris(self.partage.etat().boucle).to_string()
+        boucle_mpris(self.partage.etat().repetition).to_string()
     }
 
     #[zbus(property)]
@@ -384,12 +377,13 @@ impl Lecteur {
         self.partage.pousser(Commande::Aleatoire(actif));
     }
 
-    /// `Properties.Set LoopStatus` : `Track` n'est pas géré par RMPlayer (il relit la
-    /// playlist entière) — on le traite comme `Playlist` plutôt que de refuser, ce
-    /// qui laisserait le widget dans un état incohérent.
+    /// `Properties.Set LoopStatus` : `None`, `Track` (relire le fichier) ou `Playlist`. Une valeur
+    /// inconnue est ignorée.
     #[zbus(property)]
     fn set_loop_status(&self, mode: String) {
-        self.partage.pousser(Commande::Boucle(mode != "None"));
+        if let Some(m) = crate::config::RepeatMode::depuis_mpris(&mode) {
+            self.partage.pousser(Commande::Repetition(m));
+        }
     }
 
     fn play(&self) {
@@ -466,7 +460,7 @@ impl Serveur {
             format!("{}|{}|{}", etat.titre, etat.artiste, etat.rang),
             etat.duree_ms,
             etat.aleatoire,
-            etat.boucle,
+            etat.repetition,
         );
         // **L'état est toujours mis à jour**, même quand rien ne change à signaler :
         // la position avance à chaque image et n'est pas dans la clé de changement
@@ -600,8 +594,10 @@ mod tests {
         assert_eq!(statut_mpris(Lecture::Arrete), "Stopped");
         assert_eq!(statut_mpris(Lecture::Pause), "Paused");
         assert_eq!(statut_mpris(Lecture::Lecture), "Playing");
-        assert_eq!(boucle_mpris(true), "Playlist");
-        assert_eq!(boucle_mpris(false), "None");
+        use crate::config::RepeatMode::*;
+        assert_eq!(boucle_mpris(Playlist), "Playlist");
+        assert_eq!(boucle_mpris(Fichier), "Track");
+        assert_eq!(boucle_mpris(Aucune), "None");
     }
 
     #[test]

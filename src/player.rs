@@ -638,6 +638,10 @@ pub struct VideoPlayer {
     muted: bool,
     pub subtitles_visible: bool,
     pub loop_enabled: bool,
+    /// Répéter la playlist (le mode « fichier » est `loop_enabled`). Voir `set_repeat`.
+    repeat_playlist: bool,
+    /// Lecture continue : enchaîner le fichier suivant à la fin d'un fichier.
+    continuous: bool,
     /// Lecture aléatoire : l'ordre de passage est mélangé une fois, puis suivi.
     ///
     /// **Pourquoi un ordre mélangé plutôt qu'un tirage à chaque fois** : un tirage
@@ -793,6 +797,8 @@ impl VideoPlayer {
             muted: false,
             subtitles_visible: false,
             loop_enabled: false,
+            repeat_playlist: false,
+            continuous: true,
             shuffle: false,
             ordre_aleatoire: Vec::new(),
             rang_aleatoire: 0,
@@ -4057,6 +4063,47 @@ impl VideoPlayer {
         })
     }
 
+    /// Fixe la répétition : `Fichier` relit le fichier courant (`loop_enabled`), `Playlist` fait
+    /// recommencer la liste à sa fin.
+    pub fn set_repeat(&mut self, mode: crate::config::RepeatMode) {
+        use crate::config::RepeatMode::*;
+        self.loop_enabled = mode == Fichier;
+        self.repeat_playlist = mode == Playlist;
+        tracing::info!("Répétition : {:?}", mode);
+    }
+
+    pub fn repeat(&self) -> crate::config::RepeatMode {
+        use crate::config::RepeatMode::*;
+        if self.loop_enabled {
+            Fichier
+        } else if self.repeat_playlist {
+            Playlist
+        } else {
+            Aucune
+        }
+    }
+
+    /// Active ou coupe la lecture continue (enchaînement automatique).
+    pub fn set_continuous(&mut self, actif: bool) {
+        self.continuous = actif;
+        tracing::info!("Lecture continue : {}", actif);
+    }
+
+    pub fn continuous(&self) -> bool {
+        self.continuous
+    }
+
+    /// Élément à jouer quand le fichier courant se termine, ou `None` pour s'arrêter. Le mode
+    /// `Fichier` n'passe jamais ici (le moteur relit le fichier avant d'être « terminé »).
+    pub fn index_apres_fin(&self) -> Option<usize> {
+        let ordre = if self.shuffle && self.ordre_aleatoire.len() == self.playlist.len() {
+            Some((self.ordre_aleatoire.as_slice(), self.rang_aleatoire))
+        } else {
+            None
+        };
+        index_apres_fin(self.playlist.len(), self.playlist_index, ordre, self.repeat_playlist, self.continuous)
+    }
+
     /// Active ou coupe la lecture aléatoire.
     ///
     /// À l'activation, l'ordre est mélangé **en gardant l'élément courant en tête
@@ -4180,29 +4227,6 @@ impl VideoPlayer {
             self.playlist_index = self.playlist.len() - 1;
         }
         self.invalider_ordre_aleatoire();
-    }
-
-    /// Avance l'index de playlist d'un cran (utilisé par l'enchaînement auto).
-    ///
-    /// En lecture aléatoire, « un cran » suit l'ordre mélangé : sans cela,
-    /// l'enchaînement automatique rejouerait la liste dans l'ordre alors que le
-    /// bouton ▶︎ suivant, lui, la parcourt au hasard — deux comportements pour la
-    /// même intention.
-    pub fn playlist_index_advance(&mut self) {
-        if self.playlist.is_empty() {
-            return;
-        }
-        if self.shuffle {
-            if self.ordre_aleatoire.len() != self.playlist.len() {
-                self.remelanger();
-            }
-            if !self.ordre_aleatoire.is_empty() {
-                self.rang_aleatoire = (self.rang_aleatoire + 1) % self.ordre_aleatoire.len();
-                self.playlist_index = self.ordre_aleatoire[self.rang_aleatoire];
-            }
-            return;
-        }
-        self.playlist_index = (self.playlist_index + 1) % self.playlist.len();
     }
 
 
@@ -4364,11 +4388,6 @@ impl VideoPlayer {
         self.muted = !self.muted;
         self.sync_audio_state();
         tracing::info!("Mute: {}", self.muted);
-    }
-
-    pub fn toggle_loop(&mut self) {
-        self.loop_enabled = !self.loop_enabled;
-        tracing::info!("Boucle: {}", self.loop_enabled);
     }
 
     /// Ferme le média courant et libère toutes les ressources FFmpeg associées.
@@ -6948,6 +6967,43 @@ unsafe fn decode_audio_frame_to_f32(aus: &mut AudioStream, frame: *mut AVFrame, 
 /// Une graine fixe donnerait la **même** séquence de lecture à chaque lancement —
 /// ce qui n'est pas « aléatoire ». La valeur n'a pas besoin d'être
 /// cryptographique : elle sert à ne pas rejouer deux fois le même parcours.
+/// Quel élément après la fin du courant ? (fonction pure, testée sans moteur)
+///
+/// - `n` éléments, courant `index` ; `ordre` = (ordre mélangé, rang courant) en lecture aléatoire ;
+/// - lecture continue coupée : rien ne suit ;
+/// - fin de la liste (ou du tour mélangé) : retour au début seulement si la playlist se répète.
+fn index_apres_fin(
+    n: usize,
+    index: usize,
+    ordre: Option<(&[usize], usize)>,
+    repeter_playlist: bool,
+    continue_: bool,
+) -> Option<usize> {
+    if n == 0 || !continue_ {
+        return None;
+    }
+    match ordre {
+        Some((ordre, rang)) => {
+            if rang + 1 < ordre.len() {
+                ordre.get(rang + 1).copied()
+            } else if repeter_playlist {
+                ordre.first().copied()
+            } else {
+                None
+            }
+        }
+        None => {
+            if index + 1 < n {
+                Some(index + 1)
+            } else if repeter_playlist {
+                Some(0)
+            } else {
+                None
+            }
+        }
+    }
+}
+
 fn graine_aleatoire() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -7333,6 +7389,41 @@ mod tests_etage_hdr {
         assert!(decouper_etage_hdr("eq=contrast=1.2,libplacebo=x").is_none());
         assert!(decouper_etage_hdr("unsharp=5:5:0.8").is_none());
         assert!(decouper_etage_hdr("").is_none());
+    }
+}
+
+#[cfg(test)]
+mod tests_fin_de_fichier {
+    use super::index_apres_fin;
+
+    #[test]
+    fn en_ordre_la_fin_de_liste_arrete_sauf_si_la_playlist_se_repete() {
+        assert_eq!(index_apres_fin(3, 0, None, false, true), Some(1));
+        assert_eq!(index_apres_fin(3, 1, None, false, true), Some(2));
+        assert_eq!(index_apres_fin(3, 2, None, false, true), None, "fin de liste : arrêt");
+        assert_eq!(index_apres_fin(3, 2, None, true, true), Some(0), "playlist répétée : retour au début");
+    }
+
+    #[test]
+    fn la_lecture_continue_coupee_n_enchaine_jamais() {
+        assert_eq!(index_apres_fin(3, 0, None, false, false), None);
+        assert_eq!(index_apres_fin(3, 0, None, true, false), None, "même avec la playlist répétée");
+        let ordre = [2usize, 0, 1];
+        assert_eq!(index_apres_fin(3, 2, Some((&ordre, 0)), true, false), None);
+    }
+
+    #[test]
+    fn en_aleatoire_le_tour_suit_l_ordre_melange_puis_s_arrete_ou_recommence() {
+        let ordre = [2usize, 0, 1];
+        assert_eq!(index_apres_fin(3, 2, Some((&ordre, 0)), false, true), Some(0));
+        assert_eq!(index_apres_fin(3, 0, Some((&ordre, 1)), false, true), Some(1));
+        assert_eq!(index_apres_fin(3, 1, Some((&ordre, 2)), false, true), None, "tour fini : arrêt");
+        assert_eq!(index_apres_fin(3, 1, Some((&ordre, 2)), true, true), Some(2), "tour répété : retour en tête");
+    }
+
+    #[test]
+    fn une_playlist_vide_ne_donne_rien() {
+        assert_eq!(index_apres_fin(0, 0, None, true, true), None);
     }
 }
 

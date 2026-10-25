@@ -32,6 +32,10 @@ pub enum Action {
     VolumeMoins,
     Muet,
     Boucle,
+    /// Répétition suivante : aucune → un fichier → toute la playlist.
+    Repetition,
+    /// Lecture continue (enchaîner les fichiers) : bascule.
+    LectureContinue,
     /// Lecture aléatoire (bascule).
     Aleatoire,
     Reprise,
@@ -98,6 +102,8 @@ impl Action {
         Action::Avancer1s,
         Action::Avancer30s,
         Action::Boucle,
+        Action::Repetition,
+        Action::LectureContinue,
         Action::Reprise,
         Action::PointA,
         Action::PointB,
@@ -161,6 +167,8 @@ impl Action {
             Action::VolumeMoins => "son.moins",
             Action::Muet => "son.muet",
             Action::Boucle => "lecture.boucle",
+            Action::Repetition => "lecture.repetition",
+            Action::LectureContinue => "lecture.continue",
             Action::Aleatoire => "playlist.aleatoire",
             Action::Reprise => "lecture.reprise",
             Action::PointA => "lecture.point_a",
@@ -221,7 +229,9 @@ impl Action {
             Action::VolumePlus => "Volume +",
             Action::VolumeMoins => "Volume −",
             Action::Muet => "Couper / rétablir le son",
-            Action::Boucle => "Lecture en boucle",
+            Action::Boucle => "Répéter le fichier (bascule)",
+            Action::Repetition => "Répétition : aucune / un fichier / toute la playlist",
+            Action::LectureContinue => "Lecture continue (enchaîner les fichiers)",
             Action::Aleatoire => "Lecture aléatoire (playlist)",
             Action::Reprise => "Reprise à la position quittée",
             Action::PointA => "Répétition A-B : point A",
@@ -274,6 +284,8 @@ impl Action {
             | Action::ElementPrecedent
             | Action::Fermer
             | Action::Boucle
+            | Action::Repetition
+            | Action::LectureContinue
             | Action::Aleatoire
             | Action::Reprise
             | Action::PointA
@@ -338,6 +350,8 @@ impl Action {
             Action::VolumeMoins => "Bas, MoletteBas",
             Action::Muet => "M",
             Action::Boucle => "Ctrl+L",
+            Action::Repetition => "Ctrl+Maj+L",
+            Action::LectureContinue => "Ctrl+Maj+C",
             Action::Aleatoire => "Ctrl+A",
             Action::Reprise => "Ctrl+R",
             Action::PointA => "A",

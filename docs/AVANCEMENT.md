@@ -1253,6 +1253,17 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      alternant avec `YUV420P` (images filtrées). Garde : `verif-hdr-saut`, mutation faite (correctif
      retiré → 94 et 240 images non converties).
 
+132. 🟠 **« Boucle » disait « playlist » et faisait « fichier ».** Le menu, le panneau et les préférences
+     annonçaient « relire la playlist en boucle » alors que le moteur relisait le FICHIER courant ; MPRIS
+     annonçait `Playlist` pour cette même case et ne gérait pas `Track`. L'aléatoire, lui, tournait
+     indéfiniment. Il y a maintenant trois réglages qui disent ce qu'ils font : répétition (aucune /
+     fichier / playlist — les trois valeurs de `LoopStatus`), lecture continue, aléatoire (un tour).
+     L'enchaînement automatique passe par `play_playlist_index` (le chemin de « suivant ») au lieu de
+     `load_media` + `playlist_index_advance`, supprimée. Mesuré sur de vraies fins de fichier
+     (`verif-modes-lecture`) ; la logique de choix est une fonction pure testée (`index_apres_fin`).
+     **Pièges de l'instrument** : observer dès le lancement (un clip de 3 s est fini avant 4 s) ;
+     compresser la séquence des titres pour ne pas compter deux fois le même.
+
 ## 5. Reste à faire
 
 État au **2026-10-25 (session 37)**. **La référence est `docs/PROCHAINES-FONCTIONS.md`** : pour

@@ -96,6 +96,7 @@ run verif-fenetres-detachables tools/verif-fenetres-detachables.sh "$DISP"
 run verif-migration tools/verif-migration.sh
 run verif-hdr-saut tools/verif-hdr-saut.sh "$DISP"
 run verif-capture tools/verif-capture.sh "$DISP"
+run verif-modes-lecture tools/verif-modes-lecture.sh "$DISP"
 run verif-filtres tools/verif-filtres.sh
 run verif-couleur tools/verif-couleur.sh
 run verif-decodeur tools/verif-decodeur.sh
