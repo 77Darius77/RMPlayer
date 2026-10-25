@@ -274,6 +274,11 @@ struct VideoStream {
     /// (une description invalide ferait sinon 25 tentatives de construction par
     /// seconde, et noierait le journal).
     filters_failed_signature: Option<String>,
+    /// Dernier horodatage envoyé au graphe de filtres, et décalage qui le rend croissant : après un
+    /// saut en arrière les horodatages réels reculent, et `libplacebo` écarte alors les images (voir
+    /// `appliquer_au_graphe`). `i64::MIN` = aucune image envoyée depuis la (re)construction.
+    graphe_dernier_pts: i64,
+    graphe_decalage_pts: i64,
     time_base: AVRational,
     /// Métadonnées de couleur du flux (transfert, primaires, profondeur).
     hdr_info: Option<crate::hdr::Info>,
@@ -2040,6 +2045,8 @@ impl VideoPlayer {
                         hw_failures: 0,
                         filters: None,
                         filters_failed_signature: None,
+                        graphe_dernier_pts: i64::MIN,
+                        graphe_decalage_pts: 0,
                         // Métadonnées relevées juste avant (transfert PQ/HLG,
                         // primaires, profondeur) : elles décident de l'étage HDR.
                         hdr_info: video_hdr.clone(),
@@ -5715,6 +5722,9 @@ unsafe fn apply_video_filters(
     };
     if rebuild {
         vs.filters = None; // libère l'ancien graphe (Drop)
+        // Nouveau graphe : sa ligne de temps repart de zéro.
+        vs.graphe_dernier_pts = i64::MIN;
+        vs.graphe_decalage_pts = 0;
         if vs.filters_failed_signature.as_deref() == Some(signature.as_str()) {
             return None;
         }
@@ -5915,12 +5925,29 @@ unsafe fn appliquer_au_graphe(vs: &mut VideoStream, frame: *mut AVFrame) -> Opti
             (*frame).duration = pas;
         }
     }
+    // **Horodatages croissants pour le graphe.** Après un saut EN ARRIÈRE, les horodatages réels
+    // repartent de loin : `libplacebo` écarte (en répondant `EAGAIN`, sans message) toutes les
+    // images dont l'horodatage est inférieur au dernier vu, jusqu'à ce que la lecture le
+    // rattrape — et le moteur affiche alors l'image d'origine, NON convertie (mesuré par
+    // `verif-hdr-saut` : 94 images sur 120 après cinq sauts rapprochés, jusqu'à la fin de la
+    // prise). On donne donc au graphe des horodatages qui ne reculent jamais ; l'affichage n'en
+    // dépend pas (il utilise ceux de l'image décodée, rétablis juste après l'envoi).
+    let pts_reel = (*frame).pts;
+    let pas = if (*frame).duration > 0 { (*frame).duration } else { 1 };
+    let mut pts_graphe = pts_reel.saturating_add(vs.graphe_decalage_pts);
+    if vs.graphe_dernier_pts != i64::MIN && pts_graphe <= vs.graphe_dernier_pts {
+        vs.graphe_decalage_pts = vs.graphe_dernier_pts.saturating_add(pas).saturating_sub(pts_reel);
+        pts_graphe = pts_reel.saturating_add(vs.graphe_decalage_pts);
+    }
+    vs.graphe_dernier_pts = pts_graphe;
     let chain = vs.filters.as_mut()?;
+    (*frame).pts = pts_graphe;
     let ret = av_buffersrc_add_frame_flags(
         chain.src,
         frame,
         AV_BUFFERSRC_FLAG_KEEP_REF as c_int,
     );
+    (*frame).pts = pts_reel;
     if ret < 0 {
         tracing::warn!("Envoi d'une frame au graphe de filtres refusé : {}", av_error_text(ret));
         return None;

@@ -29,7 +29,7 @@ bancs_pour() {
         vignettes)  echo "verif-vignettes verif-playlist" ;;
         mpris)      echo "verif-mpris verif-playlist" ;;
         focus)      echo "verif-focus" ;;
-        hdr)        echo "verif-hdr verif-filtres" ;;
+        hdr)        echo "verif-hdr verif-hdr-saut verif-filtres" ;;
         soustitres) echo "verif-soustitres verif-soustitres-style verif-soustitres-langues verif-ass" ;;
         ui)         echo "audit-ui audit-menus audit-prefs" ;;
         fenetre)    echo "verif-fenetre verif-fenetre-wayland" ;;
@@ -112,7 +112,7 @@ for nom in $CIBLES; do
     echo "### $nom"
     case "$nom" in
         audit-ui)            sortie=$("$script" "$M1" "$M2" "$DISP" 2>&1) ;;
-        audit-menus|audit-prefs|verif-playlist|verif-recents|verif-boucle-ab|verif-soustitres-style|verif-soustitres-langues|verif-affichage|verif-signets|verif-souris|verif-systeme|verif-tray|verif-theme|verif-saut-pause|verif-audio-pistes|verif-peripheriques|verif-fenetres-detachables) sortie=$("$script" "$DISP" 2>&1) ;;
+        audit-menus|audit-prefs|verif-playlist|verif-recents|verif-boucle-ab|verif-soustitres-style|verif-soustitres-langues|verif-affichage|verif-signets|verif-souris|verif-systeme|verif-tray|verif-theme|verif-saut-pause|verif-audio-pistes|verif-peripheriques|verif-fenetres-detachables|verif-hdr-saut) sortie=$("$script" "$DISP" 2>&1) ;;
         verif-fenetre)       sortie=$("$script" :98 2>&1) ;;   # son propre écran 1280×800
         verif-fenetre-wayland) sortie=$(env WAYLAND_DISPLAY="$KP_ENV_ORIG_WAYLAND_DISPLAY" \
                                    XDG_SESSION_TYPE="$KP_ENV_ORIG_XDG_SESSION_TYPE" "$script" 2>&1) ;;
