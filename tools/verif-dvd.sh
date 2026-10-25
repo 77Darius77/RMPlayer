@@ -21,6 +21,7 @@
 #   7b. menus : les entrées « Ouvrir un DVD » existent ; avec un DVD ouvert, Lecture › Titres du DVD liste
 #      les titres et un clic sur le titre 2 charge ce titre (durée 5 s publiée) ;
 #   8. disque chiffré (bits de brouillage posés dans les paquets) : refus clair mentionnant CSS, sans plantage ;
+#   10. vrai film MPEG-2 avec décodage matériel demandé : image proche du logiciel (carrés verts sinon) ;
 #   9. vrai disque (`/dev/sr0`, `lsdvd`) s'il y en a un : mêmes titres, durées, chapitres, cellules et pistes que
 #      lsdvd, et le film chiffré est refusé avec le message CSS (rien n'est déchiffré). Sinon : ignoré.
 #
@@ -268,6 +269,34 @@ if [ -b /dev/sr0 ] && command -v lsdvd >/dev/null && lsdvd /dev/sr0 2>/dev/null 
     else ko "disque réel : ni image ni message CSS : $(tail -2 "$BASE/reel.log")"; fi
 else
     echo "  (aucun DVD dans le lecteur ou lsdvd absent : contrôle ignoré)"
+fi
+
+echo "=== 10. Décodage matériel d'un vrai film MPEG-2 ==="
+# Avec VA-API, le MPEG-2 de ce disque sortait en carrés verts sur fond noir (GPU AMD, Mesa) : un DVD fabriqué
+# ne le montre pas (images trop simples). Le contrôle utilise donc le vrai disque, avec le décodage matériel
+# DEMANDÉ (réglage par défaut) : l'image doit rester proche de celle du décodage logiciel.
+if [ -b /dev/sr0 ] && lsdvd /dev/sr0 2>/dev/null | grep -q "^Title:"; then
+    python3 - "$CONF" <<'PY'
+import json, sys
+c = json.load(open(sys.argv[1])); c["video"]["hardware_decoding"] = True
+json.dump(c, open(sys.argv[1], "w"), indent=2)
+PY
+    rm -f "$BASE/hw.png" "$BASE/sw.png"
+    timeout 90 "$KP" --dump-frame 300000 "$BASE/hw.png" "dvd:///dev/sr0#1" >/dev/null 2>&1
+    timeout 90 "$KP" --no-hwdec --dump-frame 300000 "$BASE/sw.png" "dvd:///dev/sr0#1" >/dev/null 2>&1
+    ecart=$(python3 - "$BASE/hw.png" "$BASE/sw.png" <<'PY'
+import sys
+import numpy as np
+from PIL import Image
+a = np.asarray(Image.open(sys.argv[1]).convert("RGB")).astype(int)
+b = np.asarray(Image.open(sys.argv[2]).convert("RGB")).astype(int)
+print(round(float(abs(a - b).mean()), 2))
+PY
+)
+    if [ -n "$ecart" ] && awk "BEGIN{exit !($ecart < 6)}"; then ok "image du décodage matériel demandé proche du logiciel (écart moyen $ecart / 255)"
+    else ko "décodage matériel : image corrompue ? écart moyen $ecart / 255 par rapport au logiciel"; fi
+else
+    echo "  (aucun DVD dans le lecteur : contrôle ignoré)"
 fi
 
 echo

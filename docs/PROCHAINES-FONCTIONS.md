@@ -114,8 +114,8 @@ doivent vivre avec la configuration, pas dans le cache.
   système, `verif-fenetres-detachables` 24/24 (piège 127). Non fait : « Ouvrir une adresse » et les
   menus déroulants de la barre (fenêtres contextuelles d'egui, bornées par la fenêtre du lecteur).
 - **DVD-Vidéo (s.37)** : ouvrir un dossier `VIDEO_TS`, un `.ifo` / `.vob` / `.bup`, une image `.iso` ou un lecteur ;
-  titre principal, menu *Titres du DVD*, chapitres, langues audio / sous-images, `--list-dvd` ; `verif-dvd` 44/44
-  (pièges 135 à 137). `libdvdread` est chargée à l'exécution (aucun en-tête, aucune dépendance de compilation).
+  titre principal, menu *Titres du DVD*, chapitres, langues audio / sous-images, `--list-dvd` ; `verif-dvd` 45/45
+  (pièges 135 à 138). `libdvdread` est chargée à l'exécution (aucun en-tête, aucune dépendance de compilation).
   **Pas fait** : menus de DVD (navigation interactive), choix de l'angle, titres à plusieurs PGC enchaînés par
   commandes de navigation ; un disque chiffré demande `libdvdcss` (installée par l'utilisateur) — sans elle le film
   brouillé est refusé avec un message. L'ordre des chapitres vient de la table PTT du premier PGC du titre.

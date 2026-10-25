@@ -2095,7 +2095,13 @@ impl VideoPlayer {
                     // profil (typiquement le H.264 pleine échelle « yuvj420p » des
                     // vidéos de téléphone), et avcodec_open2() échoue alors.
                     codec_hw_capable = codec_supports_vaapi(codec);
-                    let want_hw = hw_usable && codec_hw_capable;
+                    // MPEG-1/2 : décodage logiciel. Avec VA-API, le MPEG-2 d'un vrai DVD sort en carrés verts sur
+                    // fond noir (Mesa, GPU AMD ; mesuré par `verif-dvd` §10), alors que c'est le codec le plus
+                    // léger à décoder en logiciel — rien à gagner, tout à perdre. mpv l'exclut aussi.
+                    let want_hw = hw_usable && codec_hw_capable && !vaapi_deconseille(codecpar.codec_id);
+                    if hw_usable && codec_hw_capable && !want_hw {
+                        tracing::info!("Décodage logiciel imposé pour ce codec (VA-API non fiable sur MPEG-1/2)");
+                    }
                     let attempts: &[bool] = if want_hw { &[true, false] } else { &[false] };
 
                     for &use_hw in attempts {
@@ -6454,6 +6460,11 @@ unsafe extern "C" fn select_hw_format(
         p = p.add(1);
     }
     first
+}
+
+/// Codecs pour lesquels le décodage VA-API est écarté d'office (corruption mesurée).
+fn vaapi_deconseille(id: AVCodecID) -> bool {
+    matches!(id, AVCodecID::AV_CODEC_ID_MPEG2VIDEO | AVCodecID::AV_CODEC_ID_MPEG1VIDEO)
 }
 
 /// Vrai si ce décodeur sait produire des surfaces VA-API.

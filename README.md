@@ -242,6 +242,8 @@ avec le code 0. `--nouvelle-instance` force une seconde fenêtre,
 Le décodage vidéo passe par **VA-API** (Mesa / `radeonsi`) et retombe
 automatiquement en logiciel si le pilote refuse le profil du flux — c'est le cas des
 vidéos de téléphone en H.264 « pleine échelle » (`yuvj420p`), exactement comme avec mpv.
+**MPEG-1 et MPEG-2 (DVD) restent en logiciel d'office** : avec VA-API, le MPEG-2 d'un vrai DVD sortait en
+carrés verts sur fond noir (Mesa, Radeon), et c'est le codec le plus léger à décoder (mpv l'exclut aussi).
 Le **repli est silencieux** du côté de libavcodec : c'est pourquoi la fenêtre
 *Statistiques* (`i`) affiche le mode **réellement constaté** (« VA-API (matériel) » ou
 « logiciel (CPU) »), et non le mode demandé.
@@ -674,7 +676,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-haut-parleurs.sh [écran]` | **Enceintes** : une source 5.1 dont chaque canal porte sa fréquence ; mixage vers mono / stéréo / 3.1 / 5.1 / 7.1 (nombre de canaux, ordre ALSA, réduction, extension) puis lecture réelle vers une sortie PipeWire à 6 canaux enregistrée canal par canal, et changement en cours de lecture — 10 contrôles |
 | `verif-modes-lecture.sh [écran]` | **Fin de fichier** : trois clips, séquence des titres lue sur MPRIS — enchaînement, lecture continue coupée, répéter le fichier, répéter la playlist, aléatoire avec et sans répétition, ancienne configuration — 7 contrôles |
 | `verif-capture.sh [écran]` | **Captures** : format écrit (signature et décodage du fichier), qualité JPEG qui agit (taille et écart de pixels), WebP identique au PNG, taille native, modèle de nom, ancienne configuration — 9 contrôles |
-| `verif-dvd.sh [écran]` | **DVD-Vidéo** : un DVD fabriqué (3 cellules, 3 chapitres, 2 pistes audio) — titres et chapitres, reconnaissance par dossier et par fichier (.ifo, .vob), image rouge / vert / bleu à travers les cellules, positions du titre (début du flux ≠ 0), titre 2, audio et langues, vraie fenêtre, menus (Titres du DVD), refus d'un film brouillé ; et, avec un vrai disque, titres identiques à `lsdvd` (44 contrôles) |
+| `verif-dvd.sh [écran]` | **DVD-Vidéo** : un DVD fabriqué (3 cellules, 3 chapitres, 2 pistes audio) — titres et chapitres, reconnaissance par dossier et par fichier (.ifo, .vob), image rouge / vert / bleu à travers les cellules, positions du titre (début du flux ≠ 0), titre 2, audio et langues, vraie fenêtre, menus (Titres du DVD), refus d'un film brouillé ; et, avec un vrai disque, titres identiques à `lsdvd` (45 contrôles) |
 | `fabrique-dvd.py <sortie> <fichier.vob>` | Écrit un mini DVD-Vidéo (`VIDEO_TS`, IFO, BUP) autour d'un VOB produit par `ffmpeg -f dvd` : 3 cellules coupées sur des images I, 2 titres, 3 chapitres, audio « fre » / « jpn » |
 | `verif-hdr-saut.sh [écran]` | **HDR après un saut** : la fenêtre est filmée pendant des sauts (en lecture, en pause, cinq rapprochés) et pendant une répétition A-B ; chaque image est classée convertie / non convertie — 5 contrôles |
 | `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, moteur CPU forcé, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision, **Vulkan coupé** (repli CPU borné, avis, pas de reconstruction à chaque image) — 36 contrôles |

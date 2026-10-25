@@ -557,7 +557,7 @@ fonctions pures (détection, profondeur, plan, tramage, débanding, noms d'opér
 
 ### Sessions 36 et 37 — résumé
 
-Le détail de chaque défaut trouvé est dans les **pièges 114 à 137** (§4) ; les fonctions sont
+Le détail de chaque défaut trouvé est dans les **pièges 114 à 138** (§4) ; les fonctions sont
 décrites dans `docs/PROCHAINES-FONCTIONS.md` (lots 1 à 6) et mesurées par les bancs du README.
 
 - **Session 36** : revue externe, bancs rendus autonomes (`env-bancs.sh`), repli CPU **borné** du
@@ -573,7 +573,7 @@ décrites dans `docs/PROCHAINES-FONCTIONS.md` (lots 1 à 6) et mesurées par les
   déclenchait des raccourcis), **raccourcis rogner / glisser l'image** (130), **première image HDR après un
   saut** (131), **captures** PNG / JPEG / WebP avec qualité, taille native et modèle de nom (`capture.rs`),
   **modes de lecture** : répétition, lecture continue, aléatoire borné (132), **enceintes** mono → 7.1 (133),
-  **shaders de pixels** GLSL mpv (134) et **DVD-Vidéo** (`dvd.rs`, pièges 135 à 137) — chacune avec son banc,
+  **shaders de pixels** GLSL mpv (134) et **DVD-Vidéo** (`dvd.rs`, pièges 135 à 138) — chacune avec son banc,
   écrit et vu échouer avant le code.
 
 ---
@@ -1321,6 +1321,15 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      sur la réalité des données — les deux bits de brouillage de l'en-tête PES du premier paquet de film —
      et le refus (message nommant CSS, aucun déchiffrement, rien de contourné) est vérifié sur un DVD de test
      dont ces bits sont posés (`verif-dvd` §8). Ne pas conclure d'un message de bibliothèque.
+
+138. 🔴 **DVD : carrés verts sur fond noir avec le décodage matériel.** Le MPEG-2 du vrai disque, décodé par VA-API
+     (Mesa, Radeon RX 6700 XT), sortait corrompu — y compris pour un `.vob` ordinaire, donc pas un défaut du
+     DVD ; les DVD fabriqués (images simples) et mon essai manuel (décodage logiciel) ne le montraient pas,
+     et `verif-dvd` ne l'attrapait pas : son profil de test coupait le décodage matériel. Corrigé : MPEG-1/2
+     restent en logiciel (`vaapi_deconseille`) — c'est le codec le plus léger, et mpv l'exclut aussi. Garde :
+     `verif-dvd` §10 (vrai disque, décodage matériel demandé, écart moyen 49 → 0,0 avec le logiciel).
+     **Leçon** : un banc dont la configuration désactive une option de l'utilisateur ne prouve rien sur elle —
+     tester aussi avec ses réglages par défaut.
 
 ## 5. Reste à faire
 
