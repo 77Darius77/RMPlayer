@@ -285,6 +285,20 @@ Rattacher** les ramène, `Échap` les ferme. Le choix est mémorisé fenêtre pa
 (`interface.detached_windows`). Les menus déroulants de la barre et la boîte « Ouvrir une
 adresse » restent dans le lecteur. Mesuré côté système : `tools/verif-fenetres-detachables.sh`.
 
+### Captures d'écran
+
+`S` enregistre l'image affichée. *Préférences ▸ Interface ▸ Captures d'écran* règle :
+
+- le **format** : **PNG** (sans perte, défaut), **JPEG** (qualité 1–100, 92 par défaut) ou **WebP**
+  (toujours *sans perte* : le seul encodeur disponible hors ligne ; un WebP avec perte demanderait
+  `libwebp`) ;
+- la **taille** : l'image telle qu'affichée (réglages d'image et HDR appliqués), ou la **taille
+  d'origine du film** (décodée à part, sans ces réglages) ;
+- le **nom** : un modèle avec `{media}` (titre du film), `{position}` (HH-MM-SS), `{date}` et
+  `{heure}` — par défaut `rmplayer-{date}-{heure}`. Les caractères interdits (`/`, `:`…) deviennent
+  `_`, et un fichier existant n'est jamais écrasé (`-2`, `-3`…) ;
+- le **dossier**.
+
 ### Au quotidien
 
 - **Fichiers récents** (menu *Fichier*, 10 entrées, « effacer ») ; **lecture aléatoire** et
@@ -322,7 +336,7 @@ s'écarte des valeurs par défaut, et deux boutons « tout déplier / tout repli
 tête. Tous les réglages affichés sont **réellement appliqués** :
 
 - **Interface** : thème, titre, barre de progression, contrôles en plein écran, OSD et sa
-  durée, dossier des captures d'écran ;
+  durée, **captures d'écran** (dossier, format, qualité, taille, nom : voir plus bas) ;
 - **Vidéo** : décodage matériel VA-API, méthode de mise à l'échelle (Lanczos, Bicubique,
   Bilinéaire, Moyenne de zone, Plus proche voisin) et **mode de décodage constaté** ;
 - **Image — filtres** : détramage, désentrelacement (`bwdif` par défaut, `yadif` au choix,
@@ -586,6 +600,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-soustitres.sh [écran]` | **Style des sous-titres** : trois familles de police mesurées (largeurs 268/307/332 px), position horizontale 20/50/80 %, police inconnue, non-régression — 5 contrôles |
 | `installer-association.sh [--par-defaut] [--etat] [--retirer]` | **« Ouvrir avec » RMPlayer** : lanceur `.desktop`, icône, cache des types MIME ; `--par-defaut` l'impose pour les formats qu'il gère |
 | — | **revue externe** : `docs/BRIEF-REVUE-EXTERNE.md` — ce qu'on demande à un relecteur extérieur, budget de lecture, six vérifications qui valent mieux que la lecture, deux pièges à faux positifs |
+| `verif-capture.sh [écran]` | **Captures** : format écrit (signature et décodage du fichier), qualité JPEG qui agit (taille et écart de pixels), WebP identique au PNG, taille native, modèle de nom, ancienne configuration — 9 contrôles |
 | `verif-hdr-saut.sh [écran]` | **HDR après un saut** : la fenêtre est filmée pendant des sauts (en lecture, en pause, cinq rapprochés) et pendant une répétition A-B ; chaque image est classée convertie / non convertie — 5 contrôles |
 | `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, moteur CPU forcé, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision, **Vulkan coupé** (repli CPU borné, avis, pas de reconstruction à chaque image) — 36 contrôles |
 | `verif-focus.sh [écran]` | **Pause selon le focus** : jamais / perte de focus / fenêtre réduite, reprise au retour, respect d'une pause volontaire — 11 contrôles, avec une seconde fenêtre réelle ; la pause est mesurée aussi sur l'image (deux captures identiques), avec un témoin en lecture. Non couvert : une vraie réduction (mode 2), qui exige un gestionnaire de fenêtres |

@@ -36,6 +36,10 @@ rfd = "0.15"
 # Captures d'écran PNG (encodeur pur Rust, sans dépendance système)
 png = "0.18"
 
+# Captures d'écran JPEG (qualité réglable) et WebP (sans perte) : encodeurs purs Rust. `image` est déjà
+# présent via egui_extras ; on n'en active que les deux encodeurs utiles.
+image = { version = "0.25", default-features = false, features = ["jpeg", "webp"] }
+
 # X11 : uniquement pour « fenêtre toujours au-dessus » (voir src/x11.rs).
 # Pur Rust, aucune bibliothèque système requise. N'est utilisé que sur X11 ;
 # sur Wayland, la fonction se contente d'échouer proprement.
