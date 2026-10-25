@@ -1552,6 +1552,7 @@ Coûts des filtres CPU mesurés (1080p, par image, au-dessus des 11,96 ms) : `eq
 
 | 2026-10-18 (s.31) | **Reprise optimisée** : `docs/ETAT-COURT.md` (fiche d'une page, chiffres régénérés par `tools/etat-court.sh`), `AVANCEMENT.md` scindé (sessions 2-28 → `AVANCEMENT-ARCHIVE.md`, 177 Ko → 70 Ko), `docs/DERNIERE-SUITE.txt` écrit par la suite complète, garde-fou « banc muet » ajouté à `tout-verifier.sh`. Reprise ≈ 1 300 jetons au lieu de ~44 000 |
 | 2026-10-25 (s.37) | **DVD-Vidéo** : `src/dvd.rs` (IFO, titres, chapitres, `libdvdread` chargée à l'exécution), flux d'un titre pour FFmpeg (AVIO sur les cellules, format MPEG-PS), début de flux et saut corrigés (piège 135), menus *Ouvrir un DVD* et *Titres du DVD*, `--list-dvd` ; `tools/verif-dvd.sh`, `tools/fabrique-dvd.py` |
+| 2026-10-25 (s.37) | 🔴 **DVD : carrés verts avec le décodage matériel** (piège 138) : MPEG-1/2 décodés en logiciel (`vaapi_deconseille`), `verif-dvd` §10 sur le vrai disque (45/45). 🟡 **Recadrage : curseurs sans aimantation** (piège 139) : `curseur_bord` coupe `smart_aim`, tests `tests_curseur_recadrage`. Commits `2440335`, `800efb9`, poussés sur `main` |
 
 ---
 
