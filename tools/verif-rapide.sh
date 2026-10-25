@@ -55,6 +55,7 @@ bancs_pour() {
         modes)      echo "verif-modes-lecture verif-playlist verif-boucle-ab" ;;
         enceintes)  echo "verif-haut-parleurs verif-audio" ;;
         shaders)    echo "verif-shaders verif-hdr verif-filtres" ;;
+        dvd)        echo "verif-dvd verif-pistes verif-audio-pistes" ;;
         configuration) echo "verif-config-io verif-recents" ;;
         *)          echo "" ;;
     esac
@@ -62,7 +63,7 @@ bancs_pour() {
 
 if [ $# -eq 0 ] || [ "$1" = "--liste" ]; then
     echo "Sujets disponibles :"
-    for sujet in playlist vignettes mpris focus hdr soustitres ui fenetre association filtres audio reseau recents configuration boucle couleur affichage signets souris decodeur systeme theme saut pistes peripheriques fenetres migration capture modes enceintes shaders; do
+    for sujet in dvd playlist vignettes mpris focus hdr soustitres ui fenetre association filtres audio reseau recents configuration boucle couleur affichage signets souris decodeur systeme theme saut pistes peripheriques fenetres migration capture modes enceintes shaders; do
         echo "  $sujet → $(bancs_pour "$sujet")"
     done
     exit 0

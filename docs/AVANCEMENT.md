@@ -557,7 +557,7 @@ fonctions pures (détection, profondeur, plan, tramage, débanding, noms d'opér
 
 ### Sessions 36 et 37 — résumé
 
-Le détail de chaque défaut trouvé est dans les **pièges 114 à 128** (§4) ; les fonctions sont
+Le détail de chaque défaut trouvé est dans les **pièges 114 à 137** (§4) ; les fonctions sont
 décrites dans `docs/PROCHAINES-FONCTIONS.md` (lots 1 à 6) et mesurées par les bancs du README.
 
 - **Session 36** : revue externe, bancs rendus autonomes (`env-bancs.sh`), repli CPU **borné** du
@@ -569,6 +569,12 @@ décrites dans `docs/PROCHAINES-FONCTIONS.md` (lots 1 à 6) et mesurées par les
   audio** (langues par priorité, commentaires écartés, `Ctrl+J`) ; **sortie audio PipeWire**
   (piège 124) ; **fenêtres détachables** (piège 127) ; **renommage RMPlayer** et reprise des
   données (piège 128) ; dépôt publié sur GitHub.
+- **Session 37 (suite — lot « à ajouter »)** : **signets renommables** (piège 129, et la saisie de texte qui
+  déclenchait des raccourcis), **raccourcis rogner / glisser l'image** (130), **première image HDR après un
+  saut** (131), **captures** PNG / JPEG / WebP avec qualité, taille native et modèle de nom (`capture.rs`),
+  **modes de lecture** : répétition, lecture continue, aléatoire borné (132), **enceintes** mono → 7.1 (133),
+  **shaders de pixels** GLSL mpv (134) et **DVD-Vidéo** (`dvd.rs`, pièges 135 à 137) — chacune avec son banc,
+  écrit et vu échouer avant le code.
 
 ---
 
@@ -1286,6 +1292,36 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      ré-encode avec SA matrice (le lecteur ne la connaît pas) → l'étage de shaders sort en RVB. Garde :
      `verif-shaders` §2 et §2b (clip balisé, clip SD sans balise, avec et sans shader).
 
+135. 🔴 **Un saut dans un flux MPEG-PS (DVD) affichait une image d'une demi-seconde plus tôt, étiquetée à la
+     position visée — et les titres de DVD ne commencent pas à zéro.** Deux défauts du moteur, révélés par
+     le DVD : (1) le moteur ignorait le début du flux (`start_time`) — un VOB commence vers 0,5 s, un titre
+     du milieu du disque à des milliers de secondes : positions, saut et durée étaient décalés. Corrigé pour
+     le DVD seulement (le comportement des autres médias est inchangé) : `decaler_paquet` retranche le début
+     du flux juste après chaque `av_read_frame` (quatre sites), et `seek` l'ajoute à la cible. (2) Le
+     démultiplexeur MPEG-PS cherche à la position d'un PAQUET, pas d'une image clé : on atterrit au milieu d'un
+     groupe d'images, dont les premières n'ont pas d'horodatage ; `decode_video_packet` les étiquetait à la
+     position courante (= la cible) et les affichait — mesuré : « 8,5 s » montrait du rouge alors que le vert
+     commençait à 8,0 s. Corrigé en visant 1 s plus tôt (un groupe de DVD dure ≤ 0,6 s ; `seek_target_ms`
+     écarte les images antérieures) et en écartant les images sans horodatage pendant un saut de DVD.
+     Gardes : `verif-dvd` §3 à §5 (positions 7,7 / 8,3 / 14,7 / 15,3 s autour des changements de plan ; sans le
+     décalage ou sans la marge, trois contrôles échouent — mutation vérifiée).
+
+136. 🟠 **Instruments du banc DVD.** `lsdvd` refuse un IFO minimal (il vérifie des dizaines de champs que le
+     lecteur n'a pas besoin de lire) : on ne compare à `lsdvd` que sur un VRAI disque (42 titres identiques :
+     durées, chapitres, cellules, pistes audio, sous-images), et le DVD fabriqué sert à mesurer la lecture.
+     `--audio-track` désigne l'INDEX DE FLUX du conteneur (dans un VOB : 0 navigation, 1 vidéo, 2 et 3 audio),
+     pas le rang de la piste ; `python3 -I` ignore les paquets de l'utilisateur (numpy, PIL) — les bancs
+     passent par `env-bancs.sh`, pas à la main ; un `re.findall` de nombres sur une ligne de journal ramasse
+     d'abord les chiffres de l'HORODATAGE (couper après « rect » avant de lire une géométrie) ; egui veut
+     voir le pointeur survoler avant le clic (`mousemove`, pause, `click`).
+
+137. 🟠 **Le disque réel n'était pas chiffré, malgré le message de `libdvdread`.** « Encrypted DVD support
+     unavailable » dit seulement que `libdvdcss` est absente, pas que CE disque est chiffré : le disque du
+     lecteur se lit tel quel (titre 4, 23 min, sous-titres compris). La détection du chiffrement repose donc
+     sur la réalité des données — les deux bits de brouillage de l'en-tête PES du premier paquet de film —
+     et le refus (message nommant CSS, aucun déchiffrement, rien de contourné) est vérifié sur un DVD de test
+     dont ces bits sont posés (`verif-dvd` §8). Ne pas conclure d'un message de bibliothèque.
+
 ## 5. Reste à faire
 
 État au **2026-10-25 (session 37)**. **La référence est `docs/PROCHAINES-FONCTIONS.md`** : pour
@@ -1499,6 +1535,7 @@ Coûts des filtres CPU mesurés (1080p, par image, au-dessus des 11,96 ms) : `eq
 | 2026-10-18 (s.29) | **Démarrage audio corrigé** (§6.33) : la carte attend que le tampon soit prérempli (2 blocs de silence à 70 et 96 ms, cause du banc intermittent) ; borne de 200 ms pour que le préremplissage ne puisse jamais figer la lecture ; `verif-horloge.sh` **19/19**, cinq passes consécutives |
 
 | 2026-10-18 (s.31) | **Reprise optimisée** : `docs/ETAT-COURT.md` (fiche d'une page, chiffres régénérés par `tools/etat-court.sh`), `AVANCEMENT.md` scindé (sessions 2-28 → `AVANCEMENT-ARCHIVE.md`, 177 Ko → 70 Ko), `docs/DERNIERE-SUITE.txt` écrit par la suite complète, garde-fou « banc muet » ajouté à `tout-verifier.sh`. Reprise ≈ 1 300 jetons au lieu de ~44 000 |
+| 2026-10-25 (s.37) | **DVD-Vidéo** : `src/dvd.rs` (IFO, titres, chapitres, `libdvdread` chargée à l'exécution), flux d'un titre pour FFmpeg (AVIO sur les cellules, format MPEG-PS), début de flux et saut corrigés (piège 135), menus *Ouvrir un DVD* et *Titres du DVD*, `--list-dvd` ; `tools/verif-dvd.sh`, `tools/fabrique-dvd.py` |
 
 ---
 

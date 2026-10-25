@@ -723,7 +723,10 @@ impl App {
                 // construction de la chaîne, qui doit partir des bons réglages.
                 self.appliquer_regles(path, Some(info.resolution));
                 self.appliquer_filtres();
-                self.after_media_loaded(path);
+                // Un DVD s'ouvre par un dossier, une image ou un lecteur : ce que retiennent les récents
+                // est la référence `dvd://…#titre`, qui rouvre exactement ce titre.
+                let ouvert = self.player.current_path().cloned().unwrap_or_else(|| path.to_path_buf());
+                self.after_media_loaded(&ouvert);
                 true
             }
             Err(e) => {
@@ -731,6 +734,19 @@ impl App {
                 false
             }
         }
+    }
+
+    /// Ouvre un DVD (dossier `VIDEO_TS` ou son parent, `.ifo`, `.iso`, lecteur) : son titre principal.
+    /// Refuse clairement ce qui n'est pas un DVD-Vidéo.
+    pub fn ouvrir_dvd(&mut self, chemin: &Path) -> bool {
+        if crate::dvd::reconnaitre(chemin).is_none() {
+            self.error_message = Some(format!(
+                "{} n'est pas un DVD-Vidéo (il faut un dossier VIDEO_TS, un fichier .ifo ou .iso, ou un lecteur)",
+                chemin.display()
+            ));
+            return false;
+        }
+        self.load_media(chemin)
     }
 
     /// Applique la règle de profil qui correspond au média ouvert (préférences :
@@ -3659,7 +3675,31 @@ impl eframe::App for App {
                             }
                         }
                     }
-                    
+                    // DVD : un dossier (VIDEO_TS ou son parent), un fichier .ifo / .iso, ou le disque du
+                    // lecteur. Le titre principal (le plus long) se lit ; les autres sont dans le menu Lecture.
+                    if bouton_menu(ui, "💿 Ouvrir un DVD (dossier)…").clicked() {
+                        if let Some(path) = rfd::FileDialog::new().pick_folder() {
+                            self.ouvrir_dvd(&path);
+                        }
+                    }
+                    if bouton_menu(ui, "💿 Ouvrir un DVD (.ifo, .iso)…").clicked() {
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("DVD-Vidéo", &["ifo", "iso", "bup", "vob"])
+                            .add_filter("Tous les fichiers", &["*"])
+                            .pick_file()
+                        {
+                            self.ouvrir_dvd(&path);
+                        }
+                    }
+                    let lecteurs = crate::dvd::lecteurs();
+                    ui.add_enabled_ui(!lecteurs.is_empty(), |ui| {
+                        if bouton_menu(ui, "💿 Lire le DVD du lecteur").clicked() {
+                            if let Some(l) = lecteurs.first() {
+                                self.ouvrir_dvd(l);
+                            }
+                        }
+                    });
+
                     // Fichiers récents : le plus récent d'abord ; la liste est écrite par
                     // `after_media_loaded`. Le sous-menu est grisé tant qu'elle est vide.
                     let recents = self.config.playback.recent.clone();
@@ -3719,6 +3759,43 @@ impl eframe::App for App {
                         let _ = self.player.stop();
                     }
                     ui.separator();
+                    // Titres d'un DVD : seulement quand un DVD est ouvert.
+                    let titres_dvd: Option<(crate::dvd::Reference, usize, Vec<(usize, u64, usize)>)> =
+                        self.player.dvd().map(|d| {
+                            (
+                                d.reference.clone(),
+                                d.courant,
+                                d.titres.iter().map(|t| (t.numero, t.duree_ms, t.chapitres_ms.len())).collect(),
+                            )
+                        });
+                    if let Some((reference, courant, titres)) = titres_dvd {
+                        let mut choisi: Option<usize> = None;
+                        let titre_menu = format!("💿 Titres du DVD ({}/{})", courant, titres.len());
+                        let r = ui.menu_button(titre_menu.clone(), |ui| {
+                            egui::ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
+                                for (numero, duree, chapitres) in &titres {
+                                    let actif = *numero == courant;
+                                    let libelle = format!(
+                                        "{} Titre {}  {}  {} chap.",
+                                        if actif { "●" } else { " " },
+                                        numero,
+                                        Self::format_time(*duree),
+                                        chapitres
+                                    );
+                                    if ligne_menu(ui, actif, libelle).clicked() && !actif {
+                                        choisi = Some(*numero);
+                                    }
+                                }
+                            });
+                        });
+                        journaliser_entree(&titre_menu, r.response.rect, true);
+                        if let Some(n) = choisi {
+                            let cible = crate::dvd::Reference { emplacement: reference.emplacement, titre: Some(n) };
+                            ui.close();
+                            self.load_media(Path::new(&cible.texte()));
+                        }
+                        ui.separator();
+                    }
                     // Ordre : d'abord « où je vais » (élément, chapitre), puis les
                     // réglages de lecture (vitesse, boucle).
                     //

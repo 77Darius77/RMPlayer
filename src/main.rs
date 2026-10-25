@@ -17,6 +17,7 @@ mod instance;
 mod migration;
 mod mpris;
 mod crash;
+mod dvd;
 mod player;
 mod pistes;
 mod positions;
@@ -121,6 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "--export-config",
         "--import-config",
         "--autostart",
+        "--list-dvd",
     ];
     // **Options à deux valeurs** (`--dump-frame <pos> <image.png> <fichier>`,
     // `--vignette <pos> <image.png> <fichier>`) : le second argument est un chemin
@@ -167,6 +169,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // contenu) ; en cas d'échec, le lecteur affiche l'erreur du décodeur,
                 // qui est actionnable — contrairement à un avertissement de liste.
                 Some(path)
+            } else if dvd::reconnaitre(&path).is_some() {
+                // Un DVD : dossier VIDEO_TS, lecteur (`/dev/sr0`) ou référence `dvd://…`.
+                Some(path)
             } else {
                 tracing::warn!("Fichier introuvable: {:?}", path);
                 None
@@ -181,6 +186,34 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let profils_disponibles = config::load_profiles();
 
     let args: Vec<String> = std::env::args().collect();
+
+    // --- Liste des titres d'un DVD : `--list-dvd <dossier|image|lecteur>` ---
+    //
+    // Lit seulement les fichiers d'information (IFO), jamais le film : c'est l'instrument de mesure du banc
+    // `verif-dvd.sh`, qui compare ce rapport à celui de `lsdvd`.
+    if let Some(pos) = args.iter().position(|a| a == "--list-dvd") {
+        let Some(chemin) = args.get(pos + 1) else {
+            eprintln!("usage : rmplayer --list-dvd <dossier VIDEO_TS | image .iso | lecteur>");
+            std::process::exit(2);
+        };
+        let Some(r) = dvd::reconnaitre(std::path::Path::new(chemin)) else {
+            eprintln!("--list-dvd : {chemin} n'est pas un DVD-Vidéo");
+            std::process::exit(1);
+        };
+        match dvd::Disque::ouvrir(&r.emplacement).and_then(|d| d.titres()) {
+            Ok(titres) => {
+                print!("{}", dvd::rapport(&titres));
+                if let Some(p) = dvd::titre_principal(&titres) {
+                    println!("Longest track: {p:02}");
+                }
+                std::process::exit(0);
+            }
+            Err(e) => {
+                eprintln!("--list-dvd : {e}");
+                std::process::exit(1);
+            }
+        }
+    }
 
     // --- Démarrage automatique : `--autostart on|off|status` ---
     if let Some(pos) = args.iter().position(|a| a == "--autostart") {
