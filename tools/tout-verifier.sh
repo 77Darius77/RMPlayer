@@ -91,6 +91,7 @@ run verif-profils tools/verif-profils.sh "$DISP"
 run verif-pistes tools/verif-pistes.sh "$DISP"
 run verif-saut-pause tools/verif-saut-pause.sh "$DISP"
 run verif-audio-pistes tools/verif-audio-pistes.sh "$DISP"
+run verif-peripheriques tools/verif-peripheriques.sh "$DISP"
 run verif-filtres tools/verif-filtres.sh
 run verif-couleur tools/verif-couleur.sh
 run verif-decodeur tools/verif-decodeur.sh

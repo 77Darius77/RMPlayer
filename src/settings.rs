@@ -2019,31 +2019,55 @@ fn dessiner_audio(app: &mut App, ui: &mut egui::Ui) {
     });
 
     sous_section(ui, "Sortie", |ui| {
-        let actuel = if app.config.audio.device.is_empty() {
-            "Périphérique par défaut".to_string()
-        } else {
-            app.config.audio.device.clone()
-        };
-        let mut choisi = app.config.audio.device.clone();
-        let mut change = false;
-        let peripheriques = app.audio_devices.clone().unwrap_or_default();
+        // Les vraies sorties du système (PipeWire), par leur nom lisible. Les périphériques ALSA
+        // bruts que cpal énumère (`dmix:…`, `front:…`) ne sont plus proposés, sauf `hw:` et
+        // `plughw:` en « avancé » — ils contournent le serveur de son.
+        app.actualiser_sorties_audio(false);
+        let actuel_id = app.config.audio.device.clone();
+        let actuel = app.libelle_sortie_audio(&actuel_id);
+        let sorties = app.sorties_audio.clone();
+        let alsa = app.audio_devices.clone().unwrap_or_default();
+        let mut choisi: Option<String> = None;
 
         ligne(ui, "grille_periph", "Périphérique", |ui| {
             ui.horizontal(|ui| {
                 egui::ComboBox::from_id_salt("audio_device")
                     .selected_text(actuel)
-                    .width(280.0)
+                    .width(320.0)
                     .show_ui(ui, |ui| {
                         if ui
-                            .selectable_value(&mut choisi, String::new(), "Périphérique par défaut")
+                            .selectable_label(actuel_id.is_empty(), "Périphérique par défaut")
                             .clicked()
                         {
-                            change = true;
+                            choisi = Some(String::new());
                         }
-                        for (nom, taux, canaux) in peripheriques {
-                            let libelle = format!("{} ({} Hz, {} canaux)", nom, taux, canaux);
-                            if ui.selectable_value(&mut choisi, nom, libelle).clicked() {
-                                change = true;
+                        for s in &sorties {
+                            let id = s.identifiant();
+                            let libelle = if s.par_defaut {
+                                format!("{} (défaut du système)", s.description)
+                            } else {
+                                s.description.clone()
+                            };
+                            if ui.selectable_label(id == actuel_id, libelle).clicked() {
+                                choisi = Some(id);
+                            }
+                        }
+                        let directes: Vec<_> = alsa
+                            .iter()
+                            .filter(|(nom, _, _)| crate::audio::est_sortie_directe(nom))
+                            .collect();
+                        if !directes.is_empty() {
+                            ui.separator();
+                            ui.label(
+                                egui::RichText::new("ALSA direct (avancé : contourne PipeWire)")
+                                    .small()
+                                    .weak(),
+                            );
+                            for (nom, taux, canaux) in directes {
+                                let libelle = format!("{} ({} Hz, {} canaux)", nom, taux, canaux);
+                                if ui.selectable_label(*nom == actuel_id, libelle).clicked() {
+                                    choisi = Some(nom.clone());
+                                }
                             }
                         }
                     });
@@ -2055,14 +2079,25 @@ fn dessiner_audio(app: &mut App, ui: &mut egui::Ui) {
                     app.audio_devices = None;
                     app.refresh_audio_devices();
                     app.audio_devices = Some(crate::audio::available_output_devices());
+                    app.actualiser_sorties_audio(true);
                 }
             });
         });
+        if sorties.is_empty() {
+            ui.label(
+                egui::RichText::new("PipeWire introuvable : seuls « par défaut » et les sorties ALSA directes sont possibles.")
+                    .small()
+                    .weak(),
+            );
+        }
+        ui.label(
+            egui::RichText::new("Ctrl+Maj+J passe à la sortie suivante pendant la lecture.")
+                .small()
+                .weak(),
+        );
 
-        if change {
-            app.config.audio.device = choisi.clone();
-            app.player.set_audio_device(&choisi);
-            let _ = app.config.save();
+        if let Some(id) = choisi {
+            app.choisir_sortie_audio(&id);
         }
     });
 

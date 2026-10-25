@@ -558,6 +558,10 @@ pub struct VideoPlayer {
     volume_max: u16,
     /// Nom du périphérique audio demandé ("" = défaut)
     audio_device: String,
+    /// Nom ALSA réellement ouvert par cpal (`None` : le périphérique par défaut). Une sortie
+    /// PipeWire se choisit en redirigeant le flux, sans rouvrir ; seul un changement de cet
+    /// élément recrée la sortie.
+    audio_cpal_ouvert: Option<String>,
     /// Nombre consécutif de paquets vidéo décodés sans qu'une image soit produite
     video_decode_failures: u32,
     /// Point A de la répétition A-B (ms)
@@ -745,6 +749,7 @@ impl VideoPlayer {
             scaling_method,
             volume_max,
             audio_device,
+            audio_cpal_ouvert: None,
             video_decode_failures: 0,
             loop_a_ms: None,
             loop_b_ms: None,
@@ -1576,24 +1581,41 @@ impl VideoPlayer {
     }
 
 
-    /// Change le périphérique de sortie audio. La sortie est recréée au prochain
-    /// chargement de média (l'appelant enchaîne en général sur `reload_current_media`,
-    /// car le format du nouveau périphérique peut différer).
-    pub fn set_audio_device(&mut self, name: &str) {
+    /// Change le périphérique de sortie audio. Renvoie `true` si la sortie a dû être recréée : le
+    /// film doit alors être rechargé (`reload_current_media` garde la position), car sans cela le
+    /// décodeur audio n'a plus de sortie et le film reste muet jusqu'à la réouverture.
+    ///
+    /// Deux cas :
+    /// - **sortie PipeWire ou « par défaut »** : cpal reste ouvert sur le périphérique par défaut
+    ///   et on redirige seulement le flux (`sortie_audio::diriger_flux`) — immédiat, sans coupure ;
+    /// - **nom ALSA explicite** (ancien réglage, `hw:…`) : la sortie est recréée.
+    pub fn set_audio_device(&mut self, name: &str) -> bool {
         if self.audio_device == name {
-            return;
+            return false;
         }
         tracing::info!(
             "Périphérique audio: {}",
             if name.is_empty() { "par défaut" } else { name }
         );
         self.audio_device = name.to_string();
+        let voulu = crate::sortie_audio::nom_alsa(name);
+        if self.audio_output.is_some() && self.audio_cpal_ouvert == voulu {
+            // `None` efface la destination que WirePlumber aurait retenue pour ce flux.
+            match crate::sortie_audio::diriger_flux(crate::sortie_audio::nom_pipewire(name)) {
+                Ok(()) => tracing::info!("Flux audio redirigé"),
+                Err(e) => tracing::warn!("Redirection du flux audio impossible : {e}"),
+            }
+            return false;
+        }
         // La sortie sera reconstruite : on relâche l'ancienne (la destruction d'un
         // flux cpal peut attendre le thread audio ; c'est le prix d'un changement).
+        let avait_une_sortie = self.audio_output.is_some();
         self.audio_output = None;
+        self.audio_cpal_ouvert = None;
         self.audio_disabled = false;
         self.audio_prefill_fait = false;
         self.audio_prefill_depuis = None;
+        avait_une_sortie
     }
 
     /// Taille d'affichage attendue pour les frames (pixels). La conversion
@@ -3474,13 +3496,24 @@ impl VideoPlayer {
     /// programme) et renvoie son format : (taux, canaux).
     fn ensure_audio_output(&mut self) -> Option<(u32, u16)> {
         if self.audio_output.is_none() {
-            let wanted = if self.audio_device.is_empty() {
-                None
-            } else {
-                Some(self.audio_device.clone())
-            };
+            let wanted = crate::sortie_audio::nom_alsa(&self.audio_device);
             match crate::audio::AudioOutput::new(wanted.as_deref()) {
                 Ok(out) => {
+                    self.audio_cpal_ouvert = wanted.clone();
+                    // Une sortie PipeWire se choisit APRÈS l'ouverture, en redirigeant le flux. Le
+                    // flux n'apparaît dans le graphe qu'un instant plus tard : on attend hors du
+                    // fil appelant.
+                    if let Some(nom) = crate::sortie_audio::nom_pipewire(&self.audio_device) {
+                        let nom = nom.to_string();
+                        std::thread::spawn(move || {
+                            match crate::sortie_audio::diriger_flux_avec_attente(Some(&nom)) {
+                                Ok(()) => tracing::info!("Flux audio dirigé vers « {nom} »"),
+                                Err(e) => tracing::warn!(
+                                    "Sortie « {nom} » indisponible ({e}) — lecture sur la sortie par défaut"
+                                ),
+                            }
+                        });
+                    }
                     tracing::info!(
                         "Sortie audio prête: {} Hz, {} canaux",
                         out.sample_rate(),

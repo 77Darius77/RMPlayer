@@ -1152,6 +1152,29 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      défaut du taux d'échantillonnage déjà corrigé. Tous les benches audio utilisaient des sources
      stéréo, donc personne ne l'avait vu. Corrigé et gardé par `verif-audio-pistes` §5b.
 
+124. 🔴 **Le choix du périphérique de sortie existait… et ne servait à rien.** Sous PipeWire, cpal
+     passe par ALSA et énumère ~35 noms bruts (`dmix:CARD=HDMI,DEV=3`, `hw:CARD=Generic,DEV=0`…) :
+     l'enceinte Bluetooth et l'écran réellement utilisés n'y figuraient pas, et les `hw:` contournent
+     le serveur de son. Pire : `set_audio_device` détruisait la sortie en cours de lecture et son
+     commentaire disait « l'appelant recharge le film » — personne ne le faisait, donc le film
+     restait **muet** jusqu'à la réouverture. Un réglage qui s'affiche n'est pas un réglage qui sert
+     (même famille que les pièges 4 et 115). Refait : les vraies sorties sont les nœuds `Audio/Sink`
+     de PipeWire (`pw-dump`, noms lisibles) ; le flux reste ouvert sur la sortie par défaut et on le
+     redirige par `pw-metadata … target.object` — sans coupure, en cours de lecture. Revenir à
+     « par défaut » EFFACE la cible (sinon le flux resterait épinglé). Mesuré au son, par
+     enregistrement du moniteur de deux sorties factices : `verif-peripheriques` (17 contrôles).
+     **Pièges de l'instrument** : (a) le moniteur d'un sink nul atténue ≈ 11× (seuil de présence bas,
+     silence = zéro exact) ; (b) un contrôle « le flux est sur la sortie par défaut » passe aussi
+     quand rien n'a jamais été routé → il faut une **précondition mesurée** (« le flux était sur B »).
+
+125. 🟠 **Un `wait` nu dans un banc attend aussi le lecteur lancé en arrière-plan.** Le banc des
+     périphériques est resté bloqué sept minutes : `wait` (sans argument) attendait les
+     enregistreurs ET le lecteur, qui ne se termine jamais. Toujours `wait $pids`.
+
+126. 🟠 **`pkill -f` / `pgrep -f` se trouvent eux-mêmes.** Le motif figure dans la ligne de commande du
+     shell qui les lance : la commande tue son propre shell (code de sortie 144) sans rien afficher.
+     Utiliser `pkill -x <nom>` (nom exact) ou le trou de regex (`pkill -f "[m]otif"`).
+
 ## 5. Reste à faire
 
 État au **2026-10-19, fin de session 32**. Chaque ligne dit *pourquoi* ce n'est pas fait,
