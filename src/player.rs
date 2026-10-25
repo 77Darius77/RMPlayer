@@ -321,6 +321,8 @@ struct AudioStream {
     /// Disposition de canaux de sortie (utilisée par swr)
     out_layout: AVChannelLayout,
     out_sample_rate: i32,
+    /// Permutation des canaux vers l'ordre ALSA (voir `SpeakerLayout::ordre_alsa`), si la disposition en demande une.
+    ordre_sortie: Option<&'static [usize]>,
     /// Base de temps du stream audio (conversion PTS → ms)
     time_base: AVRational,
 }
@@ -563,6 +565,8 @@ pub struct VideoPlayer {
     volume_max: u16,
     /// Nom du périphérique audio demandé ("" = défaut)
     audio_device: String,
+    /// Disposition des haut-parleurs demandée (`audio.speakers`).
+    speakers: crate::config::SpeakerLayout,
     /// Nom ALSA réellement ouvert par cpal (`None` : le périphérique par défaut). Une sortie
     /// PipeWire se choisit en redirigeant le flux, sans rouvrir ; seul un changement de cet
     /// élément recrée la sortie.
@@ -758,6 +762,7 @@ impl VideoPlayer {
             scaling_method,
             volume_max,
             audio_device,
+            speakers: config.audio.speakers,
             audio_cpal_ouvert: None,
             video_decode_failures: 0,
             loop_a_ms: None,
@@ -1084,10 +1089,26 @@ impl VideoPlayer {
             let out_sample_rate = out_cfg
                 .map(|(r, _)| r as i32)
                 .unwrap_or_else(|| ctx.sample_rate.max(48000));
-            let channels = out_cfg.map(|(_, c)| c as i32).unwrap_or(2);
+            // Sans sortie (mode `--dump-audio`), le nombre de canaux est celui des enceintes demandées.
+            let channels = out_cfg
+                .map(|(_, c)| c as i32)
+                .or_else(|| self.speakers.canaux().map(i32::from))
+                .unwrap_or(2);
 
+            // La disposition de sortie est NOMMÉE quand les enceintes demandées correspondent au nombre
+            // de canaux réellement ouverts (le mixage de `swresample` en dépend : un 5.1 vers un 7.1
+            // n'est pas le même qu'un 5.1 vers « 8 canaux sans nom »). Sinon : celle par défaut.
             let mut out_layout: AVChannelLayout = std::mem::zeroed();
-            av_channel_layout_default(&mut out_layout, channels.max(1));
+            let nommee = self
+                .speakers
+                .nom_ffmpeg()
+                .filter(|_| self.speakers.canaux().map(i32::from) == Some(channels))
+                .and_then(|nom| CString::new(nom).ok())
+                .map(|nom| av_channel_layout_from_string(&mut out_layout, nom.as_ptr()) == 0)
+                .unwrap_or(false);
+            if !nommee {
+                av_channel_layout_default(&mut out_layout, channels.max(1));
+            }
             let mut swr: *mut SwrContext = std::ptr::null_mut();
             let ret = swr_alloc_set_opts2(
                 &mut swr,
@@ -1115,6 +1136,8 @@ impl VideoPlayer {
                 swr,
                 out_layout,
                 out_sample_rate,
+                // La permutation ne vaut que si la disposition nommée a bien été appliquée.
+                ordre_sortie: if nommee { self.speakers.ordre_alsa() } else { None },
                 time_base: stream.time_base,
             });
         }
@@ -1591,6 +1614,28 @@ impl VideoPlayer {
         }
     }
 
+
+    /// Change la disposition des haut-parleurs. Renvoie `true` si la sortie a dû être recréée (le
+    /// nombre de canaux change) : le film doit alors être rechargé, comme pour un périphérique ALSA.
+    pub fn set_speakers(&mut self, layout: crate::config::SpeakerLayout) -> bool {
+        if self.speakers == layout {
+            return false;
+        }
+        tracing::info!("Haut-parleurs : {}", layout.libelle());
+        self.speakers = layout;
+        let avait_une_sortie = self.audio_output.is_some();
+        self.audio_output = None;
+        self.audio_cpal_ouvert = None;
+        self.audio_disabled = false;
+        self.audio_prefill_fait = false;
+        self.audio_prefill_depuis = None;
+        // Le routage PipeWire d'une sortie choisie est refait à l'ouverture de la nouvelle sortie.
+        avait_une_sortie
+    }
+
+    pub fn speakers(&self) -> crate::config::SpeakerLayout {
+        self.speakers
+    }
 
     /// Change le périphérique de sortie audio. Renvoie `true` si la sortie a dû être recréée : le
     /// film doit alors être rechargé (`reload_current_media` garde la position), car sans cela le
@@ -3510,7 +3555,7 @@ impl VideoPlayer {
     fn ensure_audio_output(&mut self) -> Option<(u32, u16)> {
         if self.audio_output.is_none() {
             let wanted = crate::sortie_audio::nom_alsa(&self.audio_device);
-            match crate::audio::AudioOutput::new(wanted.as_deref()) {
+            match crate::audio::AudioOutput::new(wanted.as_deref(), self.speakers.canaux()) {
                 Ok(out) => {
                     self.audio_cpal_ouvert = wanted.clone();
                     // Une sortie PipeWire se choisit APRÈS l'ouverture, en redirigeant le flux. Le
@@ -6957,8 +7002,20 @@ unsafe fn decode_audio_frame_to_f32(aus: &mut AudioStream, frame: *mut AVFrame, 
     );
 
     if produced > 0 {
-        let n = produced as usize * channels;
-        out.extend_from_slice(&buffer[..n.min(buffer.len())]);
+        let n = (produced as usize * channels).min(buffer.len());
+        match aus.ordre_sortie {
+            // Entrelacement dans l'ordre ALSA : le canal `ordre[i]` de FFmpeg va en position `i`.
+            Some(ordre) if ordre.len() == channels => {
+                let debut = out.len();
+                out.resize(debut + n, 0.0);
+                for (trame, sortie) in buffer[..n].chunks_exact(channels).zip(out[debut..].chunks_exact_mut(channels)) {
+                    for (i, &source) in ordre.iter().enumerate() {
+                        sortie[i] = trame[source];
+                    }
+                }
+            }
+            _ => out.extend_from_slice(&buffer[..n]),
+        }
     }
 }
 

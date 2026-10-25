@@ -174,7 +174,7 @@ impl AudioOutput {
     /// Le taux d'échantillonnage et le nombre de canaux exposés sont ceux du
     /// périphérique : c'est à l'appelant de convertir ses échantillons à ce
     /// format (sinon la lecture serait à la mauvaise vitesse).
-    pub fn new(wanted: Option<&str>) -> Result<Self, String> {
+    pub fn new(wanted: Option<&str>, canaux: Option<u16>) -> Result<Self, String> {
         let host = cpal::default_host();
         let device = match wanted.filter(|n| !n.is_empty()) {
             Some(name) => match find_output_device(&host, name) {
@@ -195,9 +195,26 @@ impl AudioOutput {
                 .default_output_device()
                 .ok_or_else(|| "Aucun périphérique de sortie audio".to_string())?,
         };
-        let supported = device
+        let defaut = device
             .default_output_config()
             .map_err(|e| format!("Config audio par défaut indisponible: {}", e))?;
+        // Disposition des haut-parleurs demandée : on ouvre la sortie avec CE nombre de canaux, à
+        // condition que le périphérique l'accepte ; sinon on garde celui qu'il annonce (le moteur
+        // mixe alors vers lui) et on le dit.
+        let supported = match canaux {
+            Some(n) if n != defaut.channels() => match config_avec_canaux(&device, &defaut, n) {
+                Some(c) => c,
+                None => {
+                    tracing::warn!(
+                        "La sortie n'accepte pas {} canaux — {} canaux conservés (mixage vers eux)",
+                        n,
+                        defaut.channels()
+                    );
+                    defaut
+                }
+            },
+            _ => defaut,
+        };
         let config: cpal::StreamConfig = supported.config();
 
         tracing::info!(
@@ -557,6 +574,31 @@ fn fill_output(
             );
         }
     }
+}
+
+/// Une configuration de flux à `canaux` canaux, au taux et au format du défaut quand c'est possible
+/// (f32 de préférence : c'est le format que le moteur fournit).
+fn config_avec_canaux(
+    device: &cpal::Device,
+    defaut: &cpal::SupportedStreamConfig,
+    canaux: u16,
+) -> Option<cpal::SupportedStreamConfig> {
+    let taux = defaut.sample_rate();
+    let mut candidats: Vec<cpal::SupportedStreamConfigRange> = device
+        .supported_output_configs()
+        .ok()?
+        .filter(|r| r.channels() == canaux)
+        .collect();
+    candidats.sort_by_key(|r| match r.sample_format() {
+        cpal::SampleFormat::F32 => 0,
+        cpal::SampleFormat::I16 => 1,
+        _ => 2,
+    });
+    let gabarit = candidats.into_iter().find(|r| {
+        matches!(r.sample_format(), cpal::SampleFormat::F32 | cpal::SampleFormat::I16)
+    })?;
+    let taux = taux.clamp(gabarit.min_sample_rate(), gabarit.max_sample_rate());
+    Some(gabarit.with_sample_rate(taux))
 }
 
 /// Retrouve un périphérique de sortie par son nom exact (tel que listé dans les

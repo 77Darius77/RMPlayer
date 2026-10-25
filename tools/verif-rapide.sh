@@ -53,6 +53,7 @@ bancs_pour() {
         migration)  echo "verif-migration" ;;
         capture)    echo "verif-capture" ;;
         modes)      echo "verif-modes-lecture verif-playlist verif-boucle-ab" ;;
+        enceintes)  echo "verif-haut-parleurs verif-audio" ;;
         configuration) echo "verif-config-io verif-recents" ;;
         *)          echo "" ;;
     esac
@@ -60,7 +61,7 @@ bancs_pour() {
 
 if [ $# -eq 0 ] || [ "$1" = "--liste" ]; then
     echo "Sujets disponibles :"
-    for sujet in playlist vignettes mpris focus hdr soustitres ui fenetre association filtres audio reseau recents configuration boucle couleur affichage signets souris decodeur systeme theme saut pistes peripheriques fenetres migration capture modes; do
+    for sujet in playlist vignettes mpris focus hdr soustitres ui fenetre association filtres audio reseau recents configuration boucle couleur affichage signets souris decodeur systeme theme saut pistes peripheriques fenetres migration capture modes enceintes; do
         echo "  $sujet → $(bancs_pour "$sujet")"
     done
     exit 0
@@ -114,7 +115,7 @@ for nom in $CIBLES; do
     echo "### $nom"
     case "$nom" in
         audit-ui)            sortie=$("$script" "$M1" "$M2" "$DISP" 2>&1) ;;
-        audit-menus|audit-prefs|verif-playlist|verif-recents|verif-boucle-ab|verif-soustitres-style|verif-soustitres-langues|verif-affichage|verif-signets|verif-souris|verif-systeme|verif-tray|verif-theme|verif-saut-pause|verif-audio-pistes|verif-peripheriques|verif-fenetres-detachables|verif-hdr-saut|verif-capture|verif-modes-lecture) sortie=$("$script" "$DISP" 2>&1) ;;
+        audit-menus|audit-prefs|verif-playlist|verif-recents|verif-boucle-ab|verif-soustitres-style|verif-soustitres-langues|verif-affichage|verif-signets|verif-souris|verif-systeme|verif-tray|verif-theme|verif-saut-pause|verif-audio-pistes|verif-peripheriques|verif-fenetres-detachables|verif-hdr-saut|verif-capture|verif-modes-lecture|verif-haut-parleurs) sortie=$("$script" "$DISP" 2>&1) ;;
         verif-fenetre)       sortie=$("$script" :98 2>&1) ;;   # son propre écran 1280×800
         verif-fenetre-wayland) sortie=$(env WAYLAND_DISPLAY="$KP_ENV_ORIG_WAYLAND_DISPLAY" \
                                    XDG_SESSION_TYPE="$KP_ENV_ORIG_XDG_SESSION_TYPE" "$script" 2>&1) ;;

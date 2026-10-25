@@ -113,6 +113,9 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Fenêtres détachables (s.37)** : Préférences, Statistiques, Aide, À propos en vraies fenêtres
   système, `verif-fenetres-detachables` 24/24 (piège 127). Non fait : « Ouvrir une adresse » et les
   menus déroulants de la barre (fenêtres contextuelles d'egui, bornées par la fenêtre du lecteur).
+- **Enceintes (s.37)** : automatique, mono, stéréo, 2.1, 3.1, quadriphonie, 4.1, 5.0, 5.1, 6.1, 7.1 ;
+  `verif-haut-parleurs` 10/10 (piège 133). Limite : 2.1, 3.1, 4.1 et 6.1 n'ont pas de position standard dans
+  ALSA / PipeWire (ordre de FFmpeg) ; une vraie sortie 7.1 matérielle n'a pas été essayée (sorties factices).
 - **Modes de lecture (s.37)** : répétition (aucune / fichier / playlist), lecture continue, aléatoire borné à
   un tour, `verif-modes-lecture` 7/7 (piège 132). Changement de comportement assumé : l'aléatoire s'arrête
   après un tour s'il n'y a pas de répétition de playlist (il tournait indéfiniment).
