@@ -6,13 +6,13 @@ le reste est du jugement, écrit à la main et tenu à jour à chaque session.
 
 <!-- AUTO:debut — bloc régénéré par tools/etat-court.sh, ne pas éditer à la main -->
 ```
-Généré le            2026-10-25 01:21
-Code                 28495 lignes, 24 modules (src/)
-Bancs de contrôle    41 (tools/tout-verifier.sh)
-Dernière suite       2026-10-25 01:18 — 629 contrôles, 0 échec(s), 41 bancs
-Tests unitaires      164 (cargo test --release)
+Généré le            2026-10-25 15:27
+Code                 29280 lignes, 27 modules (src/)
+Bancs de contrôle    44 (tools/tout-verifier.sh)
+Dernière suite       2026-10-25 15:25 — 678 contrôles, 0 échec(s), 44 bancs
+Tests unitaires      176 (cargo test --release)
 Avertissements       0 (cargo build --release)
-Dernière archive     kplayer-2026-10-25-session37b.tar.gz — 110 fichiers, 713 Ko
+Dernière archive     rmplayer-2026-10-25-session37c.tar.gz — 115 fichiers, 713 Ko
 FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
   AV1 logiciel       oui (libdav1d)
   scale_vaapi        oui
@@ -20,8 +20,8 @@ FFmpeg               7.1.3 (/opt/ffmpeg-7.1)
   HDR (libplacebo)   oui (Vulkan)
 ```
 <!-- AUTO:fin -->
-> **Tout est vérifié** : dernière suite complète **2026-10-25 01:18 — 629 contrôles,
-> 0 échec, 41 bancs** (lancée depuis un shell Wayland brut, voir piège 114), 164 tests
+> **Tout est vérifié** : dernière suite complète **2026-10-25 15:25 — 678 contrôles,
+> 0 échec, 44 bancs** (lancée depuis un shell Wayland brut, voir piège 114), 176 tests
 > unitaires, 0 avertissement de code. **Session 37 : les lots 1 à 5 de
 > `docs/PROCHAINES-FONCTIONS.md` sont faits** (récents, boucle A-B, export/import, style des
 > sous-titres, langues, couleur, glisser, rogner, signets, souris, décodeur, icône de
@@ -44,7 +44,7 @@ Lecteur vidéo **Rust + egui** (Linux), sans dépendance à un lecteur externe :
 directement (`ffmpeg-sys-next`, FFmpeg 7.1.3 de `/opt/ffmpeg-7.1`), audio par `cpal`,
 réglages en JSON. Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`. **Contrôle de version
 git depuis la session 36** (branche `main`, étiquettes `session36` = l'état à 505 contrôles,
-`session36-repli-hdr` = 509 contrôles, repli HDR borné, et `session37` = 629 contrôles, lots 1 à 6 + saut en pause + pistes audio ; dépôt distant : <https://github.com/77Darius77/RMPlayer>, `main` publié) ; les archives de `sauvegardes/` restent comme copies hors
+`session36-repli-hdr` = 509 contrôles, repli HDR borné, `session37` = 629 contrôles, lots 1 à 6 + saut en pause + pistes audio, et `session37c` = 678 contrôles, + sortie audio PipeWire, fenêtres détachables, renommage RMPlayer ; dépôt distant : <https://github.com/77Darius77/RMPlayer>, `main` publié) ; les archives de `sauvegardes/` restent comme copies hors
 dépôt (non suivies par git).
 
 ## Les trois optimisations en place (mesurées, session 31)

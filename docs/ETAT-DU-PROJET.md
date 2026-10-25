@@ -17,7 +17,7 @@ Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`, sous **git** (branche `main`
 | | |
 |---|---|
 | Objet | Lecteur vidéo pour Linux, en Rust, sur FFmpeg 7.1 (`/opt/ffmpeg-7.1`) |
-| Code | 29 281 lignes, 27 modules (`src/`) |
+| Code | 29 280 lignes, 27 modules (`src/`) |
 | Binaire | `target/release/rmplayer` (≈ 52 Mo, rapport de crash exploitable) |
 | Lancement | `./run.sh film.mp4` (ou icône / ligne de commande avec `--no-hwdec`, `--fullscreen`) |
 | Compilation | `cargo build --release` — **0 avertissement** |

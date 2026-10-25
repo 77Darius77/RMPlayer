@@ -77,7 +77,7 @@
 | `src/fenetre.rs` | 97 | Fenêtres flottantes détachables (viewport immédiat) |
 | `src/positions.rs` | 73 | Reprise de lecture |
 | `src/renderer.rs` | 43 | Transport des images |
-| **Total** | **29281** | 27 modules (hors `tools/`) |
+| **Total** | **29280** | 27 modules (hors `tools/`) |
 
 `tools/` : 44 bancs lancés par `tout-verifier.sh`, plus les outils de diagnostic (`audit-ui.sh`,
 `check-ctx-reentrance.py`, `vivacite.sh`, `diag-gel.sh`, `capture-lecteur.sh`…) et les
