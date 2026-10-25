@@ -141,6 +141,7 @@ partagés : `env-bancs.sh` (environnement des bancs), `analyse-audio.py`, `metri
 | `set_scaling_method(ScalingMethod)` | Méthode de réduction transmise à `sws_getContext` (5 choix) |
 | `set_display_target(w, h)` | Taille de conversion RGBA (pixels). `(0, 0)` = natif ; hystérésis de 16 px |
 | `set_volume_max(u16)` | Plafond de volume (100–300 %) ; ramène le volume courant dans la limite |
+| `set_video_filters(&VideoSettings)` (shaders) | Compose la chaîne : étage HDR (`libplacebo`), étage de shaders (`shaders::assembler`, fusionné au HDR s'il existe, sinon `libplacebo=custom_shader_path=…:format=rgba`), filtres de base |
 | `set_speakers(SpeakerLayout) -> bool` / `speakers()` | Disposition des haut-parleurs : nombre de canaux ouvert (`AudioOutput::new(…, canaux)`), disposition nommée pour `swresample`, permutation vers l'ordre ALSA. `true` = sortie recréée, film à recharger |
 | `set_audio_device(&str) -> bool` | Sortie audio : `""` = défaut, `pw:<nom>` = sortie PipeWire (le flux est **redirigé** sans coupure), autre = nom ALSA ouvert tel quel. Renvoie `true` si la sortie a dû être recréée (l'appelant recharge alors le média) |
 | `set_speed(f32)` | Vitesse 0,1–8× **et** rééchantillonnage audio synchrone |

@@ -1913,6 +1913,102 @@ fn dessiner_image(app: &mut App, ui: &mut egui::Ui) {
         }
     });
 
+    sous_section(ui, "Shaders de pixels (GPU)", |ui| {
+        aide(
+            ui,
+            "Fichiers GLSL au format « hook » de mpv (//!HOOK MAIN, //!BIND HOOKED, vec4 hook()), exécutés \
+             par libplacebo sur la carte graphique (Vulkan) dans l'ordre de la liste. Ctrl+Maj+S les coupe ou \
+             les rétablit. Un fichier invalide est ignoré ; un shader qui ne compile pas est refusé avec un avis.",
+        );
+        if ui
+            .checkbox(&mut app.config.video.shaders_enabled, "Activer les shaders")
+            .changed()
+        {
+            modifie = true;
+        }
+        let mut retirer: Option<usize> = None;
+        let mut monter: Option<usize> = None;
+        let total = app.config.video.shaders.len();
+        if total == 0 {
+            ui.label(egui::RichText::new("aucun shader").weak());
+        }
+        for (i, chemin) in app.config.video.shaders.iter().enumerate() {
+            ui.horizontal(|ui| {
+                let etendu = crate::config::Config::expand_path(chemin);
+                let nom = etendu
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_else(|| chemin.clone());
+                ui.label(format!("{}. {}", i + 1, nom)).on_hover_text(chemin.as_str());
+                if let Err(raison) = crate::shaders::lire(&etendu) {
+                    ui.label(egui::RichText::new("⚠ ignoré").color(egui::Color32::from_rgb(230, 150, 40)))
+                        .on_hover_text(raison);
+                }
+                if ui.add_enabled(i > 0, egui::Button::new("↑").small()).on_hover_text("Plus tôt dans l'ordre").clicked() {
+                    monter = Some(i);
+                }
+                if ui.add_enabled(i + 1 < total, egui::Button::new("↓").small()).on_hover_text("Plus tard dans l'ordre").clicked() {
+                    monter = Some(i + 1);
+                }
+                if ui.small_button("✕").on_hover_text("Retirer de la liste").clicked() {
+                    retirer = Some(i);
+                }
+            });
+        }
+        if let Some(i) = retirer {
+            app.config.video.shaders.remove(i);
+            modifie = true;
+        }
+        if let Some(i) = monter {
+            if i > 0 && i < app.config.video.shaders.len() {
+                app.config.video.shaders.swap(i - 1, i);
+                modifie = true;
+            }
+        }
+        ui.horizontal(|ui| {
+            if ui.button("➕ Ajouter un shader…").clicked() {
+                if let Some(chemin) = rfd::FileDialog::new()
+                    .add_filter("Shaders GLSL", &["glsl", "hook", "frag", "txt"])
+                    .pick_file()
+                {
+                    match crate::shaders::lire(&chemin) {
+                        Ok(_) => {
+                            app.config.video.shaders.push(chemin.to_string_lossy().to_string());
+                            app.config.video.shaders_enabled = true;
+                            modifie = true;
+                        }
+                        Err(raison) => {
+                            app.error_message = Some(format!("Shader refusé : {raison}"));
+                        }
+                    }
+                }
+            }
+            if ui
+                .button("Créer des shaders d'exemple")
+                .on_hover_text("Écrit gris, sépia, netteté et négatif dans ~/.config/rmplayer/shaders/ et les ajoute")
+                .clicked()
+            {
+                let dossier = dirs::config_dir().map(|d| d.join("rmplayer").join("shaders"));
+                match dossier.map(|d| crate::shaders::installer_exemples(&d)) {
+                    Some(Ok(chemins)) => {
+                        for c in chemins {
+                            let texte = c.to_string_lossy().to_string();
+                            if !app.config.video.shaders.contains(&texte) {
+                                app.config.video.shaders.push(texte);
+                            }
+                        }
+                        // Les ajouter tous d'un coup empilerait quatre effets : on les laisse coupés.
+                        app.config.video.shaders_enabled = false;
+                        app.annonce("Shaders d'exemple créés (coupés : cochez « Activer » et retirez ceux dont vous ne voulez pas)");
+                        modifie = true;
+                    }
+                    Some(Err(e)) => app.error_message = Some(format!("Shaders d'exemple : {e}")),
+                    None => app.error_message = Some("Dossier de configuration introuvable".to_string()),
+                }
+            }
+        });
+    });
+
     // --- Sous-bloc « Avancé » : les paramètres FFmpeg eux-mêmes ---
     // C'est ici qu'un nouveau réglage fin de filtre vient s'ajouter (section déjà
     // en place, il suffit d'ajouter une ligne `ligne(...)`).

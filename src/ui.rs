@@ -1696,6 +1696,19 @@ impl App {
         self.annonce(&format!("Rapport d'aspect : {}", mode.label()));
     }
 
+    /// Active ou coupe les shaders de pixels (la liste est conservée).
+    pub(crate) fn basculer_shaders(&mut self) {
+        if self.config.video.shaders.is_empty() {
+            self.annonce("Aucun shader dans la liste (Préférences ▸ Image ▸ Shaders de pixels)");
+            return;
+        }
+        let actif = !self.config.video.shaders_enabled;
+        self.config.video.shaders_enabled = actif;
+        let _ = self.config.save();
+        self.appliquer_filtres();
+        self.annonce(if actif { "Shaders de pixels : activés" } else { "Shaders de pixels : coupés" });
+    }
+
     /// Bascule « remplir en rognant » ; quitter ce mode rétablit celui d'avant.
     fn basculer_rogner(&mut self) {
         use crate::config::AspectMode::Rogner;
@@ -3534,6 +3547,7 @@ impl eframe::App for App {
                         }
                         // Rapport d'aspect : même fonction que la souris (cycle complet).
                         Action::Aspect => self.aspect_suivant(),
+                        Action::Shaders => self.basculer_shaders(),
                         Action::AspectRogner => self.basculer_rogner(),
                         Action::ImageGlisserGauche => self.glisser_image(-PAS_GLISSEMENT, 0.0),
                         Action::ImageGlisserDroite => self.glisser_image(PAS_GLISSEMENT, 0.0),

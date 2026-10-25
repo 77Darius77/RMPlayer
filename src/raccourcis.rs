@@ -68,6 +68,8 @@ pub enum Action {
     Echap,
     Capture,
     Aspect,
+    /// Activer / couper les shaders de pixels (la liste est conservée).
+    Shaders,
     /// Remplir la fenêtre en rognant (couvrir) : bascule, puis retour au mode précédent.
     AspectRogner,
     /// Glisser l'image (décalage de 2 % par appui) et la recentrer.
@@ -133,6 +135,7 @@ impl Action {
         Action::Echap,
         Action::Capture,
         Action::Aspect,
+        Action::Shaders,
         Action::AspectRogner,
         Action::ImageGlisserGauche,
         Action::ImageGlisserDroite,
@@ -197,6 +200,7 @@ impl Action {
             Action::Echap => "affichage.echap",
             Action::Capture => "image.capture",
             Action::Aspect => "image.aspect",
+            Action::Shaders => "image.shaders",
             Action::AspectRogner => "image.rogner",
             Action::ImageGlisserGauche => "image.glisser_gauche",
             Action::ImageGlisserDroite => "image.glisser_droite",
@@ -261,6 +265,7 @@ impl Action {
             Action::Echap => "Fermer la fenêtre / sortir du plein écran",
             Action::Capture => "Capture d'écran (PNG)",
             Action::Aspect => "Rapport d'aspect suivant",
+            Action::Shaders => "Shaders de pixels : activer / couper",
             Action::AspectRogner => "Remplir la fenêtre en rognant (bascule)",
             Action::ImageGlisserGauche => "Image : glisser vers la gauche",
             Action::ImageGlisserDroite => "Image : glisser vers la droite",
@@ -324,6 +329,7 @@ impl Action {
             | Action::MasquerInterface => "Affichage",
             Action::Capture
             | Action::Aspect
+            | Action::Shaders
             | Action::AspectRogner
             | Action::ImageGlisserGauche
             | Action::ImageGlisserDroite
@@ -383,6 +389,7 @@ impl Action {
             Action::Echap => "Echap",
             Action::Capture => "S",
             Action::Aspect => "K",
+            Action::Shaders => "Ctrl+Maj+S",
             Action::AspectRogner => "Ctrl+K",
             Action::ImageGlisserGauche => "Alt+Gauche",
             Action::ImageGlisserDroite => "Alt+Droite",

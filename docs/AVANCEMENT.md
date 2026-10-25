@@ -1276,6 +1276,16 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      (format 0xFFFE) ; le « 5.1 » de FFmpeg a des canaux ARRIÈRE (BL/BR), le « 5.1(side) » des latéraux ;
      un `pkill -f` dont le motif figure dans la commande qui le lance tue le shell (piège 126).
 
+134. 🔴 **Un filtre actif forçait BT.709 sur un clip SD non balisé (la couleur changeait avec n'importe quel filtre).**
+     Trouvé en ajoutant les shaders de pixels : un shader qui ne fait rien décalait la couleur d'un clip SD non
+     balisé de (185,34,40) à (200,51,39). Cause : `appliquer_au_graphe` appelait `poser_metadonnees_couleur` pour
+     TOUT flux ayant des métadonnées couleur, SDR compris, et cette fonction écrit BT.709 sur l'image d'ORIGINE —
+     donc sur la décision de matrice du lecteur (`couleur_effective`, piège 119) : le même clip était lu en
+     BT.601 sans filtre et en BT.709 dès qu'un filtre (détramage, luminosité…) était actif. Corrigé : cette pose
+     est réservée aux sources HDR. **Deuxième défaut du même genre** : un étage `libplacebo` qui sort du YUV le
+     ré-encode avec SA matrice (le lecteur ne la connaît pas) → l'étage de shaders sort en RVB. Garde :
+     `verif-shaders` §2 et §2b (clip balisé, clip SD sans balise, avec et sans shader).
+
 ## 5. Reste à faire
 
 État au **2026-10-25 (session 37)**. **La référence est `docs/PROCHAINES-FONCTIONS.md`** : pour
