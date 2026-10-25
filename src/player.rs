@@ -1003,6 +1003,35 @@ impl VideoPlayer {
             .as_ref()
             .map(|v| v.hdr_etage.clone())
             .unwrap_or_default();
+        // Shaders de pixels : un seul fichier assemblé (voir `shaders::assembler`). Ils sont fusionnés à
+        // l'étage `libplacebo` du HDR quand il existe (un seul contexte Vulkan), sinon ils forment leur
+        // propre étage, en tête de chaîne (sur les bits d'origine).
+        let (fichier_shaders, ignores) = if video.shaders_enabled && !video.shaders.is_empty() {
+            crate::shaders::assembler(&video.shaders)
+        } else {
+            (None, Vec::new())
+        };
+        for raison in &ignores {
+            tracing::warn!("Shader ignoré — {}", raison);
+        }
+        if let (Some(vs), Some(premiere)) = (self.video_stream.as_mut(), ignores.first()) {
+            vs.hdr_avis = Some(format!("Shaders : {} ignoré(s) — {}", ignores.len(), premiere));
+        }
+        // **Sortie RVB pour l'étage de shaders seul.** Un étage `libplacebo` qui sortirait du YUV le
+        // ré-encode avec SA matrice, que le moteur ignore (il décide la matrice sur l'image d'ORIGINE,
+        // piège 119) : mesuré, un shader qui ne fait rien décalait la couleur de (197,49,37) à
+        // (210,63,35). En RVB, plus aucune matrice à deviner côté lecteur. Fusionné à l'étage HDR, la
+        // sortie reste celle du HDR (BT.709 explicite).
+        let etage = match fichier_shaders {
+            None => etage,
+            Some(f) if etage.is_empty() => {
+                format!("libplacebo=custom_shader_path={}:format=rgba", f.display())
+            }
+            Some(f) if etage.starts_with("libplacebo=") => {
+                format!("{}:custom_shader_path={}", etage, f.display())
+            }
+            Some(f) => format!("{},libplacebo=custom_shader_path={}:format=rgba", etage, f.display()),
+        };
         let description = match (etage.is_empty(), base.is_empty()) {
             (true, _) => base,
             (false, true) => etage,
@@ -5749,6 +5778,10 @@ pub(crate) fn decouper_etage_hdr(description: &str) -> Option<(String, String)> 
     Some((reste.clone(), reste))
 }
 
+/// Avis quand `libplacebo` refuse l'étage de shaders (Vulkan absent, ou shader qui ne compile pas).
+const AVIS_SHADERS_REFUSES: &str =
+    "Shaders : refusés par le système (Vulkan indisponible ou shader invalide) — non appliqués";
+
 /// Phrase affichée une fois quand l'étage HDR est retiré : l'image n'est PAS convertie,
 /// donc délavée sur un écran SDR. Si le repli CPU a été refusé, on en donne la raison.
 fn avis_hdr_non_converti(motif_repli: &str) -> String {
@@ -5809,6 +5842,9 @@ unsafe fn apply_video_filters(
                 // Vulkan est absent (pilote manquant, session distante, mémoire GPU
                 // insuffisante). Perdre **toute** la chaîne pour cela serait
                 // disproportionné : on réessaie une fois sans l'étage, et on le dit.
+                // Un étage `libplacebo` qui ne porte QUE des shaders n'est pas un étage HDR : son échec
+                // ne doit ni parler de HDR ni marquer le HDR « indisponible ».
+                let seulement_shaders = description.starts_with("libplacebo=custom_shader_path=");
                 if let Some((sans_hdr, reste)) = decouper_etage_hdr(description) {
                     // **Repli CPU borné.** Si c'est l'étage GPU (`libplacebo`) qui est
                     // refusé, l'étage CPU du même plan (`zscale` + `tonemap`) peut le
@@ -5871,8 +5907,12 @@ unsafe fn apply_video_filters(
                             e
                         );
                         vs.filters_failed_signature = Some(signature);
-                        vs.hdr_indisponible = true;
-                        vs.hdr_avis = Some(avis_hdr_non_converti(&vs.hdr_repli_motif));
+                        if seulement_shaders {
+                            vs.hdr_avis = Some(AVIS_SHADERS_REFUSES.to_string());
+                        } else {
+                            vs.hdr_indisponible = true;
+                            vs.hdr_avis = Some(avis_hdr_non_converti(&vs.hdr_repli_motif));
+                        }
                         return None;
                     }
                     tracing::warn!(
@@ -5895,8 +5935,12 @@ unsafe fn apply_video_filters(
                             );
                             vs.filters = Some(Box::new(chain));
                             vs.filters_failed_signature = None;
-                            vs.hdr_indisponible = true;
-                            vs.hdr_avis = Some(avis_hdr_non_converti(&vs.hdr_repli_motif));
+                            if seulement_shaders {
+                                vs.hdr_avis = Some(AVIS_SHADERS_REFUSES.to_string());
+                            } else {
+                                vs.hdr_indisponible = true;
+                                vs.hdr_avis = Some(avis_hdr_non_converti(&vs.hdr_repli_motif));
+                            }
                             return appliquer_au_graphe(vs, frame);
                         }
                         Err(e2) => {
@@ -5971,8 +6015,12 @@ unsafe fn poser_metadonnees_couleur(frame: *mut AVFrame, info: &crate::hdr::Info
 /// Applique la chaîne de filtres vidéo (voir `apply_video_filters`)
 unsafe fn appliquer_au_graphe(vs: &mut VideoStream, frame: *mut AVFrame) -> Option<*mut AVFrame> {
     // Les métadonnées de couleur doivent être posées **avant** l'envoi : c'est sur
-    // elles que libplacebo décide qu'il y a quelque chose à convertir.
-    if let Some(info) = vs.hdr_info.as_ref() {
+    // elles que libplacebo décide qu'il y a quelque chose à convertir. **Seulement pour une source
+    // HDR** : pour du SDR, la fonction forçait BT.709 sur l'image d'origine, donc sur la décision de
+    // matrice du lecteur (`couleur_effective`) — un clip SD non balisé était lu en BT.601 sans filtre
+    // et en BT.709 dès qu'un filtre était actif (mesuré avec un shader qui ne fait rien : (185,34,40)
+    // contre (200,51,39)).
+    if let Some(info) = vs.hdr_info.as_ref().filter(|i| i.est_hdr()) {
         poser_metadonnees_couleur(frame, info);
     }
     // Filet de sécurité : si l'horodatage manque encore (chemin exotique), on en
@@ -6832,6 +6880,23 @@ unsafe fn scale_frame_to_rgba(
     // d'entrelacement de `yadif` supposent l'image d'origine).
     let mut filtered: *mut AVFrame = std::ptr::null_mut();
     if !filters_description.is_empty() && !filtres_faits_par_gpu {
+        // **Étage de shaders seul** : `libplacebo` devine la matrice d'une image non balisée avec sa
+        // propre règle, qui diffère de celle du lecteur (mesuré : un clip SD non balisé passait de
+        // (185,34,40) à (200,51,39) avec un shader qui ne fait rien). On écrit donc sur l'image la
+        // matrice et la plage que le lecteur aurait utilisées : `libplacebo` les relit telles quelles.
+        if filters_description.starts_with("libplacebo=custom_shader_path=") {
+            let (coef, plage) = couleur_effective(frame, source, couleur);
+            (*source).colorspace = match coef {
+                1 => AVColorSpace::AVCOL_SPC_BT709,
+                9 => AVColorSpace::AVCOL_SPC_BT2020_NCL,
+                _ => AVColorSpace::AVCOL_SPC_SMPTE170M,
+            };
+            (*source).color_range = if plage == 1 {
+                ffmpeg_sys_next::AVColorRange::AVCOL_RANGE_JPEG
+            } else {
+                ffmpeg_sys_next::AVColorRange::AVCOL_RANGE_MPEG
+            };
+        }
         if let Some(f) = apply_video_filters(vs, filters_description, source) {
             filtered = f;
             source = f;

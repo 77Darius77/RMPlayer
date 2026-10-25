@@ -334,6 +334,12 @@ pub struct VideoSettings {
     pub pan_x_percent: f32,
     #[serde(default)]
     pub pan_y_percent: f32,
+    /// Shaders de pixels (GLSL, format « hook » de mpv), exécutés dans l'ordre par `libplacebo` (Vulkan).
+    #[serde(default)]
+    pub shaders: Vec<String>,
+    /// Shaders actifs ? (la liste est conservée quand on les coupe : `Ctrl+Maj+S`).
+    #[serde(default = "default_vrai")]
+    pub shaders_enabled: bool,
     /// Rapport d'aspect imposé à l'affichage (déformation volontaire si ≠ natif).
     #[serde(default)]
     pub aspect: AspectMode,
@@ -475,6 +481,9 @@ impl VideoSettings {
         self.color_range = ColorRange::default();
         self.pan_x_percent = 0.0;
         self.pan_y_percent = 0.0;
+        // Valeurs neutres = aucun shader (les fichiers restent sur le disque).
+        self.shaders.clear();
+        self.shaders_enabled = true;
         self.crop_top = 0;
         self.crop_bottom = 0;
         self.crop_left = 0;
@@ -1725,6 +1734,8 @@ impl Default for VideoSettings {
             color_range: ColorRange::default(),
             pan_x_percent: 0.0,
             pan_y_percent: 0.0,
+            shaders: Vec::new(),
+            shaders_enabled: true,
             aspect: AspectMode::default(),
             custom_aspect: default_custom_aspect(),
             crop_top: 0,
@@ -2873,6 +2884,23 @@ mod tests {
         assert!(ancienne.recent.is_empty());
         assert!(!ancienne.resume);
         assert_eq!(ancienne.precache_ms, default_precache_ms());
+    }
+
+    #[test]
+    fn les_shaders_se_relisent_se_remettent_a_zero_et_un_ancien_fichier_n_en_a_pas() {
+        let c: Config = serde_json::from_str(
+            r#"{"video": {"shaders": ["/a/gris.glsl", "~/b/sepia.glsl"], "shaders_enabled": false}}"#,
+        )
+        .unwrap();
+        assert_eq!(c.video.shaders, ["/a/gris.glsl", "~/b/sepia.glsl"]);
+        assert!(!c.video.shaders_enabled);
+        let ancien: Config = serde_json::from_str(r#"{"video": {"brightness": 0.1}}"#).unwrap();
+        assert!(ancien.video.shaders.is_empty());
+        assert!(ancien.video.shaders_enabled, "actifs par défaut (la liste est vide : aucun effet)");
+        let mut v = c.video.clone();
+        v.reset_filters();
+        assert!(v.shaders.is_empty(), "« valeurs neutres » ne laisse aucun shader actif");
+        assert!(v.shaders_enabled);
     }
 
     #[test]

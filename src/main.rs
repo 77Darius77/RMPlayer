@@ -29,6 +29,7 @@ mod utils;
 mod vignettes;
 mod ui;
 mod settings;
+mod shaders;
 mod signets;
 mod sortie_audio;
 mod systeme;

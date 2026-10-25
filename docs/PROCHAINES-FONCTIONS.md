@@ -113,6 +113,9 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Fenêtres détachables (s.37)** : Préférences, Statistiques, Aide, À propos en vraies fenêtres
   système, `verif-fenetres-detachables` 24/24 (piège 127). Non fait : « Ouvrir une adresse » et les
   menus déroulants de la barre (fenêtres contextuelles d'egui, bornées par la fenêtre du lecteur).
+- **Shaders de pixels (s.37)** : liste de shaders mpv (GLSL) via `libplacebo`, ordre, `Ctrl+Maj+S`, exemples ;
+  `verif-shaders` 14/14 (piège 134). Limites : Vulkan requis ; pas de shaders de mise à l'échelle ni de LUT 3D
+  (seulement les hooks `MAIN`) ; la compilation d'un shader n'est pas testée avant son application.
 - **Enceintes (s.37)** : automatique, mono, stéréo, 2.1, 3.1, quadriphonie, 4.1, 5.0, 5.1, 6.1, 7.1 ;
   `verif-haut-parleurs` 10/10 (piège 133). Limite : 2.1, 3.1, 4.1 et 6.1 n'ont pas de position standard dans
   ALSA / PipeWire (ordre de FFmpeg) ; une vraie sortie 7.1 matérielle n'a pas été essayée (sorties factices).

@@ -121,6 +121,7 @@ continue alors sans son (avertissement « lecture vidéo seule »).
 | `Échap` | Fermer la fenêtre / sortir du plein écran |
 | `S` | Capture d'écran (PNG) |
 | `K` | Rapport d'aspect suivant |
+| `Ctrl+Maj+S` | Shaders de pixels : activer / couper |
 | `Ctrl+K` | Remplir la fenêtre en rognant (bascule) |
 | `Alt+←` | Image : glisser vers la gauche |
 | `Alt+→` | Image : glisser vers la droite |
@@ -294,6 +295,24 @@ mélangé (réduction ou extension par `swresample`) : automatique (celle de la 
   de réglages ne change jamais les enceintes de la machine.
 - Mesuré canal par canal : `tools/verif-haut-parleurs.sh` (source 5.1 dont chaque canal porte sa fréquence ;
   sortie PipeWire factice à 6 canaux dont on enregistre chaque canal).
+
+### Shaders de pixels (GPU)
+
+*Préférences ▸ Image — filtres ▸ Shaders de pixels* : une liste de fichiers GLSL au **format « hook » de mpv**
+(`//!HOOK MAIN`, `//!BIND HOOKED`, `vec4 hook()`), exécutés sur la carte graphique par `libplacebo` (Vulkan),
+**dans l'ordre de la liste** — `[gris, rouge]` et `[rouge, gris]` ne donnent pas la même image.
+`Ctrl+Maj+S` les coupe ou les rétablit sans toucher à la liste ; « Créer des shaders d'exemple » écrit gris,
+sépia, netteté et négatif dans `~/.config/rmplayer/shaders/` (coupés par défaut). Le réglage est `video.shaders`
+(liste de chemins) et `video.shaders_enabled`.
+
+- Plusieurs fichiers sont **assemblés en un seul** (`~/.cache/rmplayer/shaders-actifs.glsl`) : `libplacebo`
+  n'accepte qu'un chemin. Avec un film HDR, les shaders sont fusionnés à l'étage HDR (un seul contexte Vulkan).
+- L'étage de shaders **sort en RVB** et lit la matrice que le lecteur aurait choisie : un shader qui ne fait rien
+  ne décale pas la couleur (mesuré sur un clip balisé et sur un clip SD sans balise).
+- Un fichier absent, trop gros (> 256 Ko) ou qui n'est pas un shader mpv est **ignoré** avec un avis ; un shader qui
+  ne compile pas (ou l'absence de Vulkan) est refusé par `libplacebo` : l'étage est retiré, la lecture continue et
+  l'avis le dit.
+- Mesuré sur les pixels, `--dump-frame` puis la vraie fenêtre : `tools/verif-shaders.sh`.
 
 ### Fenêtres détachables
 
@@ -626,6 +645,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-soustitres.sh [écran]` | **Style des sous-titres** : trois familles de police mesurées (largeurs 268/307/332 px), position horizontale 20/50/80 %, police inconnue, non-régression — 5 contrôles |
 | `installer-association.sh [--par-defaut] [--etat] [--retirer]` | **« Ouvrir avec » RMPlayer** : lanceur `.desktop`, icône, cache des types MIME ; `--par-defaut` l'impose pour les formats qu'il gère |
 | — | **revue externe** : `docs/BRIEF-REVUE-EXTERNE.md` — ce qu'on demande à un relecteur extérieur, budget de lecture, six vérifications qui valent mieux que la lecture, deux pièges à faux positifs |
+| `verif-shaders.sh [écran]` | **Shaders** : « rouge seul », gris, shader neutre sans décalage de couleur (clip balisé et clip SD sans balise), ordre de deux shaders, fichier invalide ou absent ignoré, HDR + shader, filtre CPU sans changement de matrice, vraie fenêtre et `Ctrl+Maj+S` — 14 contrôles |
 | `verif-haut-parleurs.sh [écran]` | **Enceintes** : une source 5.1 dont chaque canal porte sa fréquence ; mixage vers mono / stéréo / 3.1 / 5.1 / 7.1 (nombre de canaux, ordre ALSA, réduction, extension) puis lecture réelle vers une sortie PipeWire à 6 canaux enregistrée canal par canal, et changement en cours de lecture — 10 contrôles |
 | `verif-modes-lecture.sh [écran]` | **Fin de fichier** : trois clips, séquence des titres lue sur MPRIS — enchaînement, lecture continue coupée, répéter le fichier, répéter la playlist, aléatoire avec et sans répétition, ancienne configuration — 7 contrôles |
 | `verif-capture.sh [écran]` | **Captures** : format écrit (signature et décodage du fichier), qualité JPEG qui agit (taille et écart de pixels), WebP identique au PNG, taille native, modèle de nom, ancienne configuration — 9 contrôles |
