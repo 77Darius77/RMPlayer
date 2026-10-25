@@ -35,7 +35,7 @@ fn cle(media: &Path) -> String {
 impl Signets {
     /// Charge `signets.json` (vide s'il n'existe pas ou s'il est illisible).
     pub fn load() -> Self {
-        let path = dirs::config_dir().map(|d| d.join("kplayer").join("signets.json"));
+        let path = dirs::config_dir().map(|d| d.join("rmplayer").join("signets.json"));
         let mut par_media: BTreeMap<String, Vec<Signet>> = path
             .as_ref()
             .and_then(|p| std::fs::read_to_string(p).ok())

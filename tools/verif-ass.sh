@@ -18,11 +18,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-ass
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -131,8 +131,8 @@ fi
 config_essai() {  # config_essai <nom>
     local nom="$1"
     local dossier="$BASE/$nom"
-    rm -rf "$dossier"; mkdir -p "$dossier/conf/kplayer" "$dossier/cache"
-    python3 - "$dossier/conf/kplayer/config.json" <<'PY'
+    rm -rf "$dossier"; mkdir -p "$dossier/conf/rmplayer" "$dossier/cache"
+    python3 - "$dossier/conf/rmplayer/config.json" <<'PY'
 import json, sys
 json.dump({
     "video": {"hardware_decoding": False, "scaling_method": "Lanczos"},
@@ -183,7 +183,7 @@ PY
 
 capture() {  # capture <dossier> <image> <média>
     local dossier="$1" image="$2" media="$3"
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     XDG_CONFIG_HOME="$dossier/conf" XDG_CACHE_HOME="$dossier/cache" DISPLAY="$DISP" \
         "$KP" --fullscreen "$media" >"$dossier/run.log" 2>&1 &
     local kpid=$!
@@ -329,7 +329,7 @@ PY
 
     capturer_a() {  # capturer_a <instant_s> <attente_s> <image>
         local instant="$1" attente="$2" image="$3"
-        pkill -x kplayer 2>/dev/null; sleep 0.6
+        pkill -x rmplayer 2>/dev/null; sleep 0.6
         XDG_CONFIG_HOME="$BASE/anim/conf" XDG_CACHE_HOME="$BASE/anim/cache" DISPLAY="$DISP" \
             "$KP" --fullscreen --seek "$instant" "$BASE/media_anim/fond.mp4" \
             >"$BASE/anim/run.log" 2>&1 &
@@ -400,5 +400,5 @@ fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

@@ -27,13 +27,13 @@ les tests de validation (jusqu'à 2 min de lecture continue, enchaînements, see
 | Mise à l'échelle (5 méthodes) | ✅ appliquée par libswscale (§6.11) |
 | **Filtres d'image** (détramage, débruitage, désentrelacement, netteté, géométrie, eq) | ✅ appliqués par libavfilter et **mesurés** (§6.21) |
 | **Égaliseur audio 18 bandes** | ✅ `superequalizer`, mesuré au spectre (§6.21) |
-| **Traitements audio PotPlayer** (normaliseur, mode nuit, bruit, stéréo, réverbération, décalage, hauteur) | ✅ 9 traitements, chacun mesuré (§6.21) |
+| **Traitements audio** (normaliseur, mode nuit, bruit, stéréo, réverbération, décalage, hauteur) | ✅ 9 traitements, chacun mesuré (§6.21) |
 | **Chapitres, cadrage, aspect, style des sous-titres, URL** | ✅ 7 réglages, chacun mesuré (§6.16) |
 | **Pistes embarquées** (audio et sous-titres du conteneur) | ✅ inventaire, changement à chaud, minutages exacts (§6.21) |
 | **Géométrie vidéo** (rotation, miroir, zoom) et **netteté** | ✅ mesurés (§6.21) |
 | Capture d'écran PNG | ✅ fichier réellement écrit |
 | OSD, statistiques, playlist | ✅ affichés et interactifs |
-| Reprise de lecture, playlist persistante | ✅ `~/.cache/kplayer/positions.json` |
+| Reprise de lecture, playlist persistante | ✅ `~/.cache/rmplayer/positions.json` |
 | Sous-titres embarqués dans le conteneur | ❌ à faire (limite assumée) |
 | Sélection de piste audio | ❌ à faire (limite assumée) |
 | Rapport de crash | ✅ `src/crash.rs` (voir §6) |
@@ -51,7 +51,7 @@ src/
 ├── audio.rs       Sortie cpal : tampon circulaire + callback temps réel
 ├── subtitles.rs   Sous-titres externes : parsing SRT / ASS / SSA
 ├── crash.rs       Rapport de crash sûr (handler de signal async-signal-safe)
-├── config.rs      Configuration JSON persistante (~/.config/kplayer/config.json)
+├── config.rs      Configuration JSON persistante (~/.config/rmplayer/config.json)
 ├── renderer.rs    Transport des frames RGBA vers egui
 └── utils.rs       Utilitaires (formatage temps/taille/bitrate, détection de format)
 ```
@@ -260,9 +260,8 @@ une **chaîne de filtres FFmpeg (`libavfilter`)**, que le projet n'implémente p
 
 ### 6.36 Sous-titres : famille de police et position horizontale (session 31)
 
-**Ce que la vérification de PotPlayer avait nommé.** La page `Dialog(383)` de son
-`French.ini` liste `Police`, `Alphabet`, `Interlettre`, `Position hori. (%)`,
-`Position verti. (%)`, `Ruby`… Or KPlayer ne réglait que la **taille** : la police était
+**Ce qui manquait.** Un lecteur de sous-titres complet règle `Police`, `Alphabet`, `Interlettre`,
+`Position hori. (%)`, `Position verti. (%)`… Or RMPlayer ne réglait que la **taille** : la police était
 celle d'egui (DejaVu en secours), et le texte ne pouvait être placé qu'au bord ou au
 centre. Deux champs comblent l'écart le plus visible.
 
@@ -300,7 +299,7 @@ redonne exactement l'ancien rendu (bord, ou centre) : aucune régression d'aspec
 Un test unitaire de plus (95 au total) verrouille les valeurs par défaut (50 %, police
 vide), pour qu'un fichier écrit avant ces champs reste lisible et ne change pas d'aspect.
 
-**Reste de l'écart avec `Dialog(383)`** : `Alphabet` (limitation à un jeu de caractères),
+**Reste à faire** : `Alphabet` (limitation à un jeu de caractères),
 `Interlettre`, `2nd contour`, `Contour flou`, `Ruby`. Aucun n'est planifié : ce sont des
 détails de composition, alors que police et position se voient au premier coup d'œil.
 
@@ -375,12 +374,12 @@ Autrement dit, le SIGABRT n'était **pas le bug** : c'était la conséquence du 
 - **Async-signal-safe** : descripteur ouvert à l'avance, `write(2)` uniquement,
   **aucun verrou ni allocation** (tampons sur la pile), pile alternative `SA_ONSTACK`
   de 256 Kio (indispensable en cas de débordement de pile).
-- Consigne dans `~/.cache/kplayer/crash.log` : `exe_base`, signal, `fault_addr`,
+- Consigne dans `~/.cache/rmplayer/crash.log` : `exe_base`, signal, `fault_addr`,
   `si_code`, registres (`rip`, `rip_rel`, `rsp`, `rbp`, `rax`, `rdi`) et un **vidage
   brut de la pile** autour de RSP.
 - Rétablit le handler par défaut puis relance le signal : **le core dump reste produit**.
 - Symbolisation immédiate :
-  `addr2line -f -C -e target/release/kplayer <rip_rel>`
+  `addr2line -f -C -e target/release/rmplayer <rip_rel>`
 - Option `--crash-test` pour valider le dispositif (testé : `signal=11`,
   `fault_addr=0x0`, code de sortie 139, core toujours généré).
 
@@ -581,7 +580,7 @@ que le projet n'implémente pas. Les champs morts correspondants ont aussi été
 et la configuration ne contient plus que 6 sections appliquées :
 `video`, `audio`, `subtitles`, `interface`, `playback`, `playlist`.
 
-### 6.12 Audit de l'interface et raccourcis « façon PotPlayer » (session 10)
+### 6.12 Audit de l'interface et raccourcis (session 10)
 
 **Audit automatisé** (`tools/audit-ui.sh`) : la fenêtre est placée à une taille connue,
 photographiée, et **les zones de boutons sont détectées dans l'image** (aucune coordonnée
@@ -725,7 +724,7 @@ fichier, sans double rendu.
 
 ### 6.16 Personnalisation avancée : chapitres, cadrage, style des sous-titres, URL (session 18)
 
-**Objectif** : combler les manques de personnalisation face à PotPlayer/VLC. Sept
+**Objectif** : combler les manques de personnalisation face aux lecteurs courants. Sept
 fonctions ajoutées, **chacune mesurée**.
 
 | Réglage | Ce que ça fait | Mesure (`tools/verif-cadrage.sh` et `verif-pistes.sh`) |
@@ -809,10 +808,9 @@ et deux pistes SRT (fr/en).
 signalés (« image, non affichable ») mais **non rendus** : cela demande de décoder des
 bitmaps et de les composer sur la vidéo, un chantier distinct.
 
-### 6.18 Traitement audio et vidéo étendus — parité avec PotPlayer (session 16)
+### 6.18 Traitement audio et vidéo étendus (session 16)
 
-**Objectif.** Compléter l'égaliseur (session 15) avec les traitements que PotPlayer
-propose, en n'ajoutant **que** ce que ce build FFmpeg sait réellement faire, et en
+**Objectif.** Compléter l'égaliseur (session 15) avec les traitements courants, en n'ajoutant **que** ce que ce build FFmpeg sait réellement faire, et en
 mesurant chaque ajout.
 
 **Audio — huit traitements ajoutés** (`superequalizer` existait déjà) :
@@ -1295,73 +1293,6 @@ annoncée à 60 s, ce n'est pas une fin.
 au plus 3 s (lecture) ou 10 s (ouverture), une fois. Supprimer totalement ce blocage
 demanderait de déplacer tout le démultiplexeur dans un thread et de faire circuler les
 paquets — un chantier à part entière, hors de cette session.
-
----
-
-### 6.35 PotPlayer : arborescence des réglages **vérifiée sur l'installation** (session 30)
-
-**Pourquoi reprendre ce travail.** La comparaison de la session 29 s'appuyait sur la
-documentation publique, avec une réserve explicite (« les intitulés varient »). La réserve
-était justifiée : la vérification a corrigé **trois erreurs**.
-
-**Comment.** PotPlayer est installé dans un préfixe Wine de test
-(`wine-test-pot/drive_c/Program Files/DAUM/PotPlayer/`). Les libellés de l'interface sont
-dans `Language/French.ini` (5 640 lignes) — c'est le texte que la fenêtre charge. La version
-est celle que l'application écrit elle-même dans le registre : **`v260819`**.
-
-**Deux obstacles, tous deux levés par la mesure :**
-
-1. **Le binaire est packé Themida** (section `.themida`) et sa ressource `VERSIONINFO` est
-   vidée (`0.0.0.0`). Chercher les libellés *dans l'exécutable* ne donne que du bruit de
-   packer : le fichier de langue est la bonne surface.
-2. **Les outils de chaînes de REA répondaient `provider_unavailable` — diagnostic
-   rectifié.** Première explication donnée : « ghidra non configuré et la machine n'a que le
-   JDK 11 ». **Faux sur le second point** : Ghidra **12.1.4**
-   (`/media/blaise/LINUX_DATA/ghidra_12.1.4_PUBLIC`) et un **JDK 21**
-   (`/media/blaise/LINUX_DATA/jdk-21.0.12.1+1`) sont installés, et `~/.bashrc` les exporte
-   déjà. La vraie cause : le **serveur REA en cours** (fils de `ajean web`) a été lancé
-   **sans** `GHIDRA_INSTALL_DIR` ni `JAVA_HOME` — son `/proc/<pid>/environ` ne contient ni
-   l'un ni l'autre, d'où le repli sur le `java` du système (11) et le refus.
-
-   **Vérifié depuis**, avec les deux variables : `rea doctor` passe **tous** les contrôles
-   Ghidra (installation, version 12.1.4, `analyzeHeadless`, décompileur natif
-   `linux_x86_64`, java 21.0.12.1 64 bits accepté) et `rea search notepad.exe "Wine"`
-   renvoie `0x140008256 = "Wine Notepad"` (preuve `ev_452a9170…`). En revanche
-   `rea search PotPlayer64.dll` renvoie **`provider_timeout`** : 30 Mo packés Themida,
-   analyse au-delà du budget de 330 s.
-
-   **Correctif, en deux temps (le premier était au mauvais endroit)** :
-   `~/.config/environment.d/50-rea-ghidra.conf` ne sert à rien ici — `ajean web` est un
-   **service systemd système**, pas une application de session. Le bon endroit est un
-   drop-in `/etc/systemd/system/ajean-ui.service.d/rea-ghidra.conf`
-   (`Environment=GHIDRA_INSTALL_DIR=…` + `Environment=JAVA_HOME=…`), suivi de
-   `systemctl daemon-reload` et du redémarrage du service.
-
-   **Vérifié après redémarrage** (serveur REA 17 300 67) : variables présentes dans
-   `/proc/<pid>/environ` ; `binary_session` → ghidra **`available`**, **12.1.4**, java
-   **21.0.12.1** ; et l'appel réel **passé par le MCP** :
-   `open_binary(notepad.exe)` puis `search_strings("Wine")` →
-   **`0x140008256 = "Wine Notepad"`** (`ev_452a9170…`). Décompilation et inventaire de
-   chaînes sont donc utilisables depuis l'agent.
-
-   Ce qui **a** fonctionné sans moteur : `inspect_pe_resources` (fournisseur
-   `rea-pe-resources`) → PE `pe32-plus`, machine 34404, inventaire des ressources complet
-   (`ev_9baa890c…`).
-
-**Les trois corrections.** `Lecture` n'est pas une catégorie mais une sous-page de
-**Général** ; il n'y a **pas** de catégorie « Capture » mais **Général › Capture d'écran** ;
-le bloc de filtres s'appelle **Contrôle du filtre** et ne compte que quatre pages
-(Source/Séparateur, Décodeurs vidéo, Décodeurs audio, Priorité globale) — le
-désentrelacement, la colorimétrie et les effets sont sous **Vidéo**.
-
-**Livrable** : `docs/POTPLAYER-REGLAGES-VERIFIES.md` — arborescence exacte (identifiants
-2055→2098), libellés **page par page** avec le numéro de `[Dialog(N)]` d'où ils viennent
-(Colorimétrie 384, Désentrelacement 385, Effets 386, Style police 383, Rendu vidéo 355,
-Égaliseur 363, Normaliseur/Freeverb 387, Général 354, Souris 458, A-B 453), digests des
-fichiers. La comparaison (`COMPARAISON-POTPLAYER.md`) est mise à jour avec ces libellés, et
-les manques se précisent : **Teinte**, **WarpSharp**, **mouvement flou**, **10 bits**, **HDR
-matériel**, **SuperEQ**, **famille de police**, **alphabet/interlettre/second contour**,
-**position horizontale**, **Ruby**.
 
 ---
 

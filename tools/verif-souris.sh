@@ -13,11 +13,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-souris
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -32,13 +32,13 @@ if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ] && [ -S "$XDG_RUNTIME_DIR/bus" ]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=$XDG_RUNTIME_DIR/bus"
 fi
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 SHOTS="$BASE/captures"; mkdir -p "$SHOTS"
 
 arreter() {
-    for pid in $(pgrep -x kplayer 2>/dev/null); do
+    for pid in $(pgrep -x rmplayer 2>/dev/null); do
         aff=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
         [ "$aff" = "$DISP" ] && kill "$pid" 2>/dev/null
     done
@@ -60,7 +60,7 @@ json.dump({"video": {"hardware_decoding": False}, "audio": {"device": "", "volum
            "playback": {"resume": False}, "playlist": []}, open(sys.argv[1], "w"), indent=2)
 PY
 }
-mpris() { gdbus call --session --dest org.mpris.MediaPlayer2.kplayer --object-path /org/mpris/MediaPlayer2 "$@" 2>/dev/null; }
+mpris() { gdbus call --session --dest org.mpris.MediaPlayer2.rmplayer --object-path /org/mpris/MediaPlayer2 "$@" 2>/dev/null; }
 lire() {  # lire <propriété> : nombre
     mpris --method org.freedesktop.DBus.Properties.Get org.mpris.MediaPlayer2.Player "$1" \
         | sed -n 's/^(<\(int64 \)\?\(-\?[0-9.e+-]*\)>,)$/\2/p' | head -1
@@ -70,7 +70,7 @@ lance() {
     "$KP" --fullscreen "$BASE/film.mp4" >"$BASE/dernier.log" 2>&1 &
     K_PID=$!
     sleep 4.5
-    ID=$(xdotool search --pid "$K_PID" --name KPlayer 2>/dev/null | tail -1)
+    ID=$(xdotool search --pid "$K_PID" --name RMPlayer 2>/dev/null | tail -1)
     xdotool windowfocus "$ID" 2>/dev/null; sleep 0.3
     xdotool mousemove 640 360; sleep 0.4
 }
@@ -79,7 +79,7 @@ vers() {  # vers <ms> : pause puis saut
     piste=$(mpris --method org.freedesktop.DBus.Properties.Get org.mpris.MediaPlayer2.Player Metadata \
         | sed -n "s/.*trackid[^']*objectpath '\([^']*\)'.*/\1/p" | head -1)
     mpris --method org.mpris.MediaPlayer2.Player.Pause >/dev/null; sleep 0.4
-    mpris --method org.mpris.MediaPlayer2.Player.SetPosition "${piste:-/org/kplayer/track/0}" "$(( $1 * 1000 ))" >/dev/null
+    mpris --method org.mpris.MediaPlayer2.Player.SetPosition "${piste:-/org/rmplayer/track/0}" "$(( $1 * 1000 ))" >/dev/null
     sleep 1.0
 }
 pos_ms() { python3 -c "print(int(float('$(lire Position)')/1000))"; }

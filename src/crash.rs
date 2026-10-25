@@ -32,7 +32,7 @@
 //! était tronqué). Les deux défauts sont corrigés ici : le rapport précédent est
 //! conservé (`crash.1.log`) et l'émetteur est nommé dans le rapport.
 //!
-//! **Deux fichiers** dans `~/.cache/kplayer/` : `crash.log` (dernier) et
+//! **Deux fichiers** dans `~/.cache/rmplayer/` : `crash.log` (dernier) et
 //! `crash.1.log` (l'avant-dernier, qui n'est plus écrasé au démarrage).
 
 use std::os::raw::{c_int, c_void};
@@ -53,7 +53,7 @@ const STACK_WORDS: usize = 512;
 pub fn install() {
     let path = dirs::cache_dir()
         .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-        .join("kplayer");
+        .join("rmplayer");
     let _ = std::fs::create_dir_all(&path);
     let log_path = path.join("crash.log");
 
@@ -150,7 +150,7 @@ unsafe extern "C" fn handler(sig: c_int, info: *mut c_void, ucontext: *mut c_voi
     }
 
     let mut buf = [0u8; 160];
-    write_fd(fd, b"\n=== CRASH KPLAYER ===\n");
+    write_fd(fd, b"\n=== CRASH RMPLAYER ===\n");
 
     let base = EXE_BASE.load(Ordering::SeqCst) as u64;
     let n = write_hex(&mut buf, "exe_base=", base, "\n");

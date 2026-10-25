@@ -50,6 +50,7 @@ bancs_pour() {
         pistes)     echo "verif-audio-pistes verif-pistes" ;;
         peripheriques) echo "verif-peripheriques" ;;
         fenetres)   echo "verif-fenetres-detachables audit-prefs" ;;
+        migration)  echo "verif-migration" ;;
         configuration) echo "verif-config-io verif-recents" ;;
         *)          echo "" ;;
     esac
@@ -57,7 +58,7 @@ bancs_pour() {
 
 if [ $# -eq 0 ] || [ "$1" = "--liste" ]; then
     echo "Sujets disponibles :"
-    for sujet in playlist vignettes mpris focus hdr soustitres ui fenetre association filtres audio reseau recents configuration boucle couleur affichage signets souris decodeur systeme theme saut pistes peripheriques fenetres; do
+    for sujet in playlist vignettes mpris focus hdr soustitres ui fenetre association filtres audio reseau recents configuration boucle couleur affichage signets souris decodeur systeme theme saut pistes peripheriques fenetres migration; do
         echo "  $sujet → $(bancs_pour "$sujet")"
     done
     exit 0

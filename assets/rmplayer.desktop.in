@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=KPlayer
-Name[en]=KPlayer
+Name=RMPlayer
+Name[en]=RMPlayer
 GenericName=Lecteur vidéo
 GenericName[en]=Video player
 Comment=Lecteur vidéo Rust + egui : décodage matériel VA-API, filtres FFmpeg, sous-titres ASS, reprise de lecture
@@ -14,7 +14,7 @@ Terminal=false
 Categories=AudioVideo;Video;Player;Qt;KDE;
 Keywords=vidéo;film;série;lecteur;player;media;mkv;mp4;
 StartupNotify=true
-StartupWMClass=kplayer
+StartupWMClass=rmplayer
 # Quatre types ont été retirés après vérification (session 33) : video/x-m2ts,
 # video/x-divx, video/vnd.dlna.mpeg-tts et video/x-ms-vob ne figurent pas dans
 # shared-mime-info — les déclarer ne pouvait rien déclencher.

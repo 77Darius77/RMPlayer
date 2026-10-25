@@ -15,7 +15,7 @@
 # Usage : tools/verif-personnalisation.sh [écran]
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 DISP="${1:-:90}"
 BASE=/tmp/kp-perso
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
@@ -23,7 +23,7 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 export DISPLAY="$DISP"
 export XDG_CONFIG_HOME="$BASE/conf"
 export XDG_CACHE_HOME="$BASE/cache"
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 mkdir -p "$BASE"
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -57,9 +57,9 @@ sleep 2
 config_base() {
     local surplus="${1:-}"
     rm -rf "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
-    mkdir -p "$XDG_CONFIG_HOME/kplayer" "$XDG_CACHE_HOME"
-    rm -f "$XDG_CACHE_HOME/kplayer/positions.json"
-    python3 - "$XDG_CONFIG_HOME/kplayer/config.json" "$surplus" <<'EOF'
+    mkdir -p "$XDG_CONFIG_HOME/rmplayer" "$XDG_CACHE_HOME"
+    rm -f "$XDG_CACHE_HOME/rmplayer/positions.json"
+    python3 - "$XDG_CONFIG_HOME/rmplayer/config.json" "$surplus" <<'EOF'
 import json, sys
 base = {
     "video": {"hardware_decoding": True, "scaling_method": "Lanczos"},
@@ -90,8 +90,8 @@ lancer() {
     if ! kill -0 "$KPID" 2>/dev/null; then
         echo "    (le lecteur a quitté ; journal : $(head -c 200 "$journal" 2>/dev/null))" >&2
     fi
-    WID=$(xdotool search --pid "$KPID" --name KPlayer 2>/dev/null | head -1)
-    [ -z "${WID:-}" ] && WID=$(xdotool search --name KPlayer | head -1)
+    WID=$(xdotool search --pid "$KPID" --name RMPlayer 2>/dev/null | head -1)
+    [ -z "${WID:-}" ] && WID=$(xdotool search --name RMPlayer | head -1)
     if [ -n "${WID:-}" ]; then
         xdotool windowmove "$WID" 0 0 2>/dev/null
         xdotool windowsize "$WID" 1280 720 2>/dev/null

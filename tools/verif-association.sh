@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# verif-association.sh — « Ouvrir avec KPlayer » : le lanceur, le type MIME, et
+# verif-association.sh — « Ouvrir avec RMPlayer » : le lanceur, le type MIME, et
 #                        l'ouverture dans la fenêtre déjà ouverte.
 #
 # **Ce qu'on vérifie, et pourquoi de cette façon.** Un `.desktop` peut être présent
@@ -21,7 +21,7 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-association
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
@@ -40,13 +40,13 @@ done
 # --- Témoins de l'état de l'utilisateur, avant toute chose -------------------
 DATA_UTILISATEUR="${XDG_DATA_HOME:-$HOME/.local/share}"
 MIME_UTILISATEUR="${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list"
-temoin_data=$( [ -f "$DATA_UTILISATEUR/applications/kplayer.desktop" ] && md5sum "$DATA_UTILISATEUR/applications/kplayer.desktop" || echo absent )
+temoin_data=$( [ -f "$DATA_UTILISATEUR/applications/rmplayer.desktop" ] && md5sum "$DATA_UTILISATEUR/applications/rmplayer.desktop" || echo absent )
 temoin_mime=$( [ -f "$MIME_UTILISATEUR" ] && md5sum "$MIME_UTILISATEUR" || echo absent )
 
 rm -rf "$BASE"; mkdir -p "$BASE/data" "$BASE/conf" "$BASE/cache"
 export XDG_DATA_HOME="$BASE/data" XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-DESKTOP="$XDG_DATA_HOME/applications/kplayer.desktop"
-ICONE="$XDG_DATA_HOME/icons/hicolor/256x256/apps/kplayer.png"
+DESKTOP="$XDG_DATA_HOME/applications/rmplayer.desktop"
+ICONE="$XDG_DATA_HOME/icons/hicolor/256x256/apps/rmplayer.png"
 
 nettoyer() {
     [ -n "${K_PID:-}" ] && kill -9 "$K_PID" 2>/dev/null
@@ -114,7 +114,7 @@ echo
 echo "=== 3. Exécution réelle de la ligne Exec (comme un gestionnaire de fichiers) ==="
 # On remplace %U par le fichier, exactement comme le ferait Dolphin.
 COMMANDE=$(printf '%s' "$EXEC_LIGNE" | sed "s|%U|$BASE/a.mp4|")
-RUST_LOG=kplayer=info bash -c "$COMMANDE" >"$BASE/exec1.log" 2>&1 &
+RUST_LOG=rmplayer=info bash -c "$COMMANDE" >"$BASE/exec1.log" 2>&1 &
 K_PID=$!
 charge=0
 for _ in $(seq 40); do
@@ -126,7 +126,7 @@ if [ "$charge" -eq 1 ]; then
 else
     ko "aucun média chargé par la ligne Exec (voir $BASE/exec1.log)"
 fi
-if [ -n "$(xdotool search --pid "$K_PID" --name KPlayer 2>/dev/null)" ]; then
+if [ -n "$(xdotool search --pid "$K_PID" --name RMPlayer 2>/dev/null)" ]; then
     ok "une fenêtre s'ouvre réellement"
 else
     ko "aucune fenêtre pour le processus lancé"
@@ -162,28 +162,28 @@ PYMIME
         ko "types MIME déclarés mais inconnus du système : $inconnus"
     fi
 fi
-if grep -q "video/mp4=kplayer.desktop" "$XDG_DATA_HOME/applications/mimeinfo.cache" 2>/dev/null; then
+if grep -q "video/mp4=rmplayer.desktop" "$XDG_DATA_HOME/applications/mimeinfo.cache" 2>/dev/null; then
     ok "mimeinfo.cache mis à jour (proposé dans « Ouvrir avec »)"
 else
-    ko "mimeinfo.cache absent ou sans kplayer.desktop (update-desktop-database a-t-il tourné ?)"
+    ko "mimeinfo.cache absent ou sans rmplayer.desktop (update-desktop-database a-t-il tourné ?)"
 fi
 
 echo
 echo "=== 4 bis. « Par défaut » : écrit dans mimeapps.list, et seulement là ==="
 # Le contrôle porte sur le fichier, pas sur `xdg-mime query default` : celui-ci
-# répond « kplayer.desktop » même quand rien n'est enregistré (il retombe sur la
+# répond « rmplayer.desktop » même quand rien n'est enregistré (il retombe sur la
 # base de GIO), ce qui ferait passer un contrôle faux.
 if tools/installer-association.sh --par-defaut >"$BASE/defaut.log" 2>&1; then
     ok "--par-defaut s'exécute"
 else
     ko "--par-defaut a échoué"
 fi
-if grep -q "^video/mp4=kplayer.desktop" "$XDG_CONFIG_HOME/mimeapps.list" 2>/dev/null; then
+if grep -q "^video/mp4=rmplayer.desktop" "$XDG_CONFIG_HOME/mimeapps.list" 2>/dev/null; then
     ok "video/mp4 associé par défaut dans mimeapps.list"
 else
     ko "video/mp4 absent de mimeapps.list après --par-defaut"
 fi
-if grep -q "^video/x-matroska=kplayer.desktop" "$XDG_CONFIG_HOME/mimeapps.list" 2>/dev/null; then
+if grep -q "^video/x-matroska=rmplayer.desktop" "$XDG_CONFIG_HOME/mimeapps.list" 2>/dev/null; then
     ok "video/x-matroska associé par défaut"
 else
     ko "video/x-matroska non associé"
@@ -191,11 +191,11 @@ fi
 # Un type non déclaré ne doit pas être capté (on ne prend pas la place d'un
 # lecteur audio, par exemple).
 if grep -q "^audio/mpeg" "$XDG_CONFIG_HOME/mimeapps.list" 2>/dev/null; then
-    ko "KPlayer s'est imposé sur un type qu'il ne déclare pas (audio/mpeg)"
+    ko "RMPlayer s'est imposé sur un type qu'il ne déclare pas (audio/mpeg)"
 else
     ok "aucun type non déclaré capté (audio/mpeg intact)"
 fi
-info "$(grep -c '=kplayer.desktop' "$XDG_CONFIG_HOME/mimeapps.list") type(s) associés par défaut"
+info "$(grep -c '=rmplayer.desktop' "$XDG_CONFIG_HOME/mimeapps.list") type(s) associés par défaut"
 
 echo
 echo "=== 5. Seconde ouverture : même fenêtre, pas une deuxième ==="
@@ -230,11 +230,11 @@ if grep -q "ouverture demandée par un autre processus" "$BASE/exec1.log"; then
 else
     ko "aucune trace de la réception dans l'instance"
 fi
-nb=$(pgrep -x kplayer | wc -l)
+nb=$(pgrep -x rmplayer | wc -l)
 if [ "$nb" -eq 1 ]; then
     ok "une seule instance au total ($nb processus)"
 else
-    ko "$nb processus kplayer : une seconde fenêtre a été ouverte"
+    ko "$nb processus rmplayer : une seconde fenêtre a été ouverte"
 fi
 
 echo
@@ -244,7 +244,7 @@ bash -c "$(printf '%s' "$EXEC_LIGNE" | sed "s|%U|--nouvelle-instance $BASE/a.mp4
 SECOND=$!
 attendu=0
 for _ in $(seq 40); do
-    if [ "$(pgrep -x kplayer | wc -l)" -ge 2 ]; then attendu=1; break; fi
+    if [ "$(pgrep -x rmplayer | wc -l)" -ge 2 ]; then attendu=1; break; fi
     sleep 0.25
 done
 if [ "$attendu" -eq 1 ]; then
@@ -253,7 +253,7 @@ else
     ko "--nouvelle-instance n'a pas ouvert de seconde instance"
 fi
 kill "$SECOND" 2>/dev/null
-pkill -x kplayer 2>/dev/null
+pkill -x rmplayer 2>/dev/null
 sleep 1
 
 echo
@@ -280,7 +280,7 @@ kill -9 "$K_PID" 2>/dev/null
 wait "$K_PID" 2>/dev/null
 sleep 1
 
-orphelin=$(ls "$XDG_RUNTIME_DIR"/kplayer-*.sock 2>/dev/null | head -1)
+orphelin=$(ls "$XDG_RUNTIME_DIR"/rmplayer-*.sock 2>/dev/null | head -1)
 if [ -n "$orphelin" ]; then
     info "socket laissé par l'arrêt brutal : $(basename "$orphelin")"
     bash -c "$COMMANDE_B" >"$BASE/exec5.log" 2>&1 &
@@ -305,15 +305,15 @@ if [ -n "$orphelin" ]; then
 else
     ok "aucun socket résiduel après kill -9 (rien à reprendre)"
 fi
-pkill -x kplayer 2>/dev/null
+pkill -x rmplayer 2>/dev/null
 sleep 1
 
 echo
 echo "=== 7 bis. Balayage des sockets orphelins des autres configurations ==="
 # Chaque configuration isolée (donc chaque banc) laisse son socket derrière elle
 # quand elle est tuée : 26 accumulés en une seule suite, constaté. Un socket
-# « kplayer-*.sock » qui ne répond pas doit être retiré au lancement suivant.
-faux="$XDG_RUNTIME_DIR/kplayer-bancfaux.sock"
+# « rmplayer-*.sock » qui ne répond pas doit être retiré au lancement suivant.
+faux="$XDG_RUNTIME_DIR/rmplayer-bancfaux.sock"
 python3 - "$faux" <<'PYMIME'
 import socket, sys
 s = socket.socket(socket.AF_UNIX)
@@ -338,7 +338,7 @@ fi
 bash -c "$COMMANDE_A" >"$BASE/exec7.log" 2>&1 &
 K_PID=$!
 for _ in $(seq 40); do grep -q "Média chargé" "$BASE/exec7.log" 2>/dev/null && break; sleep 0.25; done
-mon_socket=$(ls "$XDG_RUNTIME_DIR"/kplayer-*.sock 2>/dev/null | head -1)
+mon_socket=$(ls "$XDG_RUNTIME_DIR"/rmplayer-*.sock 2>/dev/null | head -1)
 bash -c "$COMMANDE_B" >"$BASE/exec8.log" 2>&1     # même configuration : transmet
 if kill -0 "$K_PID" 2>/dev/null && [ -n "$mon_socket" ]; then
     ok "une instance vivante survit au balayage (sonde de présence sans effet)"
@@ -350,7 +350,7 @@ if grep -q "Média chargé" "$BASE/exec8.log" 2>/dev/null; then
 else
     ok "la sonde de présence n'ouvre aucun média"
 fi
-pkill -x kplayer 2>/dev/null
+pkill -x rmplayer 2>/dev/null
 sleep 1
 
 echo
@@ -362,20 +362,20 @@ else
 fi
 [ -f "$DESKTOP" ] && ko "le .desktop est toujours là" || ok ".desktop supprimé"
 [ -f "$ICONE" ] && ko "l'icône est toujours là" || ok "icône supprimée"
-if grep -q "kplayer.desktop" "$XDG_DATA_HOME/applications/mimeinfo.cache" 2>/dev/null; then
-    ko "mimeinfo.cache propose encore kplayer.desktop (lecteur fantôme dans « Ouvrir avec »)"
+if grep -q "rmplayer.desktop" "$XDG_DATA_HOME/applications/mimeinfo.cache" 2>/dev/null; then
+    ko "mimeinfo.cache propose encore rmplayer.desktop (lecteur fantôme dans « Ouvrir avec »)"
 else
     ok "mimeinfo.cache nettoyé"
 fi
-if grep -q "kplayer.desktop" "$XDG_CONFIG_HOME/mimeapps.list" 2>/dev/null; then
-    ko "mimeapps.list associe encore kplayer.desktop (type fantôme)"
+if grep -q "rmplayer.desktop" "$XDG_CONFIG_HOME/mimeapps.list" 2>/dev/null; then
+    ko "mimeapps.list associe encore rmplayer.desktop (type fantôme)"
 else
-    ok "mimeapps.list nettoyé des associations KPlayer"
+    ok "mimeapps.list nettoyé des associations RMPlayer"
 fi
 
 echo
 echo "=== 9. La configuration de l'utilisateur n'a pas bougé ==="
-maintenant_data=$( [ -f "$DATA_UTILISATEUR/applications/kplayer.desktop" ] && md5sum "$DATA_UTILISATEUR/applications/kplayer.desktop" || echo absent )
+maintenant_data=$( [ -f "$DATA_UTILISATEUR/applications/rmplayer.desktop" ] && md5sum "$DATA_UTILISATEUR/applications/rmplayer.desktop" || echo absent )
 maintenant_mime=$( [ -f "$MIME_UTILISATEUR" ] && md5sum "$MIME_UTILISATEUR" || echo absent )
 if [ "$temoin_data" = "$maintenant_data" ]; then
     ok "aucun .desktop écrit chez l'utilisateur"

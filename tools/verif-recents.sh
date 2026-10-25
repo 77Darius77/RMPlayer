@@ -19,11 +19,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-recents
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 BORNE=10
 
 PASS=0; FAIL=0
@@ -36,17 +36,17 @@ for outil in Xvfb xdotool python3; do
 done
 [ -x "$KP" ] || { echo "binaire absent : compilez d'abord (cargo build --release)"; exit 2; }
 
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 sleep 1
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache" "$BASE/films"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache" "$BASE/films"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 JOURNAL="$BASE/journal.txt"
 
 nettoyer() {
     [ -n "${K_PID:-}" ] && kill "$K_PID" 2>/dev/null
-    pkill -x kplayer 2>/dev/null || true
+    pkill -x rmplayer 2>/dev/null || true
 }
 trap nettoyer EXIT
 
@@ -67,7 +67,7 @@ ouvre() {
     "$KP" "$@" >>"$JOURNAL" 2>&1 &
     K_PID=$!
     for _ in $(seq 60); do
-        xdotool search --pid "$K_PID" --name KPlayer >/dev/null 2>&1 && break
+        xdotool search --pid "$K_PID" --name RMPlayer >/dev/null 2>&1 && break
         sleep 0.25
     done
     sleep 1.2   # l'écriture suit l'ouverture du média

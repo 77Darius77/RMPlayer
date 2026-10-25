@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# installer-association.sh — « Ouvrir avec KPlayer » dans le gestionnaire de
+# installer-association.sh — « Ouvrir avec RMPlayer » dans le gestionnaire de
 #                            fichiers, et un lanceur dans le menu des applications.
 #
 # **Ce que ça installe.** Un fichier `.desktop` dans
-# `$XDG_DATA_HOME/applications/kplayer.desktop` (donc `~/.local/share/applications`
+# `$XDG_DATA_HOME/applications/rmplayer.desktop` (donc `~/.local/share/applications`
 # par défaut) et son icône dans le thème `hicolor`. C'est ce que lisent Dolphin,
 # KRunner, le menu d'applications et « Ouvrir avec ».
 #
-# **Ce que ça ne fait pas tout seul.** KPlayer n'est **pas** imposé comme lecteur
+# **Ce que ça ne fait pas tout seul.** RMPlayer n'est **pas** imposé comme lecteur
 # par défaut : `--par-defaut` le fait explicitement pour les formats qu'il gère.
 # Sans cette option, il apparaît dans « Ouvrir avec » sans prendre la place de VLC
 # ou mpv — c'est la différence entre « disponible » et « à ma place ».
 #
 # **Le lanceur.** `Exec` pointe sur `run.sh`, qui pose `LD_LIBRARY_PATH` (le binaire
 # est lié à `/opt/ffmpeg-7.1`) et transmet les fichiers. Le lecteur est une
-# **instance unique** : si KPlayer tourne déjà, le fichier s'ouvre dans la fenêtre
+# **instance unique** : si RMPlayer tourne déjà, le fichier s'ouvre dans la fenêtre
 # existante (voir `src/instance.rs`), pas dans une seconde.
 #
 # Usage :
@@ -44,10 +44,10 @@ while [ $# -gt 0 ]; do
 done
 
 DATA="${XDG_DATA_HOME:-$HOME/.local/share}"
-DESKTOP="$DATA/applications/kplayer.desktop"
-ICONE="$DATA/icons/hicolor/256x256/apps/kplayer.png"
-MODELE="$RACINE/assets/kplayer.desktop.in"
-BINAIRE="$RACINE/target/release/kplayer"
+DESKTOP="$DATA/applications/rmplayer.desktop"
+ICONE="$DATA/icons/hicolor/256x256/apps/rmplayer.png"
+MODELE="$RACINE/assets/rmplayer.desktop.in"
+BINAIRE="$RACINE/target/release/rmplayer"
 LANCEUR="$RACINE/run.sh"
 
 # Types MIME pour lesquels on peut être lecteur par défaut : ceux que le .desktop
@@ -60,7 +60,7 @@ types_declares() {
 #
 # **Pourquoi pas `xdg-mime query default`.** Mesuré sur ce poste : sans aucune
 # association par défaut enregistrée, `xdg-mime query default video/mp4` répond
-# quand même « kplayer.desktop » — il retombe sur la base de GIO, qui propose le
+# quand même « rmplayer.desktop » — il retombe sur la base de GIO, qui propose le
 # premier gestionnaire venu. S'appuyer dessus ferait annoncer « lecteur par défaut »
 # alors que rien n'est enregistré, et `--retirer` effacerait des associations que
 # l'utilisateur n'a jamais posées. On lit donc le fichier lui-même.
@@ -74,7 +74,7 @@ chemin, type_ = sys.argv[1], sys.argv[2]
 cp = configparser.RawConfigParser(strict=False); cp.optionxform = str
 cp.read(chemin, encoding="utf-8")
 valeurs = [v for v in cp.get("Default Applications", type_, fallback="").split(";") if v]
-print("oui" if valeurs[:1] == ["kplayer.desktop"] else "non")
+print("oui" if valeurs[:1] == ["rmplayer.desktop"] else "non")
 PYMIME
 }
 
@@ -90,9 +90,9 @@ cp.read(chemin, encoding="utf-8")
 section = "Default Applications"
 if not cp.has_section(section):
     cp.add_section(section)
-valeurs = [v for v in cp.get(section, type_, fallback="").split(";") if v and v != "kplayer.desktop"]
+valeurs = [v for v in cp.get(section, type_, fallback="").split(";") if v and v != "rmplayer.desktop"]
 if action == "ajouter":
-    valeurs = ["kplayer.desktop"] + valeurs
+    valeurs = ["rmplayer.desktop"] + valeurs
 if valeurs:
     cp.set(section, type_, ";".join(valeurs) + ";")
 elif cp.has_option(section, type_):
@@ -154,8 +154,8 @@ modele, sortie, lanceur, binaire, icone = sys.argv[1:6]
 texte = open(modele, encoding="utf-8").read()
 texte = texte.replace("@EXEC@", lanceur).replace("@EXEC_BIN@", binaire)
 # Le thème d'icônes cherche un NOM, pas un chemin : l'icône est installée dans
-# hicolor sous le nom « kplayer ».
-texte = texte.replace("@ICON@", "kplayer")
+# hicolor sous le nom « rmplayer ».
+texte = texte.replace("@ICON@", "rmplayer")
 open(sortie, "w", encoding="utf-8").write(texte)
 PY
 }
@@ -187,7 +187,7 @@ ok "lanceur installé : $DESKTOP"
 ok "icône installée : $ICONE"
 
 # Ajout à « Ouvrir avec » : `Added Associations` ne prend pas la place du lecteur
-# actuel, il rend KPlayer disponible dans la liste. Sans cela, un fichier .desktop
+# actuel, il rend RMPlayer disponible dans la liste. Sans cela, un fichier .desktop
 # déclarant des MimeType reste proposé par KDE mais pas par les applications qui
 # ne lisent que `mimeapps.list`.
 if [ "$PAR_DEFAUT" -eq 1 ]; then

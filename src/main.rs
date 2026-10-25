@@ -1,5 +1,5 @@
-//! KPlayer — Lecteur vidéo professionnel Linux
-//! Qualité PotPlayer, 100% natif Rust + Vulkan
+//! RMPlayer — Lecteur vidéo professionnel Linux
+//! Rust Media Player : 100% natif Rust, FFmpeg, GPU (VA-API / Vulkan)
 //! 
 //! Architecture :
 //!   - FFmpeg (libav) pour le décodage vidéo/audio
@@ -13,6 +13,7 @@ mod edid;
 mod fenetre;
 mod hdr;
 mod instance;
+mod migration;
 mod mpris;
 mod crash;
 mod player;
@@ -36,6 +37,9 @@ mod tray;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Reprise des données de l'ancien nom (KPlayer) : avant tout accès à la configuration.
+    migration::migrer_donnees();
+
     // Rapport de crash : handler async-signal-safe (celui de Rust interbloque
     // sur SIGSEGV, ce qui gèle l'application au lieu de produire un rapport).
     crash::install();
@@ -49,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         eprintln!("{}", msg);
         let path = dirs::cache_dir()
             .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
-            .join("kplayer");
+            .join("rmplayer");
         let _ = std::fs::create_dir_all(&path);
         let _ = std::fs::write(path.join("panic.log"), &msg);
     }));
@@ -58,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "kplayer=info,wgpu=warn".into())
+                .unwrap_or_else(|_| "rmplayer=info,wgpu=warn".into())
         )
         .init();
 
@@ -194,7 +198,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 std::process::exit(0);
             }
             _ => {
-                eprintln!("usage : kplayer --autostart on|off|status");
+                eprintln!("usage : rmplayer --autostart on|off|status");
                 std::process::exit(2);
             }
         }
@@ -204,7 +208,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     // `--export-config <fichier>` écrit la configuration courante ; `--import-config <fichier>`
     // la remplace par un fichier validé (refusé sans rien écraser s'il n'est pas une
-    // configuration de KPlayer). À lancer **lecteur fermé** : une fenêtre ouverte réécrirait
+    // configuration de RMPlayer). À lancer **lecteur fermé** : une fenêtre ouverte réécrirait
     // sa propre configuration à la fermeture.
     for (option, importer) in [("--export-config", false), ("--import-config", true)] {
         let Some(pos) = args.iter().position(|a| a == option) else { continue };
@@ -391,7 +395,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // couvrent les cas de base ; ici, c'est le fichier réel de l'utilisateur).
     if let Some(pos) = args.iter().position(|a| a == "--ass-dump") {
         let Some(chemin) = args.get(pos + 1) else {
-            eprintln!("usage : kplayer --ass-dump <fichier.ass>");
+            eprintln!("usage : rmplayer --ass-dump <fichier.ass>");
             std::process::exit(2);
         };
         let contenu = match std::fs::read_to_string(chemin) {
@@ -645,7 +649,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // texte ET les temps sans passer par l'affichage.
     if let Some(pos) = args.iter().position(|a| a == "--dump-subs") {
         let Some(sortie) = args.get(pos + 1).map(PathBuf::from) else {
-            eprintln!("usage : kplayer --dump-subs <fichier.txt> <fichier_média>");
+            eprintln!("usage : rmplayer --dump-subs <fichier.txt> <fichier_média>");
             std::process::exit(2);
         };
         let Some(media) = cli_files.first() else {
@@ -771,7 +775,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let sortie = match args.get(pos + 1) {
             Some(p) => PathBuf::from(p),
             None => {
-                eprintln!("usage : kplayer --dump-audio <fichier.wav> <fichier_média>");
+                eprintln!("usage : rmplayer --dump-audio <fichier.wav> <fichier_média>");
                 std::process::exit(2);
             }
         };
@@ -871,7 +875,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // `--dump-frame` mesure ensuite les pixels réellement produits.
     if let Some(pos) = args_bruts.iter().position(|a| a == "--hdr-info") {
         let Some(chemin) = args_bruts.get(pos + 1).map(PathBuf::from) else {
-            eprintln!("usage : kplayer --hdr-info <fichier>");
+            eprintln!("usage : rmplayer --hdr-info <fichier>");
             std::process::exit(2);
         };
         match hdr::inspecter_fichier(&chemin) {
@@ -916,7 +920,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .and_then(|p| args_bruts.get(p + 1))
             .and_then(|v| v.parse().ok())
             .unwrap_or(20);
-        let serveur = match mpris::demarrer("KPlayer") {
+        let serveur = match mpris::demarrer("RMPlayer") {
             mpris::Demarrage::Actif(s) => s,
             mpris::Demarrage::Indisponible(raison) => {
                 eprintln!("--mpris-test : bus indisponible : {}", raison);
@@ -931,7 +935,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             position_ms: 12_000,
             duree_ms: 60_000,
             titre: "Mire de test MPRIS".to_string(),
-            artiste: "KPlayer".to_string(),
+            artiste: "RMPlayer".to_string(),
             rang: 0,
             volume: 0.8,
             aleatoire: false,
@@ -982,7 +986,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let sortie = match args.get(pos + 2) {
             Some(p) => PathBuf::from(p),
             None => {
-                eprintln!("usage : kplayer --vignette <position_ms> <image.png> <fichier> [--vignette-largeur N]");
+                eprintln!("usage : rmplayer --vignette <position_ms> <image.png> <fichier> [--vignette-largeur N]");
                 std::process::exit(2);
             }
         };
@@ -1028,7 +1032,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let sortie = match args.get(pos + 2) {
             Some(p) => PathBuf::from(p),
             None => {
-                eprintln!("usage : kplayer --dump-frame <position_ms> <image.png> <fichier>");
+                eprintln!("usage : rmplayer --dump-frame <position_ms> <image.png> <fichier>");
                 std::process::exit(2);
             }
         };
@@ -1164,7 +1168,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut viewport = egui::ViewportBuilder::default()
         .with_inner_size(taille_enregistree.unwrap_or([1280.0, 720.0]))
         .with_min_inner_size(crate::config::TAILLE_MIN_FENETRE)
-        .with_title("KPlayer — Lecteur Vidéo");
+        .with_title("RMPlayer — Lecteur Vidéo");
     if let Some(position) = position_enregistree.filter(|_| !wayland) {
         viewport = viewport.with_position(position);
     }
@@ -1198,7 +1202,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Lancer l'application eframe avec les fichiers CLI
     eframe::run_native(
-        "KPlayer",
+        "RMPlayer",
         options,
         Box::new(move |cc| {
             // Police : egui ne dessine que ce que ses polices contiennent. Or la

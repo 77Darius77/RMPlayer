@@ -1,7 +1,7 @@
 //! Sortie audio — cpal (PipeWire / PulseAudio / ALSA)
 //!
 //! Architecture :
-//!   - KPlayer décode l'audio via FFmpeg et convertit en f32 entrelacé
+//!   - RMPlayer décode l'audio via FFmpeg et convertit en f32 entrelacé
 //!     (au format **du périphérique**, via libswresample, côté `player.rs`)
 //!   - Les échantillons sont poussés dans un tampon circulaire (ring buffer)
 //!   - Un callback cpal les consomme et les écrit vers la carte son

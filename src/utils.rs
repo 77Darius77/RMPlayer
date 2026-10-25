@@ -21,8 +21,8 @@ pub fn is_stream_url(texte: &str) -> bool {
         .any(|p| t.starts_with(p))
 }
 
-/// Types MIME annoncés par KPlayer — **une seule liste** pour le lanceur
-/// (`assets/kplayer.desktop.in`) et pour MPRIS (`SupportedMimeTypes`).
+/// Types MIME annoncés par RMPlayer — **une seule liste** pour le lanceur
+/// (`assets/rmplayer.desktop.in`) et pour MPRIS (`SupportedMimeTypes`).
 ///
 /// Tous sont présents dans shared-mime-info (vérifié en session 33 : quatre types
 /// envisagés n'existent pas et ont été retirés — les annoncer ne pouvait rien

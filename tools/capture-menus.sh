@@ -14,11 +14,11 @@ mkdir -p "$XDG_CONFIG_HOME" "$XDG_CACHE_HOME"
 Xvfb :94 -screen 0 1280x800x24 >"$BASE/xvfb.log" 2>&1 &
 XPID=$!
 sleep 2
-./target/release/kplayer /tmp/menu-test.mkv >"$BASE/lecteur.log" 2>&1 &
+./target/release/rmplayer /tmp/menu-test.mkv >"$BASE/lecteur.log" 2>&1 &
 KPID=$!
 sleep 3
 
-WID=$(xdotool search --pid $KPID --name KPlayer | head -1)
+WID=$(xdotool search --pid $KPID --name RMPlayer | head -1)
 eval "$(xdotool getwindowgeometry --shell "$WID")"
 xdotool mousemove $((X + WIDTH/2)) $((Y + HEIGHT/2))
 xdotool windowfocus --sync "$WID"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Capture d'écran d'une lecture KPlayer sur un écran X virtuel.
+# Capture d'écran d'une lecture RMPlayer sur un écran X virtuel.
 # Usage : capture-lecteur.sh <fichier> <image.png> [attente_s] [touches xdotool...]
 set -u
 FILE="${1:?fichier requis}"
@@ -10,21 +10,21 @@ KEYS=("$@")
 
 cd /media/blaise/LINUX_DATA/lecteur-linux
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
-export XDG_RUNTIME_DIR=/tmp/kplayer-bench-pas-de-son   # audio désactivé : capture silencieuse
+export XDG_RUNTIME_DIR=/tmp/rmplayer-bench-pas-de-son   # audio désactivé : capture silencieuse
 LOG="${OUT%.png}.log"
 
 Xvfb :99 -screen 0 1280x800x24 >/tmp/xvfb-$$.log 2>&1 &
 XPID=$!
 sleep 2
 
-DISPLAY=:99 RUST_LOG=kplayer=info ./target/release/kplayer "$FILE" >"$LOG" 2>&1 &
+DISPLAY=:99 RUST_LOG=rmplayer=info ./target/release/rmplayer "$FILE" >"$LOG" 2>&1 &
 KPID=$!
 sleep "$WAIT"
 
 # Sans gestionnaire de fenêtres (Xvfb), le focus X11 est « PointerRoot » : le
 # pointeur doit survoler la fenêtre pour que les touches XTEST lui parviennent.
 # (xdotool key --window envoie un événement synthétique que winit ignore.)
-WID=$(DISPLAY=:99 xdotool search --name "KPlayer" | head -1)
+WID=$(DISPLAY=:99 xdotool search --name "RMPlayer" | head -1)
 if [ -n "$WID" ]; then
     eval "$(DISPLAY=:99 xdotool getwindowgeometry --shell "$WID")"
     DISPLAY=:99 xdotool mousemove $((X + WIDTH / 2)) $((Y + HEIGHT / 2))

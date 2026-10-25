@@ -16,7 +16,7 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux || exit 2
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 FF=/opt/ffmpeg-7.1/bin/ffmpeg
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 MAUVAIS=0
 
 ok()  { echo "  ✔ $1"; }
@@ -68,12 +68,12 @@ if [ -x "$KP" ]; then
     moteur=$($KP --hdr-info "$mire" 2>/dev/null | sed -n 's/^moteur: //p')
     case "$moteur" in
         libplacebo*) ok "moteur retenu : $moteur" ;;
-        "")          ko "kplayer --hdr-info ne répond pas" ;;
+        "")          ko "rmplayer --hdr-info ne répond pas" ;;
         *)           info "moteur retenu : $moteur (mode HDR forcé, ou écran HDR : voir docs/HDR.md)" ;;
     esac
     rm -f "$mire"
 else
-    info "binaire kplayer absent (cargo build --release) — contrôle 4 ignoré"
+    info "binaire rmplayer absent (cargo build --release) — contrôle 4 ignoré"
 fi
 
 echo

@@ -21,7 +21,7 @@
 # Usage : tools/verif-sousimages.sh [écran]
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 DISP="${1:-:95}"
 BASE=/tmp/kp-sousimages
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
@@ -53,11 +53,11 @@ done
 # Une capture d'écran (x11grab) prend **tout l'écran** : un lecteur laissé par un
 # essai précédent sur le même écran virtuel recouvre la fenêtre mesurée, et le banc
 # mesure ses pixels (constaté : taille 1075x651 « sous-titre » et couleur bleue,
-# c'étaient les barres de couleur d'un autre film). On arrête donc les kplayer qui
+# c'étaient les barres de couleur d'un autre film). On arrête donc les rmplayer qui
 # tournent **sur cet écran** — `DISPLAY` est lu dans /proc, pour ne jamais toucher
 # au lecteur de l'utilisateur (qui est sur :0 / Wayland).
 arreter_instances_de_test() {
-    for pid in $(pgrep -x kplayer 2>/dev/null); do
+    for pid in $(pgrep -x rmplayer 2>/dev/null); do
         affichage=$(tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | sed -n 's/^DISPLAY=//p')
         if [ "$affichage" = "$DISP" ]; then
             kill "$pid" 2>/dev/null
@@ -146,7 +146,7 @@ else
     }
     # Lecture depuis le début (un seek effacerait le sous-titre en cours, voir la
     # limite documentée) ; capture pendant l'affichage puis après l'extinction.
-    rm -f "$XDG_CACHE_HOME/kplayer/positions.json"
+    rm -f "$XDG_CACHE_HOME/rmplayer/positions.json"
     "$KP" "$BASE/hd.mkv" >"$BASE/lecteur.log" 2>&1 &
     KP_PID=$!
     sleep 3

@@ -16,7 +16,7 @@ pub enum CommandeTray {
     Quitter,
 }
 
-struct IconeKPlayer {
+struct IconeRMPlayer {
     envoi: Sender<CommandeTray>,
     /// Pour réveiller l'interface : sans cela, une fenêtre au repos (lecture en pause) ne verrait
     /// la commande qu'au prochain événement.
@@ -25,26 +25,26 @@ struct IconeKPlayer {
     en_lecture: bool,
 }
 
-impl IconeKPlayer {
+impl IconeRMPlayer {
     fn demander(&self, c: CommandeTray) {
         let _ = self.envoi.send(c);
         self.contexte.request_repaint();
     }
 }
 
-impl ksni::Tray for IconeKPlayer {
+impl ksni::Tray for IconeRMPlayer {
     fn id(&self) -> String {
-        "kplayer".into()
+        "rmplayer".into()
     }
     fn title(&self) -> String {
-        "KPlayer".into()
+        "RMPlayer".into()
     }
     fn icon_name(&self) -> String {
-        "kplayer".into()
+        "rmplayer".into()
     }
     fn tool_tip(&self) -> ksni::ToolTip {
         ksni::ToolTip {
-            title: "KPlayer".into(),
+            title: "RMPlayer".into(),
             description: self.titre.clone(),
             ..Default::default()
         }
@@ -80,7 +80,7 @@ impl ksni::Tray for IconeKPlayer {
 }
 
 pub struct Tray {
-    handle: Handle<IconeKPlayer>,
+    handle: Handle<IconeRMPlayer>,
     commandes: Receiver<CommandeTray>,
     dernier: (String, bool),
 }
@@ -90,7 +90,7 @@ impl Tray {
     /// l'erreur est rendue, le lecteur continue sans icône.
     pub fn demarrer(contexte: egui::Context) -> Result<Self, String> {
         let (envoi, commandes) = channel();
-        let icone = IconeKPlayer { envoi, contexte, titre: String::new(), en_lecture: false };
+        let icone = IconeRMPlayer { envoi, contexte, titre: String::new(), en_lecture: false };
         let handle = icone.spawn().map_err(|e| e.to_string())?;
         Ok(Self { handle, commandes, dernier: (String::new(), false) })
     }
@@ -107,7 +107,7 @@ impl Tray {
         }
         self.dernier = (titre.to_string(), en_lecture);
         let titre = titre.to_string();
-        self.handle.update(move |t: &mut IconeKPlayer| {
+        self.handle.update(move |t: &mut IconeRMPlayer| {
             t.titre = titre;
             t.en_lecture = en_lecture;
         });

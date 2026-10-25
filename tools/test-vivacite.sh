@@ -13,11 +13,11 @@ DISP="${1:-:99}"
 LOG=/tmp/test-vivacite.log
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 sleep 1
-DISPLAY=$DISP ./target/release/kplayer /media/blaise/LINUX_DATA/test-60s.mp4 >"$LOG" 2>&1 &
+DISPLAY=$DISP ./target/release/rmplayer /media/blaise/LINUX_DATA/test-60s.mp4 >"$LOG" 2>&1 &
 KPID=$!
 sleep 6
 if ! kill -0 "$KPID" 2>/dev/null; then
@@ -30,8 +30,8 @@ touches_avant=$(grep -c "touche X" "$LOG" || true)
 # qu'à la fenêtre qui a RÉELLEMENT le focus d'entrée : ni le survol, ni le clic
 # ne suffisent (`XGetInputFocus` reste sur PointerRoot = 1). Il faut
 # `windowactivate` (repli `windowfocus`) : constaté ici à l'instant.
-WID=$(DISPLAY=$DISP xdotool search --pid "$KPID" --name KPlayer 2>/dev/null | head -1)
-[ -z "$WID" ] && WID=$(DISPLAY=$DISP xdotool search --name KPlayer 2>/dev/null | head -1)
+WID=$(DISPLAY=$DISP xdotool search --pid "$KPID" --name RMPlayer 2>/dev/null | head -1)
+[ -z "$WID" ] && WID=$(DISPLAY=$DISP xdotool search --name RMPlayer 2>/dev/null | head -1)
 eval "$(DISPLAY=$DISP xdotool getwindowgeometry --shell "$WID")"
 focus_lecteur() {
     DISPLAY=$DISP xdotool windowactivate --sync "$WID" 2>/dev/null \

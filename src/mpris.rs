@@ -2,7 +2,7 @@
 //!
 //! **Le besoin.** Une touche « lecture/pause » ou « piste suivante » du clavier doit
 //! agir sur le lecteur, et le widget média du bureau doit afficher ce qui joue.
-//! C'est le dernier manque d'**intégration au bureau** du comparatif PotPlayer :
+//! C'est l'**intégration au bureau** :
 //! sans MPRIS, les touches média ne font rien et Plasma affiche « aucun lecteur ».
 //!
 //! **Pourquoi D-Bus, et pas autre chose.** C'est le mécanisme que le bureau écoute :
@@ -34,9 +34,9 @@ use zbus::zvariant::{OwnedValue, Value};
 /// Chemin d'objet imposé par la spécification MPRIS.
 pub const CHEMIN: &str = "/org/mpris/MediaPlayer2";
 /// Nom bien connu : `org.mpris.MediaPlayer2.<identifiant>`.
-pub const NOM: &str = "org.mpris.MediaPlayer2.kplayer";
+pub const NOM: &str = "org.mpris.MediaPlayer2.rmplayer";
 /// Préfixe des identifiants de piste (`mpris:trackid`).
-pub const PREFIXE_PISTE: &str = "/org/kplayer/track/";
+pub const PREFIXE_PISTE: &str = "/org/rmplayer/track/";
 
 pub const IFACE_LECTEUR: &str = "org.mpris.MediaPlayer2.Player";
 
@@ -59,7 +59,7 @@ pub fn statut_mpris(etat: Lecture) -> &'static str {
 
 /// Mode de boucle MPRIS : `None`, `Track` ou `Playlist`.
 ///
-/// KPlayer ne sait faire que « relire la playlist » (`loop_enabled`) : on annonce
+/// RMPlayer ne sait faire que « relire la playlist » (`loop_enabled`) : on annonce
 /// donc `Playlist` ou `None`, jamais `Track` — annoncer un mode qu'on n'applique pas
 /// ferait mentir le bureau, qui proposerait un choix sans effet.
 pub fn boucle_mpris(actif: bool) -> &'static str {
@@ -128,7 +128,7 @@ pub struct Etat {
     pub artiste: String,
     /// Rang de l'élément courant dans la playlist (pour `mpris:trackid`).
     pub rang: usize,
-    /// Volume, de 0 à 1 (MPRIS ; KPlayer autorise jusqu'à 1,5 en interne).
+    /// Volume, de 0 à 1 (MPRIS ; RMPlayer autorise jusqu'à 1,5 en interne).
     pub volume: f64,
     pub aleatoire: bool,
     pub boucle: bool,
@@ -205,10 +205,10 @@ struct Racine {
 impl Racine {
     #[zbus(property)]
     fn identity(&self) -> String {
-        "KPlayer".to_string()
+        "RMPlayer".to_string()
     }
 
-    /// KPlayer peut se fermer depuis le bureau (`Quit` est implémenté).
+    /// RMPlayer peut se fermer depuis le bureau (`Quit` est implémenté).
     #[zbus(property)]
     fn can_quit(&self) -> bool {
         true
@@ -222,7 +222,7 @@ impl Racine {
     }
 
     /// Pas de liste de pistes MPRIS (`org.mpris.MediaPlayer2.TrackList`) : la
-    /// playlist de KPlayer se pilote dans sa fenêtre, et implémenter cette interface
+    /// playlist de RMPlayer se pilote dans sa fenêtre, et implémenter cette interface
     /// à moitié serait pire que ne pas l'annoncer.
     #[zbus(property)]
     fn has_track_list(&self) -> bool {
@@ -231,7 +231,7 @@ impl Racine {
 
     #[zbus(property)]
     fn desktop_entry(&self) -> String {
-        "kplayer".to_string()
+        "rmplayer".to_string()
     }
 
     #[zbus(property)]
@@ -384,7 +384,7 @@ impl Lecteur {
         self.partage.pousser(Commande::Aleatoire(actif));
     }
 
-    /// `Properties.Set LoopStatus` : `Track` n'est pas géré par KPlayer (il relit la
+    /// `Properties.Set LoopStatus` : `Track` n'est pas géré par RMPlayer (il relit la
     /// playlist entière) — on le traite comme `Playlist` plutôt que de refuser, ce
     /// qui laisserait le widget dans un état incohérent.
     #[zbus(property)]
@@ -607,7 +607,7 @@ mod tests {
     #[test]
     fn l_identifiant_de_piste_va_et_vient() {
         let id = identifiant_piste(7);
-        assert_eq!(id, "/org/kplayer/track/7");
+        assert_eq!(id, "/org/rmplayer/track/7");
         assert_eq!(rang_de_piste(&id), Some(7));
         // Un identifiant étranger (autre lecteur, ou valeur d'un bureau en retard)
         // ne doit pas être interprété.

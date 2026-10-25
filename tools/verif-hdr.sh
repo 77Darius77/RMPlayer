@@ -22,9 +22,9 @@
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 BASE=/tmp/kp-hdr-verif
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -69,8 +69,8 @@ ls -la "$BASE/clips/"*.mkv | awk '{print "    ", $NF, $5, "octets"}'
 # Configuration isolée : `config <nom> '<json video>'`.
 config() {
     local nom="$1" video="$2"
-    mkdir -p "$BASE/cfg/$nom/kplayer" "$BASE/cfg/$nom/cache"
-    python3 - "$BASE/cfg/$nom/kplayer/config.json" "$video" <<'PY'
+    mkdir -p "$BASE/cfg/$nom/rmplayer" "$BASE/cfg/$nom/cache"
+    python3 - "$BASE/cfg/$nom/rmplayer/config.json" "$video" <<'PY'
 import json, sys
 chemin, video = sys.argv[1], json.loads(sys.argv[2])
 json.dump({
@@ -86,7 +86,7 @@ PY
 image() {
     local nom="$1" clip="$2" sortie="$3" moteur="${4:-}"
     if [ -n "$moteur" ]; then
-        KPLAYER_HDR_MOTEUR="$moteur" XDG_CONFIG_HOME="$BASE/cfg/$nom" \
+        RMPLAYER_HDR_MOTEUR="$moteur" XDG_CONFIG_HOME="$BASE/cfg/$nom" \
             XDG_CACHE_HOME="$BASE/cfg/$nom/cache" \
             "$KP" --dump-frame 500 "$sortie" "$clip" >"$BASE/cfg/$nom.log" 2>&1
     else
@@ -324,7 +324,7 @@ else
 fi
 # Moteur forcé à « aucun » : l'étage disparaît, et l'explication le dit.
 image auto "$BASE/clips/bandes.mkv" "$BASE/dumps/bandes-aucun.png" aucun
-if grep -q "KPLAYER_HDR_MOTEUR" "$BASE/cfg/auto.log"; then
+if grep -q "RMPLAYER_HDR_MOTEUR" "$BASE/cfg/auto.log"; then
     ok "moteur forcé à « aucun » : explication présente"
 else
     ko "moteur forcé : aucune explication"
@@ -547,7 +547,7 @@ if command -v Xvfb >/dev/null; then
     config contraste '{"contrast": 1.2, "hdr": {"mode": "Auto"}}'
     joue() {  # joue <clip> <journal>
         env -u WAYLAND_DISPLAY XDG_SESSION_TYPE=x11 DISPLAY="$XV" \
-            XDG_RUNTIME_DIR=/tmp/kplayer-bench-pas-de-son $VK_CASSE \
+            XDG_RUNTIME_DIR=/tmp/rmplayer-bench-pas-de-son $VK_CASSE \
             XDG_CONFIG_HOME="$BASE/cfg/contraste" XDG_CACHE_HOME="$BASE/cfg/contraste/cache" \
             timeout 5 "$KP" "$1" >"$2" 2>&1
     }

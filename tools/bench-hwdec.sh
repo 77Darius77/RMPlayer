@@ -17,16 +17,16 @@
 
 set -u
 
-BIN="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)/target/release/kplayer"
+BIN="$(cd "$(dirname "$(readlink -f "$0")")/.." && pwd)/target/release/rmplayer"
 FILE="${1:?usage: bench-hwdec.sh <fichier> [durée_s] [display] [materiel|logiciel|both]}"
 DUR="${2:-20}"
 DISP="${3:-${DISPLAY:-:0}}"
 MODE="${4:-both}"
 
 export LD_LIBRARY_PATH="/opt/ffmpeg-7.1/lib:${LD_LIBRARY_PATH:-}"
-export RUST_LOG="${RUST_LOG:-kplayer=info}"
+export RUST_LOG="${RUST_LOG:-rmplayer=info}"
 # Serveur audio injoignable → lecture vidéo seule, silencieuse
-export XDG_RUNTIME_DIR="/tmp/kplayer-bench-pas-de-son"
+export XDG_RUNTIME_DIR="/tmp/rmplayer-bench-pas-de-son"
 
 HZ=$(getconf CLK_TCK)
 NC=$(nproc)
@@ -37,7 +37,7 @@ mesure() {
     local mode="$1" extra=() log pid t1 t2 c1 c2 cpu
     [ "$mode" = "logiciel" ] && extra=(--no-hwdec)
 
-    log=$(mktemp /tmp/kplayer-bench.XXXXXX.log)
+    log=$(mktemp /tmp/rmplayer-bench.XXXXXX.log)
     DISPLAY="$DISP" "$BIN" "${extra[@]}" "$FILE" >"$log" 2>&1 &
     pid=$!
     sleep 4

@@ -374,7 +374,7 @@ impl Generateur {
         let (tx_demande, rx_demande) = mpsc::channel::<Demande>();
         let (tx_resultat, rx_resultat) = mpsc::channel();
         std::thread::Builder::new()
-            .name("kplayer-vignettes".into())
+            .name("rmplayer-vignettes".into())
             .spawn(move || {
                 // Le décodeur survit d'une demande à l'autre **pour le même fichier**.
                 let mut courant: Option<Decodeur> = None;
@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn un_fichier_absent_echoue_proprement() {
-        let err = extraire(Path::new("/tmp/inexistant-kplayer-vignette.mkv"), 0, 320)
+        let err = extraire(Path::new("/tmp/inexistant-rmplayer-vignette.mkv"), 0, 320)
             .err()
             .expect("doit échouer");
         assert!(

@@ -724,7 +724,7 @@ impl VideoPlayer {
             // Les messages d'FFmpeg partent par défaut sur la sortie d'erreur, où ils
             // noient les journaux de l'application (un flux AV1 refusé en produit des
             // centaines). On les redirige vers `tracing`, au niveau « debug » : ils
-            // restent accessibles avec `RUST_LOG=kplayer=debug` (ou `ffmpeg=debug`).
+            // restent accessibles avec `RUST_LOG=rmplayer=debug` (ou `ffmpeg=debug`).
             av_log_set_callback(Some(ffmpeg_log_callback));
         }
 
@@ -1299,7 +1299,7 @@ impl VideoPlayer {
     ///
     /// Sauter « au chapitre suivant » tel qu'on l'attend : si on est au milieu du
     /// chapitre 3, on va au début du 4 ; si on est au tout début du chapitre 3, on
-    /// va aussi au 4 (comportement des lecteurs de salon et de PotPlayer). Le
+    /// va aussi au 4 (comportement des lecteurs de salon). Le
     /// chapitre 1 n'est atteignable que par le début du média ou le menu.
     pub fn next_chapter(&mut self) -> Option<usize> {
         let position = self.current_position_ms;
@@ -1712,7 +1712,7 @@ impl VideoPlayer {
                     ("reconnect", "1"),                 // reconnexion HTTP interne
                     ("reconnect_streamed", "1"),        // y compris pour un flux continu
                     ("reconnect_delay_max", "2"),       // plafond de 2 s entre essais
-                    ("user_agent", "KPlayer/0.1"),
+                    ("user_agent", "RMPlayer/0.1"),
                 ];
                 for (cle, valeur) in cles {
                     let ck = CString::new(cle).unwrap();
@@ -3451,7 +3451,7 @@ impl VideoPlayer {
     ///
     /// Sans cela, `--bench` mesure toujours la conversion à la résolution native et
     /// ne peut pas montrer l'effet d'une réduction : or c'est précisément le cas
-    /// où l'échelle matérielle change tout (cf. `docs/OPTIMISATION-COMPARATIF.md`).
+    /// où l'échelle matérielle change tout (cf. `docs/OPTIMISATION.md`).
     /// `(0, 0)` = résolution native.
     pub fn bench_decode_taille(&mut self, frames: usize, taille: (u32, u32)) -> (f64, u64) {
         self.display_target = taille;
@@ -4451,7 +4451,7 @@ impl VideoPlayer {
             }
         }
         self.state = PlayerState::Idle;
-        tracing::info!("KPlayer quitté");
+        tracing::info!("RMPlayer quitté");
         Ok(())
     }
 }
@@ -6257,7 +6257,7 @@ impl Drop for GpuChain {
 
 /// Rapatrie une surface VA-API **après l'avoir réduite dans le GPU**.
 ///
-/// **Pourquoi** (mesuré, `docs/OPTIMISATION-COMPARATIF.md`) : sans cela, chaque
+/// **Pourquoi** (mesuré, `docs/OPTIMISATION.md`) : sans cela, chaque
 /// image 1080p est recopiée telle quelle en mémoire système, puis réduite par
 /// libswscale (CPU). Sur un flux 1080p affiché en 720p, la chaîne complète coûte
 /// 9,95 ms/image ; en réduisant d'abord côté GPU (`scale_vaapi`) et en ne
@@ -6648,7 +6648,7 @@ unsafe fn scale_frame_to_rgba(
         // --- Optimisation mesurée : réduire DANS le GPU ---
         // Sans filtre CPU à appliquer, la copie 1080p puis la réduction par swscale
         // sont remplacées par une réduction matérielle suivie d'une copie du seul
-        // résultat (9,95 → 4,60 ms/image, cf. docs/OPTIMISATION-COMPARATIF.md).
+        // résultat (9,95 → 4,60 ms/image, cf. docs/OPTIMISATION.md).
         // Dès qu'un filtre CPU est demandé, on garde l'ordre actuel : les filtres
         // travaillent sur la résolution native (leurs seuils en dépendent).
         // Chemin GPU : soit la chaîne est vide (il ne reste que la réduction), soit

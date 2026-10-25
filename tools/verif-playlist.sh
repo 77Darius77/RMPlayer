@@ -28,10 +28,10 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-playlist
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -44,9 +44,9 @@ for outil in Xvfb xdotool python3; do
 done
 [ -x "$KP" ] || { echo "binaire absent : compilez d'abord (cargo build --release)"; exit 2; }
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache"
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
-CONF="$XDG_CONFIG_HOME/kplayer/config.json"
+CONF="$XDG_CONFIG_HOME/rmplayer/config.json"
 
 # Quatre médias distincts (couleurs et tailles différentes : on les reconnaît au
 # journal par leur nom de fichier).
@@ -92,7 +92,7 @@ lance() {  # lance <journal> [args…]
     "$KP" "$@" >"$journal" 2>&1 &
     K_PID=$!
     for _ in $(seq 60); do
-        if xdotool search --pid "$K_PID" --name KPlayer >/dev/null 2>&1; then
+        if xdotool search --pid "$K_PID" --name RMPlayer >/dev/null 2>&1; then
             sleep 1; return 0
         fi
         sleep 0.25
@@ -105,7 +105,7 @@ arreter() {
     K_PID=""
     sleep 1
 }
-fenetre() { xdotool search --pid "$K_PID" --name KPlayer 2>/dev/null | tail -1; }
+fenetre() { xdotool search --pid "$K_PID" --name RMPlayer 2>/dev/null | tail -1; }
 # ordre_actuel : chemins de la playlist enregistrée, un par ligne.
 ordre_actuel() {
     python3 - "$CONF" <<'PY'
@@ -334,8 +334,8 @@ c.setdefault("regles", [])
 c["regles"] = [{"champ": "chemin", "motif": "film3", "profil": "BancLumineux"}]
 json.dump(c, open(sys.argv[1], "w"), indent=2)
 PYREGLE
-mkdir -p "$XDG_CONFIG_HOME/kplayer"
-python3 - "$XDG_CONFIG_HOME/kplayer/profiles.json" "$CONF" <<'PYPROFIL'
+mkdir -p "$XDG_CONFIG_HOME/rmplayer"
+python3 - "$XDG_CONFIG_HOME/rmplayer/profiles.json" "$CONF" <<'PYPROFIL'
 import json, sys
 conf = json.load(open(sys.argv[2]))
 json.dump([{
@@ -573,7 +573,7 @@ echo "=== 9. MPRIS : le bureau pilote vraiment le lecteur (intégration) ==="
 # Le module est mesuré seul par `tools/verif-mpris.sh` (26 contrôles, mode
 # `--mpris-test`). Ici, c'est l'**intégration** : une fenêtre réelle, un média réel,
 # et des appels D-Bus qui doivent changer ce que le lecteur fait réellement.
-P_MPRIS=org.mpris.MediaPlayer2.kplayer
+P_MPRIS=org.mpris.MediaPlayer2.rmplayer
 O_MPRIS=/org/mpris/MediaPlayer2
 bus_ok=0
 if [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then

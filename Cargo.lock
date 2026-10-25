@@ -1957,30 +1957,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2db585e1d738fc771bf08a151420d3ed193d9d895a36df7f6f8a9456b911ddc"
 
 [[package]]
-name = "kplayer"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "cpal",
- "dirs",
- "eframe",
- "egui",
- "egui_extras",
- "encoding_rs",
- "ffmpeg-sys-next",
- "ksni",
- "libc",
- "png",
- "rfd",
- "serde",
- "serde_json",
- "tracing",
- "tracing-subscriber",
- "x11rb",
- "zbus",
-]
-
-[[package]]
 name = "ksni"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3142,6 +3118,30 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "rmplayer"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "cpal",
+ "dirs",
+ "eframe",
+ "egui",
+ "egui_extras",
+ "encoding_rs",
+ "ffmpeg-sys-next",
+ "ksni",
+ "libc",
+ "png",
+ "rfd",
+ "serde",
+ "serde_json",
+ "tracing",
+ "tracing-subscriber",
+ "x11rb",
+ "zbus",
 ]
 
 [[package]]

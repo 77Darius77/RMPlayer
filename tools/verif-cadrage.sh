@@ -13,10 +13,10 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-cadrage
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -111,8 +111,8 @@ echo "médias de test : $BASE/{letterbox.mp4, plein.mp4, subs_gris.mkv, chapitre
 config_essai() {  # config_essai <nom> '<json video>' ['<json subtitles>']
     local nom="$1" video="$2" subs="${3:-{\}}"
     local dossier="$BASE/$nom"
-    rm -rf "$dossier"; mkdir -p "$dossier/conf/kplayer" "$dossier/cache"
-    python3 - "$dossier/conf/kplayer/config.json" "$video" "$subs" <<'PY'
+    rm -rf "$dossier"; mkdir -p "$dossier/conf/rmplayer" "$dossier/cache"
+    python3 - "$dossier/conf/rmplayer/config.json" "$video" "$subs" <<'PY'
 import json, sys
 video = json.loads(sys.argv[2])
 subs = json.loads(sys.argv[3])
@@ -195,7 +195,7 @@ echo "=== 4. Style des sous-titres (analyse de pixels) ==="
 # entre deux réglages : la couleur, la position et la taille doivent changer l'image.
 capture_subs() {  # capture_subs <nom_config> <sortie.png>
     local nom="$1" sortie="$2"
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     XDG_CONFIG_HOME="$BASE/$nom/conf" XDG_CACHE_HOME="$BASE/$nom/cache" DISPLAY="$DISP" \
         "$KP" --fullscreen "$BASE/subs_gris.mkv" >"$BASE/$nom/run.log" 2>&1 &
     local kpid=$!
@@ -328,7 +328,7 @@ echo "=== 5. Rapport d'aspect imposé (forme de la zone vidéo) ==="
 if DISPLAY=$DISP xdotool getdisplaygeometry >/dev/null 2>&1; then
     mesurer_zone() {  # mesurer_zone <nom_config>
         local nom="$1"
-        pkill -x kplayer 2>/dev/null; sleep 0.6
+        pkill -x rmplayer 2>/dev/null; sleep 0.6
         XDG_CONFIG_HOME="$BASE/$nom/conf" XDG_CACHE_HOME="$BASE/$nom/cache" DISPLAY="$DISP" \
             "$KP" --fullscreen "$BASE/plein.mp4" >"$BASE/$nom/run.log" 2>&1 &
         local kpid=$!
@@ -375,5 +375,5 @@ fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

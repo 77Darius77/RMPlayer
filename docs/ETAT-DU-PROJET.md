@@ -1,4 +1,4 @@
-# KPlayer — état du projet et travail restant
+# RMPlayer — état du projet et travail restant
 
 
 > **Pour reprendre le travail, lire [`docs/ETAT-COURT.md`](ETAT-COURT.md)** — une page,
@@ -9,19 +9,15 @@
 Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux` — **aucun contrôle de version** (voir
 « Sauvegarde » en fin de document).
 
-**Documents voisins** : `docs/POTPLAYER-VERS-KPLAYER.md` (listing **complet** des réglages
-PotPlayer, classé par catégorie, avec l'état de chacun et le plan de rattrapage),
-`docs/OPTIMISATION-COMPARATIF.md` (coûts mesurés et plan d'optimisation face au moteur de
-PotPlayer), `docs/COMPARAISON-POTPLAYER.md` (chaque réglage, par catégorie, face
-à PotPlayer) et `docs/POTPLAYER-REGLAGES-VERIFIES.md` (l'arborescence de `F5` relevée dans
-l'installation v260819, libellés page par page), `docs/INVENTAIRE-FONCTIONNALITES.md` (ce qui
-marche, limite, a été retiré), `docs/AVANCEMENT.md` (journal des sessions, bugs et pièges).
+**Documents voisins** : `docs/OPTIMISATION.md` (coûts mesurés et plan d'optimisation),
+`docs/INVENTAIRE-FONCTIONNALITES.md` (ce qui marche, limite, a été retiré), `docs/AVANCEMENT.md`
+(journal des sessions, bugs et pièges).
 
 | | |
 |---|---|
 | Objet | Lecteur vidéo pour Linux, en Rust, sur FFmpeg 7.1 (`/opt/ffmpeg-7.1`) |
 | Code | 25 299 lignes, 19 modules (`src/`) |
-| Binaire | `target/release/kplayer` (52 Mo, rapport de crash exploitable) |
+| Binaire | `target/release/rmplayer` (52 Mo, rapport de crash exploitable) |
 | Lancement | `./run.sh film.mp4` (ou icône / ligne de commande avec `--no-hwdec`, `--fullscreen`) |
 | Compilation | `cargo build --release` — **0 avertissement** |
 | Audit de l'interface | `tools/audit-ui.sh` — **54/54** (contrôle statique des interblocages, vivacité après chaque touche, fermeture par `Q`) |
@@ -190,7 +186,7 @@ persistée et restaurée), **capture d'écran PNG** (`S`), plein écran (`F`/`En
 **aide des raccourcis** (`F1`), préférences (`F5`), à propos (`F2`), glisser-déposer,
 « Ouvrir » / « Ouvrir dossier ».
 
-**Robustesse** : rapport de crash maison (`~/.cache/kplayer/crash.log`), journaux FFmpeg
+**Robustesse** : rapport de crash maison (`~/.cache/rmplayer/crash.log`), journaux FFmpeg
 redirigés vers `tracing`, refus explicite des flux indécodables, diagnostic intégré
 (géométrie des fenêtres et touches reçues en `kinterface=debug`).
 
@@ -301,11 +297,11 @@ tools/verif-regles.sh
 tools/tout-verifier.sh
 
 # Profondeur du tampon sans effet sur la synchronisation image/son (option de mesure)
-./target/release/kplayer film.mp4 --audio-buffer 400
+./target/release/rmplayer film.mp4 --audio-buffer 400
 
 # Coût des filtres, et image de contrôle à la résolution native
-./target/release/kplayer --bench 300 film.mp4
-./target/release/kplayer --dump-frame 5000 /tmp/image.png film.mp4
+./target/release/rmplayer --bench 300 film.mp4
+./target/release/rmplayer --dump-frame 5000 /tmp/image.png film.mp4
 
 # Comparaison décodage matériel / logiciel (charge CPU)
 tools/bench-hwdec.sh /chemin/video.mp4 12
@@ -314,12 +310,12 @@ tools/bench-hwdec.sh /chemin/video.mp4 12
 tools/capture-lecteur.sh /chemin/video.mp4 /tmp/capture.png 8
 
 # Journal détaillé (journaux FFmpeg, touches reçues, géométrie des fenêtres)
-RUST_LOG=kplayer=info,kinterface=debug,ffmpeg=debug ./run.sh film.mkv
+RUST_LOG=rmplayer=info,kinterface=debug,ffmpeg=debug ./run.sh film.mkv
 ```
 
-Configuration : `~/.config/kplayer/config.json` (6 sections, **toutes appliquées**).
-Positions de reprise : `~/.cache/kplayer/positions.json`. Rapports de crash :
-`~/.cache/kplayer/crash.log` (dernier arrêt) et `crash.1.log` (le précédent).
+Configuration : `~/.config/rmplayer/config.json` (6 sections, **toutes appliquées**).
+Positions de reprise : `~/.cache/rmplayer/positions.json`. Rapports de crash :
+`~/.cache/rmplayer/crash.log` (dernier arrêt) et `crash.1.log` (le précédent).
 
 ---
 
@@ -349,7 +345,7 @@ Positions de reprise : `~/.cache/kplayer/positions.json`. Rapports de crash :
    message après l'action : `tools/vivacite.sh` (validé par `tools/test-vivacite.sh`).
 12. **Un `SIGABRT` n'est pas forcément un plantage** : KWin « force à quitter » une fenêtre
    gelée (SIGABRT puis SIGKILL). Lire `si_code`/`si_pid`/`sender` dans
-   `~/.cache/kplayer/crash.log` (rapport précédent : `crash.1.log`).
+   `~/.cache/rmplayer/crash.log` (rapport précédent : `crash.1.log`).
 
 ---
 
@@ -369,7 +365,7 @@ Positions de reprise : `~/.cache/kplayer/positions.json`. Rapports de crash :
 | 13 | **Chaîne de filtres `libavfilter`** : détramage, débruitage, désentrelacement, image ; **45/45** |
 | 14 | **Préférences dépliables** et bornées à l'écran ; paramètres avancés des filtres ; `audit-prefs.sh` |
 | 15 | **Égaliseur audio 18 bandes** (`superequalizer`), vérifié au spectre |
-| 16 | **Parité PotPlayer** : 9 traitements audio (dont correction de hauteur, normaliseur, mode nuit, réduction de bruit, karaoké, réverbération, décalage) + netteté et géométrie vidéo ; HDR **ajouté en session 35** (conversion tonale mesurée, détection EDID ; passthrough prêt mais impossible : fenêtre 8 bits — `docs/HDR.md`) ; bancs 29/29 audio et 12/12 vidéo |
+| 16 | **Traitements audio et vidéo étendus** : 9 traitements audio (dont correction de hauteur, normaliseur, mode nuit, réduction de bruit, karaoké, réverbération, décalage) + netteté et géométrie vidéo ; HDR **ajouté en session 35** (conversion tonale mesurée, détection EDID ; passthrough prêt mais impossible : fenêtre 8 bits — `docs/HDR.md`) ; bancs 29/29 audio et 12/12 vidéo |
 | 17 | **Pistes embarquées** : inventaire audio/sous-titres, langue préférée, bascule audio à chaud, sous-titres MKV/MP4 ; `verif-pistes.sh` **16/16** |
 | 19 | **Profils nommés** + **rendu ASS par événement** (`src/ass.rs`) ; 14 tests unitaires, `verif-ass.sh` **11/11**, `verif-profils.sh` **17/17** |
 | 20 | **Animations ASS** (`\move`, `\t`, karaoké `\k`/`\kf`, couleur secondaire `\2c`) ; option `--seek` ; 21 tests unitaires, `verif-ass.sh` **17/17** |
@@ -401,7 +397,7 @@ Ce dossier **n'est pas** sous contrôle de version : une archive horodatée est 
 | `sauvegardes/kplayer-2026-10-17-session13.tar.gz` | état **fin de session 13** (filtres) | ✅ archive valide (gzip), 36 fichiers, restauration vérifiée |
 | `sauvegardes/kplayer-2026-10-17-session14.tar.gz` | état **fin de session 14** (préférences en sections) | ✅ archive valide (gzip), 38 fichiers, restauration vérifiée |
 | `sauvegardes/kplayer-2026-10-17-session15.tar.gz` | état **fin de session 15** (égaliseur audio) | ✅ archive valide (gzip), 39 fichiers, restauration vérifiée |
-| `sauvegardes/kplayer-2026-10-17-session16.tar.gz` | état **fin de session 16** (parité PotPlayer) | ✅ archive valide (gzip), 40 fichiers, restauration vérifiée |
+| `sauvegardes/kplayer-2026-10-17-session16.tar.gz` | état **fin de session 16** (traitements audio et vidéo étendus) | ✅ archive valide (gzip), 40 fichiers, restauration vérifiée |
 | `sauvegardes/kplayer-2026-10-17-session20.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 20** (animations ASS) | ✅ archive valide (gzip), 46 fichiers, **12 633 lignes de code**, restauration vérifiée |
 | `sauvegardes/kplayer-2026-10-17-session19.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 19** (profils + ASS) | ✅ archive valide (gzip), 46 fichiers, **11 979 lignes de code**, restauration vérifiée |
 | `sauvegardes/kplayer-2026-10-17-session18.tar.gz` | `src/`, `docs/`, `tools/`, `Cargo.toml`, `Cargo.lock`, `.cargo/`, `run.sh`, `README.md`, `.gitignore` — **état fin de session 18** (personnalisation avancée) | ✅ archive valide (gzip), 42 fichiers, **10 277 lignes de code**, restauration vérifiée |
@@ -413,14 +409,14 @@ Ce dossier **n'est pas** sous contrôle de version : une archive horodatée est 
 # sauvegarder à nouveau (à faire après chaque étape importante)
 cd /media/blaise/LINUX_DATA/lecteur-linux
 mkdir -p sauvegardes
-tar czf "sauvegardes/kplayer-$(date +%F).tar.gz" \
+tar czf "sauvegardes/rmplayer-$(date +%F).tar.gz" \
     src docs tools Cargo.toml Cargo.lock .cargo run.sh README.md .gitignore
 
 # restaurer
-tar xzf sauvegardes/kplayer-AAAA-MM-JJ.tar.gz -C /chemin/de/restauration
+tar xzf sauvegardes/rmplayer-AAAA-MM-JJ.tar.gz -C /chemin/de/restauration
 
 # vérifier une archive
-gzip -t sauvegardes/kplayer-AAAA-MM-JJ.tar.gz && echo valide
+gzip -t sauvegardes/rmplayer-AAAA-MM-JJ.tar.gz && echo valide
 ```
 
 > **Recommandation** : initialiser un dépôt Git dans ce dossier donnerait un historique

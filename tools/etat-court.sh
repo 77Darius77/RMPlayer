@@ -31,7 +31,7 @@ echecs_tests=$(grep -oE "[0-9]+ failed" <<<"$bilan_tests" | grep -oE "[0-9]+" | 
 [ "${echecs_tests:-0}" -gt 0 ] && tests="ÉCHEC : ${echecs_tests} test(s) en échec (${tests} réussis)"
 avertissements=$(cargo build --release 2>&1 | grep -cE "^warning")
 suite=$(cat docs/DERNIERE-SUITE.txt 2>/dev/null || echo "jamais exécutée")
-archive=$(ls -1 sauvegardes/kplayer-*.tar.gz 2>/dev/null | sort | tail -1)
+archive=$(ls -1 sauvegardes/kplayer-*.tar.gz sauvegardes/rmplayer-*.tar.gz 2>/dev/null | sort -t- -k2 | tail -1)
 # Taille en kilooctets arrondis : la valeur exacte dépend de la fiche qui la cite
 # (le fichier fait partie de l'archive), on ne peut donc pas la figer au bit près —
 # constaté en session 32 : 482043 → 482047 → 482046 → 482048 selon l'itération.

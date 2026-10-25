@@ -32,7 +32,7 @@ fn journaliser(id: &str, rect: egui::Rect, detachee: bool) {
 }
 
 /// Dessine `contenu` dans une fenêtre rattachée (`fenetre`) ou, si `detachee`, dans une fenêtre
-/// système de titre « KPlayer — <nom> ».
+/// système de titre « RMPlayer — <nom> ».
 ///
 /// - `ouvert` : passe à `false` à la fermeture (✕, bouton du gestionnaire de fenêtres, Échap dans
 ///   la fenêtre détachée) ;
@@ -53,9 +53,9 @@ pub fn afficher<'a>(
 ) -> Retour {
     let mut bascule = false;
     if detachee {
-        let viewport = egui::ViewportId::from_hash_of(("kplayer-fenetre", id));
+        let viewport = egui::ViewportId::from_hash_of(("rmplayer-fenetre", id));
         let constructeur = egui::ViewportBuilder::default()
-            .with_title(format!("KPlayer — {nom}"))
+            .with_title(format!("RMPlayer — {nom}"))
             .with_inner_size(taille_detachee)
             .with_min_inner_size([300.0, 160.0]);
         ctx.show_viewport_immediate(viewport, constructeur, |ctx, _classe| {

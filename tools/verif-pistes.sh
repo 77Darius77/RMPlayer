@@ -16,12 +16,12 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-pistes
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
 # `kinterface=debug` : les menus journalisent la géométrie de leurs entrées, que
 # l'audit utilise pour cliquer sans deviner les pixels.
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -85,8 +85,8 @@ echo "média de test : $BASE/complet.mkv"
 config_essai() {  # config_essai <nom> <langue_audio> <langue_subs> <embarques>
     local nom="$1" la="$2" ls_="$3" emb="$4"
     local dossier="$BASE/$nom"
-    rm -rf "$dossier"; mkdir -p "$dossier/conf/kplayer" "$dossier/cache"
-    python3 - "$dossier/conf/kplayer/config.json" "$la" "$ls_" "$emb" <<'PY'
+    rm -rf "$dossier"; mkdir -p "$dossier/conf/rmplayer" "$dossier/cache"
+    python3 - "$dossier/conf/rmplayer/config.json" "$la" "$ls_" "$emb" <<'PY'
 import json, sys
 la, ls_, emb = sys.argv[2], sys.argv[3], sys.argv[4] == "true"
 json.dump({
@@ -207,7 +207,7 @@ echo "=== 5. Affichage réel du sous-titre embarqué ==="
 # le BAS de l'écran entre « embarqués activés » et « désactivés ».
 capture_bas() {  # capture_bas <nom_config> <sortie.png>
     local nom="$1" sortie="$2"
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     XDG_CONFIG_HOME="$BASE/$nom/conf" XDG_CACHE_HOME="$BASE/$nom/cache" DISPLAY="$DISP" \
         "$KP" --fullscreen "$BASE/complet.mkv" >"$BASE/$nom/run.log" 2>&1 &
     local kpid=$!
@@ -249,14 +249,14 @@ echo "=== 6. Changement de piste à chaud depuis l'interface ==="
 # journal de sélection. Sans cela, une erreur d'index ou un menu inerte passerait
 # inaperçu alors que le moteur fonctionne.
 if DISPLAY=$DISP xdotool getdisplaygeometry >/dev/null 2>&1; then
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     config_essai chaud "" "" false
     XDG_CONFIG_HOME="$BASE/chaud/conf" XDG_CACHE_HOME="$BASE/chaud/cache" DISPLAY="$DISP" \
         "$KP" --speed 0.5 "$BASE/complet.mkv" >"$BASE/chaud/run.log" 2>&1 &
     kpid=$!
     sleep 5
-    wid=$(DISPLAY=$DISP xdotool search --pid "$kpid" --name KPlayer 2>/dev/null | head -1)
-    [ -z "$wid" ] && wid=$(DISPLAY=$DISP xdotool search --name KPlayer 2>/dev/null | head -1)
+    wid=$(DISPLAY=$DISP xdotool search --pid "$kpid" --name RMPlayer 2>/dev/null | head -1)
+    [ -z "$wid" ] && wid=$(DISPLAY=$DISP xdotool search --name RMPlayer 2>/dev/null | head -1)
     DISPLAY=$DISP xdotool windowactivate --sync "$wid" 2>/dev/null \
         || DISPLAY=$DISP xdotool windowfocus --sync "$wid" 2>/dev/null || true
     # Coordonnées RELATIVES à la fenêtre : elle n'est pas forcément en (0,0) — un
@@ -301,5 +301,5 @@ fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

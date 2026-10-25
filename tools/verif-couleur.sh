@@ -22,10 +22,10 @@
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 BASE=/tmp/kp-couleur
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info
+export RUST_LOG=rmplayer=info
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -53,8 +53,8 @@ clip blanc-tv 0xFFFFFF 640x360 bt709 tv oui
 clip gris-pc  0xC8C8C8 640x360 bt709 pc oui
 
 config() {  # config <nom> '<json video>' : isole la configuration
-    local d="$BASE/$1"; rm -rf "$d"; mkdir -p "$d/conf/kplayer" "$d/cache"
-    python3 - "$d/conf/kplayer/config.json" "$2" <<'PY'
+    local d="$BASE/$1"; rm -rf "$d"; mkdir -p "$d/conf/rmplayer" "$d/cache"
+    python3 - "$d/conf/rmplayer/config.json" "$2" <<'PY'
 import json, sys
 video = {"hardware_decoding": False, "scaling_method": "Lanczos"}
 video.update(json.loads(sys.argv[2]))

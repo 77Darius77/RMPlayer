@@ -20,11 +20,11 @@ set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
 DISP="${1:-:99}"
 BASE=/tmp/kp-regles
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 export PATH=$HOME/.cargo/bin:$PATH
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 export XDG_RUNTIME_DIR=/run/user/1000
-export RUST_LOG=kplayer=info,kinterface=debug
+export RUST_LOG=rmplayer=info,kinterface=debug
 
 PASS=0; FAIL=0
 ok() { echo "  ✔ $1"; PASS=$((PASS+1)); }
@@ -34,7 +34,7 @@ journal() { sed 's/\x1b\[[0-9;]*m//g' "$1"; }
 luma() { mesure luma "$1"; }
 couleur() { mesure couleur "$1"; }
 
-rm -rf "$BASE"; mkdir -p "$BASE/conf/kplayer" "$BASE/cache" \
+rm -rf "$BASE"; mkdir -p "$BASE/conf/rmplayer" "$BASE/cache" \
     "$BASE/Films/anime" "$BASE/Films/divers"
 export XDG_CONFIG_HOME="$BASE/conf" XDG_CACHE_HOME="$BASE/cache"
 
@@ -54,7 +54,7 @@ env -u LD_LIBRARY_PATH ffmpeg -hide_banner -loglevel error \
     -c:v libx264 -preset ultrafast -y "$BASE/Films/divers/petit.mp4"
 
 ecrire_profils() {
-python3 - "$BASE/conf/kplayer/profiles.json" <<'PY'
+python3 - "$BASE/conf/rmplayer/profiles.json" <<'PY'
 import json, sys
 base = {"video": {"hardware_decoding": False, "scaling_method": "Lanczos"},
         "audio": {"device": "", "volume_max": 150}}
@@ -75,7 +75,7 @@ PY
 
 # Configuration neutre, avec ou sans règles (passées en JSON).
 ecrire_config() {
-python3 - "$BASE/conf/kplayer/config.json" "$1" <<'PY'
+python3 - "$BASE/conf/rmplayer/config.json" "$1" <<'PY'
 import json, sys
 base = {"video": {"hardware_decoding": False, "scaling_method": "Lanczos"},
         "audio": {"device": "", "volume_max": 150},
@@ -269,7 +269,7 @@ else
     ko "nettoyage des règles inutilisables incorrect"
 fi
 # Configuration sans le champ « regles » (écrite avant cette fonctionnalité).
-python3 - "$BASE/conf/kplayer/config.json" <<'PY'
+python3 - "$BASE/conf/rmplayer/config.json" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))
 c.pop("regles", None)
@@ -288,7 +288,7 @@ echo "=== 10. Interface : ajouter, supprimer, et appliquer à l'ouverture ==="
 if DISPLAY=$DISP xdotool getdisplaygeometry >/dev/null 2>&1; then
     ecrire_profils
     ecrire_config '[{"champ": "chemin", "motif": "anime", "profil": "Eclairci"}]'
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     DISPLAY=$DISP "$KP" "$BASE/Films/anime/ep1.mkv" >"$BASE/ui.log" 2>&1 &
     kpid=$!
     sleep 6
@@ -298,8 +298,8 @@ if DISPLAY=$DISP xdotool getdisplaygeometry >/dev/null 2>&1; then
     else
         ko "règle non appliquée à l'ouverture dans l'interface"
     fi
-    wid=$(DISPLAY=$DISP xdotool search --pid "$kpid" --name KPlayer 2>/dev/null | head -1)
-    [ -z "$wid" ] && wid=$(DISPLAY=$DISP xdotool search --name KPlayer 2>/dev/null | head -1)
+    wid=$(DISPLAY=$DISP xdotool search --pid "$kpid" --name RMPlayer 2>/dev/null | head -1)
+    [ -z "$wid" ] && wid=$(DISPLAY=$DISP xdotool search --name RMPlayer 2>/dev/null | head -1)
     DISPLAY=$DISP xdotool windowfocus --sync "$wid" 2>/dev/null || true
     # Le focus clavier s'obtient en cliquant DANS la fenêtre (X11).
     DISPLAY=$DISP xdotool mousemove 640 400; sleep 0.3
@@ -337,7 +337,7 @@ if DISPLAY=$DISP xdotool getdisplaygeometry >/dev/null 2>&1; then
         ko "le bouton « Ajouter la règle » n'a rien créé"
     fi
     nb=$(python3 -c "
-import json; print(len(json.load(open('$BASE/conf/kplayer/config.json')).get('regles', [])))")
+import json; print(len(json.load(open('$BASE/conf/rmplayer/config.json')).get('regles', [])))")
     if [ "$nb" = "2" ]; then
         ok "la règle ajoutée est écrite dans la configuration (persistante)"
     else
@@ -352,7 +352,7 @@ import json; print(len(json.load(open('$BASE/conf/kplayer/config.json')).get('re
         ko "la corbeille ne supprime rien"
     fi
     nb=$(python3 -c "
-import json; print(len(json.load(open('$BASE/conf/kplayer/config.json')).get('regles', [])))")
+import json; print(len(json.load(open('$BASE/conf/rmplayer/config.json')).get('regles', [])))")
     if [ "$nb" = "1" ]; then
         ok "la suppression est écrite dans la configuration"
     else
@@ -362,19 +362,19 @@ import json; print(len(json.load(open('$BASE/conf/kplayer/config.json')).get('re
     # (e) le bouton « Appliquer » d'un profil atteint AUSSI la chaîne audio
     #     (défaut corrigé en session 27 : seul refresh_audio_chain était appelé).
     ecrire_config '[]'
-    python3 - "$BASE/conf/kplayer/config.json" <<'PY'
+    python3 - "$BASE/conf/rmplayer/config.json" <<'PY'
 import json, sys
 c = json.load(open(sys.argv[1]))
 c["audio"] = {"device": "", "volume_max": 150}     # égaliseur coupé au départ
 c["video"] = {"hardware_decoding": False, "scaling_method": "Lanczos"}
 json.dump(c, open(sys.argv[1], "w"), indent=2)
 PY
-    pkill -x kplayer 2>/dev/null; sleep 0.6
+    pkill -x rmplayer 2>/dev/null; sleep 0.6
     DISPLAY=$DISP "$KP" "$BASE/Films/anime/ep1.mkv" >"$BASE/ui2.log" 2>&1 &
     kpid=$!
     sleep 6
-    wid=$(DISPLAY=$DISP xdotool search --pid "$kpid" --name KPlayer 2>/dev/null | head -1)
-    [ -z "$wid" ] && wid=$(DISPLAY=$DISP xdotool search --name KPlayer 2>/dev/null | head -1)
+    wid=$(DISPLAY=$DISP xdotool search --pid "$kpid" --name RMPlayer 2>/dev/null | head -1)
+    [ -z "$wid" ] && wid=$(DISPLAY=$DISP xdotool search --name RMPlayer 2>/dev/null | head -1)
     DISPLAY=$DISP xdotool windowfocus --sync "$wid" 2>/dev/null || true
     DISPLAY=$DISP xdotool mousemove 640 400; sleep 0.3
     DISPLAY=$DISP xdotool click 1; sleep 0.5
@@ -399,5 +399,5 @@ fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="
-pkill -x kplayer 2>/dev/null || true
+pkill -x rmplayer 2>/dev/null || true
 [ "$FAIL" -eq 0 ]

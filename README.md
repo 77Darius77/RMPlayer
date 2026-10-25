@@ -1,4 +1,4 @@
-# KPlayer
+# RMPlayer
 
 Lecteur vidéo pour Linux, écrit en **Rust**, s'appuyant directement sur **FFmpeg 7.x**
 (libav + libswscale + libswresample) et **egui/eframe** pour l'interface, **cpal** pour
@@ -48,7 +48,7 @@ cargo build --release
 Directement :
 
 ```bash
-LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib ./target/release/kplayer film.mp4
+LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib ./target/release/rmplayer film.mp4
 ```
 
 ### Journaux détaillés
@@ -57,7 +57,7 @@ Les messages d'FFmpeg sont redirigés vers le journal de l'application et n'appa
 qu'en mode verbeux :
 
 ```bash
-RUST_LOG=kplayer=debug,ffmpeg=debug ./run.sh film.mkv
+RUST_LOG=rmplayer=debug,ffmpeg=debug ./run.sh film.mkv
 ```
 
 ### Si le son ne fonctionne pas
@@ -66,7 +66,7 @@ Depuis un shell hors session graphique, exportez le dossier d'exécution utilisa
 
 ```bash
 XDG_RUNTIME_DIR=/run/user/1000 LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib \
-  ./target/release/kplayer film.mp4
+  ./target/release/rmplayer film.mp4
 ```
 
 Sans cela, PipeWire est injoignable et ALSA renvoie `Host is down (112)`. Le lecteur
@@ -140,7 +140,7 @@ restituées (`tools/verif-fenetre.sh`, 9 contrôles ; `tools/verif-fenetre-wayla
 
 ### HDR : films HDR10 et HLG sur un écran ordinaire
 
-Un film HDR lu tel quel apparaît **lavé** (noirs gris, hautes lumières écrasées). KPlayer
+Un film HDR lu tel quel apparaît **lavé** (noirs gris, hautes lumières écrasées). RMPlayer
 détecte le transfert (PQ = HDR10, HLG = diffusion), les primaires BT.2020 et la profondeur, puis
 applique une **conversion tonale** vers SDR :
 
@@ -151,7 +151,7 @@ applique une **conversion tonale** vers SDR :
   (1080p60, 1440p, 4K), une conversion saccadée serait pire qu'une image non convertie, donc
   l'image est jouée **telle quelle** (délavée sur un écran SDR). Dans les deux cas le refus est
   journalisé et un **avis s'affiche à l'écran** (`verif-hdr`, section 12). Le moteur CPU se force
-  aussi à la main (`KPLAYER_HDR_MOTEUR=cpu`), sans condition de budget.
+  aussi à la main (`RMPLAYER_HDR_MOTEUR=cpu`), sans condition de budget.
 
 Réglages dans *Préférences ▸ Image — filtres ▸ HDR et 10 bits* : mode (auto / toujours / jamais),
 opérateur, gamut, détail des hautes lumières, tramage 10→8 bits, débanding GPU.
@@ -165,7 +165,7 @@ mode « jamais » qu'il faudra brancher.
 
 ### Touches média et widget du bureau (MPRIS)
 
-KPlayer expose `org.mpris.MediaPlayer2.kplayer` sur le bus de session : les touches média du
+RMPlayer expose `org.mpris.MediaPlayer2.rmplayer` sur le bus de session : les touches média du
 clavier (lecture/pause, suivant, précédent) et le widget « lecture en cours » de Plasma/GNOME
 agissent sur le lecteur et affichent ce qui joue (titre, durée, position).
 
@@ -174,7 +174,7 @@ règles de profil, sous-titres et OSD s'appliquent, et la fenêtre est **réveil
 — sans quoi une touche média semblait morte dès que la lecture était arrêtée.
 
 ```bash
-gdbus call --session --dest org.mpris.MediaPlayer2.kplayer \
+gdbus call --session --dest org.mpris.MediaPlayer2.rmplayer \
   --object-path /org/mpris/MediaPlayer2 \
   --method org.mpris.MediaPlayer2.Player.PlayPause
 ```
@@ -190,15 +190,15 @@ tools/installer-association.sh --par-defaut    # et lecteur par défaut des form
 tools/installer-association.sh --etat | --retirer
 ```
 
-Le lanceur (`~/.local/share/applications/kplayer.desktop`) déclare 16 types MIME — tous
+Le lanceur (`~/.local/share/applications/rmplayer.desktop`) déclare 16 types MIME — tous
 présents dans shared-mime-info — et deux actions (plein écran, décodage logiciel). Sans
-`--par-defaut`, KPlayer apparaît dans « Ouvrir avec » **sans prendre la place** de VLC ou mpv.
+`--par-defaut`, RMPlayer apparaît dans « Ouvrir avec » **sans prendre la place** de VLC ou mpv.
 
 **Une seule fenêtre.** Si le lecteur tourne déjà, un fichier ouvert depuis Dolphin lui est
 transmis (socket Unix dans `$XDG_RUNTIME_DIR`, nom dérivé du dossier de configuration) : la
 fenêtre existante charge le média et démarre la lecture, le second processus sort aussitôt
 avec le code 0. `--nouvelle-instance` force une seconde fenêtre,
-`KPLAYER_INSTANCE_UNIQUE=0` désactive la mécanique (utile aux bancs).
+`RMPLAYER_INSTANCE_UNIQUE=0` désactive la mécanique (utile aux bancs).
 
 ### Décodage matériel (VA-API)
 
@@ -276,7 +276,7 @@ tête. Tous les réglages affichés sont **réellement appliqués** :
   réaffiche l'image d'origine pour ajuster.
 - **Miroir horizontal** (`Ctrl+H`) et vertical (`Ctrl+Maj+H`), cumulables.
 - **Flux réseau** : *Fichier ▸ Ouvrir une adresse* (http, HLS, RTSP, RTMP, SMB, FTP), ou
-  directement `kplayer https://exemple.test/flux.m3u8`. Une **coupure n'arrête plus la
+  directement `rmplayer https://exemple.test/flux.m3u8`. Une **coupure n'arrête plus la
   lecture** : le flux est rouvert automatiquement (8 essais, 0,3 s → 8 s), la lecture
   reprend là où l'on en était, un bandeau l'indique et reste affiché pendant l'attente.
 - **Pré-cache d'un flux** : le flux est lu **en avance** (réserve réglable, 6 s par défaut,
@@ -294,7 +294,7 @@ et les sous-titres (style, langue). Utile pour ne pas refaire dix réglages à c
 sombre, anime ou vieux DVD.
 
 *Préférences ▸ Profils de réglages* : enregistrer, appliquer, exporter et importer (JSON).
-Ligne de commande : `kplayer --profil "Film sombre" film.mkv`, `kplayer --list-profiles`.
+Ligne de commande : `rmplayer --profil "Film sombre" film.mkv`, `rmplayer --list-profiles`.
 Le périphérique de sortie audio n'est jamais écrasé par un profil (il est propre à la
 machine).
 
@@ -310,7 +310,7 @@ Elles sont essayées **dans l'ordre affiché** (la première qui correspond gagn
 dont le profil a été supprimé est ignorée et la suivante prend le relais. `--profil <nom>`
 reste prioritaire sur toute règle. Réglage et liste :
 *Préférences ▸ Profils de réglages ▸ Profil appliqué automatiquement* ; lecture seule et
-diagnostic : `kplayer --list-regles`.
+diagnostic : `rmplayer --list-regles`.
 
 ### Sous-titres ASS
 
@@ -328,7 +328,7 @@ chemin quelconque (triangle, courbe) est réduit à ses bornes — c'est une lim
 Ne sont pas gérés (et sont ignorés proprement, le texte restant lisible) : les
 **dessins vectoriels** `\p` et les rotations 3D `\frx`/`\fry`.
 
-`kplayer --ass-dump fichier.ass` affiche l'analyse (styles, positions, couleurs) sans
+`rmplayer --ass-dump fichier.ass` affiche l'analyse (styles, positions, couleurs) sans
 écran : utile pour comprendre pourquoi un sous-titre s'affiche ailleurs que prévu.
 
 ### Style des sous-titres
@@ -380,14 +380,14 @@ automatiquement (ainsi que ceux des sous-dossiers `subs/`, `subtitles/`,
 En cas de plantage, un rapport est écrit dans :
 
 ```
-~/.cache/kplayer/crash.log
+~/.cache/rmplayer/crash.log
 ```
 
 Il contient l'adresse de base du binaire, le signal, l'adresse fautive, les registres et
 un vidage de pile. Pour retrouver la fonction et la ligne :
 
 ```bash
-addr2line -f -C -e target/release/kplayer <rip_rel>
+addr2line -f -C -e target/release/rmplayer <rip_rel>
 ```
 
 Le dispositif est autonome et **préserve le core dump** du système.
@@ -395,7 +395,7 @@ Le dispositif est autonome et **préserve le core dump** du système.
 ### Tester le rapport de crash
 
 ```bash
-./target/release/kplayer --crash-test
+./target/release/rmplayer --crash-test
 ```
 
 ---
@@ -413,16 +413,8 @@ Le dispositif est autonome et **préserve le core dump** du système.
   les causes racines), pièges à connaître.
 - **[docs/INVENTAIRE-FONCTIONNALITES.md](docs/INVENTAIRE-FONCTIONNALITES.md)** — ce qui
   fonctionne réellement vs ce qui est annoncé sans l'être.
-- **[docs/COMPARAISON-POTPLAYER.md](docs/COMPARAISON-POTPLAYER.md)** — chaque réglage, par
-  catégorie, face à PotPlayer : ce qui est repris, partiel, absent, sans objet sous Linux.
-- **[docs/POTPLAYER-VERS-KPLAYER.md](docs/POTPLAYER-VERS-KPLAYER.md)** — **tous** les
-  réglages de PotPlayer, classés par catégorie, avec l'état de chacun dans KPlayer et le
-  plan de rattrapage (effort / effet).
-- **[docs/OPTIMISATION-COMPARATIF.md](docs/OPTIMISATION-COMPARATIF.md)** — où part le temps
-  (mesuré), ce que le moteur de PotPlayer a de plus, et le plan d'optimisation chiffré.
-- **[docs/POTPLAYER-REGLAGES-VERIFIES.md](docs/POTPLAYER-REGLAGES-VERIFIES.md)** —
-  l'arborescence des préférences de PotPlayer **relevée dans l'installation** (v260819), avec
-  les libellés page par page et les digests des fichiers : c'est la référence de la comparaison.
+- **[docs/OPTIMISATION.md](docs/OPTIMISATION.md)** — où part le temps
+  (mesuré) et le plan d'optimisation chiffré.
 - **[docs/ETAT-TECHNIQUE.md](docs/ETAT-TECHNIQUE.md)** — environnement, API du moteur,
   procédure de diagnostic.
 
@@ -492,7 +484,7 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `fabrique-pgs.py <sortie.sup> [--largeur … --x … --couleur …]` | Écrit un flux PGS minimal valide (aucun encodeur PGS n'existe dans FFmpeg) |
 | `bench-optimisation.sh [écran]` | **Chiffre les optimisations** : échelle GPU contre CPU (−42 %), désentrelacement GPU contre `bwdif` (−38 %), géométrie inchangée, AV1 logiciel (dav1d) — 4 contrôles |
 | `verif-soustitres.sh [écran]` | **Style des sous-titres** : trois familles de police mesurées (largeurs 268/307/332 px), position horizontale 20/50/80 %, police inconnue, non-régression — 5 contrôles |
-| `installer-association.sh [--par-defaut] [--etat] [--retirer]` | **« Ouvrir avec » KPlayer** : lanceur `.desktop`, icône, cache des types MIME ; `--par-defaut` l'impose pour les formats qu'il gère |
+| `installer-association.sh [--par-defaut] [--etat] [--retirer]` | **« Ouvrir avec » RMPlayer** : lanceur `.desktop`, icône, cache des types MIME ; `--par-defaut` l'impose pour les formats qu'il gère |
 | — | **revue externe** : `docs/BRIEF-REVUE-EXTERNE.md` — ce qu'on demande à un relecteur extérieur, budget de lecture, six vérifications qui valent mieux que la lecture, deux pièges à faux positifs |
 | `verif-hdr.sh` | **HDR** (sans écran) : détection PQ/HLG/BT.2020, signature de conversion en nits, deux opérateurs, moteur CPU forcé, tramage, débanding GPU, décodage VA-API identique au logiciel, **détection des écrans par EDID** et branchement de la décision, **Vulkan coupé** (repli CPU borné, avis, pas de reconstruction à chaque image) — 36 contrôles |
 | `verif-focus.sh [écran]` | **Pause selon le focus** : jamais / perte de focus / fenêtre réduite, reprise au retour, respect d'une pause volontaire — 11 contrôles, avec une seconde fenêtre réelle ; la pause est mesurée aussi sur l'image (deux captures identiques), avec un témoin en lecture. Non couvert : une vraie réduction (mode 2), qui exige un gestionnaire de fenêtres |
@@ -510,6 +502,7 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-tray.sh [écran]` | **Icône de notification** (StatusNotifierItem) pilotée par D-Bus — 7 contrôles |
 | `verif-theme.sh [écran]` | **Thèmes externes** : pixel de la barre de menus, thème illisible refusé — 6 contrôles |
 | `verif-saut-pause.sh [écran]` | **Saut en pause** : l'image (teinte qui dit l'instant) et la réplique intégrée suivent un saut, le pas à pas change l'image — 5 contrôles |
+| `verif-migration.sh` | **Renommage KPlayer → RMPlayer** : un vrai lancement reprend les réglages, les positions de reprise et les thèmes de l'ancien dossier (copié, jamais déplacé), sans écraser le nouveau — 7 contrôles |
 | `verif-fenetres-detachables.sh [écran]` | **Fenêtres détachables** : Préférences, Statistiques, Aide, À propos deviennent de vraies fenêtres système (fenêtre distincte, déplacée hors du lecteur, contenu visible, rattachement, Échap, mémoire du choix, ancienne configuration) — 24 contrôles |
 | `verif-peripheriques.sh [écran]` | **Sortie audio** : deux sorties PipeWire factices ; le 440 Hz arrive sur la sortie choisie (enregistrement de son moniteur), changement en cours de lecture (raccourci et clic de menu), retour au défaut, ancien réglage ALSA, sortie disparue — 17 contrôles |
 | `verif-audio-pistes.sh [écran]` | **Pistes audio** : langues par priorité, commentaires écartés, piste par défaut, source mono, mémoire par film — mesuré au son — 11 contrôles |
@@ -519,7 +512,7 @@ Ces points sont listés dans le « reste à faire » de `docs/AVANCEMENT.md`.
 | `verif-rapide.sh <sujet…>` | **Vérification ciblée** : ne rejoue que les bancs concernés par une modification (`playlist`, `ui`, `fenetre`, `association`, `filtres`, `audio`, `reseau`) — la suite complète prend ~35 min, ceci ~3 |
 | `verif-association.sh [écran]` | **Association et instance unique** : la ligne `Exec` est réellement exécutée (le média se charge), types MIME vérifiés contre le système, seconde ouverture absorbée par la première instance, socket orphelin repris puis balayé, désinstallation — 38 contrôles, `~/.local` de l'utilisateur intact |
 | `verif-fenetre-wayland.sh` | **Mémoire de la fenêtre sous Wayland** : taille enregistrée, aucune position inventée, règle KWin appliquée puis retirée, redimensionnement suivi — mesure par script KWin chargé en D-Bus, fenêtre ciblée par PID, `kwinrulesrc` restauré — 12 contrôles (ignoré si aucune session Wayland) |
-| `regle-fenetre-kwin.sh [--position x,y] [--depuis-fenetre] [--etat] [--retirer]` | **Règle de fenêtre KWin** : la position de KPlayer sous Wayland (le client ne peut pas se placer lui-même) |
+| `regle-fenetre-kwin.sh [--position x,y] [--depuis-fenetre] [--etat] [--retirer]` | **Règle de fenêtre KWin** : la position de RMPlayer sous Wayland (le client ne peut pas se placer lui-même) |
 | `verif-fenetre.sh [écran]` | **Mémoire de la fenêtre** : déplacement et redimensionnement par `xdotool`, configuration relue, puis relance et mesure de la géométrie réelle — taille, position et état agrandi restitués, écriture temporisée (aucune réécriture sans changement), géométrie hors écran recentrée, plein écran sans effet sur la géométrie — 9 contrôles |
 | `verif-precache.sh [écran]` | **Pré-cache des flux** : un serveur HLS local journalise chaque requête — avance des segments, coupure de 3 s absorbée (blocage 0,46 s contre 4,34 s), reprise en continuité — 9 contrôles |
 | `verif-reseau.sh [écran]` | **Reconnexion d'un flux interrompu** : sert un HLS local et simule les pannes (503, serveur tué, connexion fermée, serveur muet), vérifie la reprise à la position, la synchronisation, l'abandon après 8 essais et qu'une vraie fin n'est pas prise pour une coupure — 21 contrôles |
@@ -561,7 +554,7 @@ dans `sauvegardes/` (sources, documentation et outils ; sans les artefacts de co
 
 ```bash
 ls -la sauvegardes/
-tar xzf sauvegardes/kplayer-AAAA-MM-JJ.tar.gz -C /chemin/de/restauration
+tar xzf sauvegardes/rmplayer-AAAA-MM-JJ.tar.gz -C /chemin/de/restauration
 ```
 
 ## Licence

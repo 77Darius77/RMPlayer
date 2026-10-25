@@ -1,4 +1,4 @@
-# Ajouter une fonction à KPlayer — la recette
+# Ajouter une fonction à RMPlayer — la recette
 
 *Établie le 2026-10-24 (session 36) à partir de ce qui a coûté des sessions : les pièges 1 à 6
 et 114 à 116 de `docs/AVANCEMENT.md` §4. Le choix de la fonction est dans
@@ -113,7 +113,7 @@ mais elle reste utile comme copie hors dépôt.
 
 ## Ce que cette recette ne garantit pas
 
-- Que la fonction **plaise** : les bancs mesurent un effet, pas un goût. La qualité perçue et
-  la comparaison avec PotPlayer demandent un œil.
+- Que la fonction **plaise** : les bancs mesurent un effet, pas un goût. La qualité perçue
+  demande un œil.
 - Que le comportement soit le même sur un autre GPU, un autre écran ou une autre session
   (Wayland / X11) que ceux de cette machine.

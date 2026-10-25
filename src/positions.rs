@@ -1,6 +1,6 @@
 //! Mémorisation des positions de lecture — « reprendre là où on s'est arrêté ».
 //!
-//! Fichier JSON simple (`~/.cache/kplayer/positions.json`) : chemin du média →
+//! Fichier JSON simple (`~/.cache/rmplayer/positions.json`) : chemin du média →
 //! position en millisecondes. Écrit à la fermeture d'un média ou à la sortie,
 //! relu au chargement suivant. Écrasé une fois pour toutes en fin de lecture
 //! (position trop proche de la fin), pour ne pas reprendre sur le générique.
@@ -21,7 +21,7 @@ pub struct Positions {
 impl Positions {
     /// Charge le fichier de positions (silencieusement vide s'il n'existe pas).
     pub fn load() -> Self {
-        let path = dirs::cache_dir().map(|d| d.join("kplayer").join("positions.json"));
+        let path = dirs::cache_dir().map(|d| d.join("rmplayer").join("positions.json"));
         let entries = path
             .as_ref()
             .and_then(|p| std::fs::read_to_string(p).ok())

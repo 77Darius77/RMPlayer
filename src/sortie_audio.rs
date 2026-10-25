@@ -240,7 +240,7 @@ mod tests {
       {"id":70,"type":"PipeWire:Interface:Client","info":{"props":{"application.process.id":4242}}},
       {"id":71,"type":"PipeWire:Interface:Client","info":{"props":{"application.process.id":"999"}}},
       {"id":106,"type":"PipeWire:Interface:Node","info":{"props":{"media.class":"Stream/Output/Audio",
-        "client.id":70,"node.name":"alsa_playback.kplayer"}}},
+        "client.id":70,"node.name":"alsa_playback.rmplayer"}}},
       {"id":86,"type":"PipeWire:Interface:Node","info":{"props":{"media.class":"Stream/Output/Audio",
         "client.id":71,"node.name":"vlc"}}}
     ]"#;

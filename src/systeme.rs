@@ -9,10 +9,10 @@ use std::path::{Path, PathBuf};
 // Démarrage automatique
 // ---------------------------------------------------------------------------
 
-/// `$XDG_CONFIG_HOME/autostart/kplayer.desktop` : ce que lisent KDE, GNOME, XFCE… à l'ouverture
+/// `$XDG_CONFIG_HOME/autostart/rmplayer.desktop` : ce que lisent KDE, GNOME, XFCE… à l'ouverture
 /// de session.
 pub fn chemin_autostart() -> Option<PathBuf> {
-    dirs::config_dir().map(|d| d.join("autostart").join("kplayer.desktop"))
+    dirs::config_dir().map(|d| d.join("autostart").join("rmplayer.desktop"))
 }
 
 /// Commande à lancer : le lanceur `run.sh` du dépôt s'il existe (il pose `LD_LIBRARY_PATH`,
@@ -30,8 +30,8 @@ pub fn commande_de_lancement() -> Option<PathBuf> {
 
 fn contenu_desktop(commande: &Path) -> String {
     format!(
-        "[Desktop Entry]\nType=Application\nName=KPlayer\nComment=Lecteur vidéo\n\
-         Exec={}\nIcon=kplayer\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
+        "[Desktop Entry]\nType=Application\nName=RMPlayer\nComment=Lecteur vidéo\n\
+         Exec={}\nIcon=rmplayer\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
         commande.display()
     )
 }
@@ -128,9 +128,9 @@ mod tests {
 
     #[test]
     fn le_fichier_autostart_est_un_lanceur_valide() {
-        let t = contenu_desktop(Path::new("/opt/kplayer/run.sh"));
+        let t = contenu_desktop(Path::new("/opt/rmplayer/run.sh"));
         assert!(t.starts_with("[Desktop Entry]\n"));
-        assert!(t.contains("Exec=/opt/kplayer/run.sh\n"));
+        assert!(t.contains("Exec=/opt/rmplayer/run.sh\n"));
         assert!(t.contains("Type=Application\n"));
     }
 }

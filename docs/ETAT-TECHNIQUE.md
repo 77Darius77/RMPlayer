@@ -1,10 +1,10 @@
-# KPlayer — État technique (instantané)
+# RMPlayer — État technique (instantané)
 
 > État d'ensemble et travail restant : [`ETAT-DU-PROJET.md`](ETAT-DU-PROJET.md).
 > Ce document décrit l'environnement, l'API du moteur et les procédures de diagnostic.
 
 **Date :** 2026-10-16  
-**Binaire validé :** `target/release/kplayer` (51 Mo, `debug = "line-tables-only"`)
+**Binaire validé :** `target/release/rmplayer` (51 Mo, `debug = "line-tables-only"`)
 
 ---
 
@@ -33,7 +33,7 @@
 | `cpal` | 0.15 | Sortie audio |
 | `serde` / `serde_json` / `dirs` | 1.0 / 1.0 / 6.0 | Configuration persistante |
 | `rfd` | 0.15 | Dialogues de fichiers |
-| `tracing` / `tracing-subscriber` | 0.1 / 0.3 | Journalisation (`RUST_LOG=kplayer=debug`) |
+| `tracing` / `tracing-subscriber` | 0.1 / 0.3 | Journalisation (`RUST_LOG=rmplayer=debug`) |
 | `libc` | 0.2 | Handler de signal de `crash.rs` |
 | `chrono` | 0.4 | Dates |
 
@@ -87,7 +87,7 @@
 | `tools/verif-playlist.sh` | 512 | Playlist : aléatoire, glisser-déposer, clic et ✕, volet borné (18 contrôles ; lignes visées depuis la géométrie journalisée) |
 | `tools/verif-rapide.sh` | 110 | Vérification ciblée : ne rejoue que les bancs d'un sujet (`playlist`, `ui`, `fenetre`…) |
 | `tools/verif-association.sh` | 393 | Association et instance unique (38 contrôles ; `Exec` réellement exécuté) |
-| `tools/regle-fenetre-kwin.sh` | 227 | Règle de fenêtre KWin : la position de KPlayer sous Wayland (`--position`, `--depuis-fenetre`, `--etat`, `--retirer`) |
+| `tools/regle-fenetre-kwin.sh` | 227 | Règle de fenêtre KWin : la position de RMPlayer sous Wayland (`--position`, `--depuis-fenetre`, `--etat`, `--retirer`) |
 | `tools/verif-ass.sh` | 412 | Rendu ASS : 21 tests unitaires + position, couleur, alignement, animations, karaoké |
 | `tools/verif-profils.sh` | 334 | Profils de réglages |
 | `tools/verif-pistes.sh` | 305 | Pistes embarquées : inventaire, bascule à chaud, sous-titres (16 contrôles) |
@@ -266,7 +266,7 @@ Réglages : `video.deband` (bool), `video.denoise` (0–3), `video.deinterlace` 
    peut être rognée par son panneau).
 6. `XDG_RUNTIME_DIR` doit être défini pour que cpal/PipeWire trouve le serveur audio.
 7. Un SIGSEGV fait **interbloquer** le handler de la std Rust : c'est `src/crash.rs` qui
-   fournit l'information exploitable (`~/.cache/kplayer/crash.log`).
+   fournit l'information exploitable (`~/.cache/rmplayer/crash.log`).
    *Attention : `--crash-test` produit de vrais cores SIGSEGV — vérifier l'argument de
    lancement avant de conclure à un plantage.*
 8. **Un décodeur ouvert en VA-API n'implique pas l'usage du matériel** : si le pilote
@@ -284,7 +284,7 @@ Réglages : `video.deband` (bool), `video.denoise` (0–3), `video.deinterlace` 
 
 ```bash
 # 1. Consulter le rapport applicatif (le précédent est conservé : crash.1.log)
-cat ~/.cache/kplayer/crash.log
+cat ~/.cache/rmplayer/crash.log
 
 # 2. Lire en premier `si_code`, `si_pid`, `sender` et `origine` :
 #    - origine=defaut interne au processus  → vrai plantage, continuer en 3
@@ -293,15 +293,15 @@ cat ~/.cache/kplayer/crash.log
 #      fenêtre gelée). Chercher alors un GEL, pas un bug de mémoire.
 
 # 3. Symboliser les adresses (rip_rel est un offset absolu dans le binaire)
-addr2line -f -C -e target/release/kplayer <rip_rel>
+addr2line -f -C -e target/release/rmplayer <rip_rel>
 
 # 4. Reproduire un gel et obtenir la pile complète, en une commande :
 tools/diag-gel.sh q /chemin/film.mp4 :99 12
 
 # 5. Si besoin, extraire un core système
-coredumpctl list --no-pager | grep kplayer
+coredumpctl list --no-pager | grep rmplayer
 coredumpctl dump <PID> -o /tmp/core      # sinon : zstd -d -c /var/lib/.../*.zst > /tmp/core
-gdb -batch -q -ex "info proc mappings" -ex "thread apply all bt" ./target/release/kplayer /tmp/core
+gdb -batch -q -ex "info proc mappings" -ex "thread apply all bt" ./target/release/rmplayer /tmp/core
 #    ATTENTION : dans le core, `si_code`/`si_pid` décrivent le RELANCEMENT du
 #    signal par notre handler (SI_TKILL, pid = le nôtre), pas l'origine réelle.
 ```
@@ -318,9 +318,9 @@ tools/vivacite.sh <journal> :99 5
 
 # 3. Pile complète. `ptrace_scope = 1` interdit `gdb -p` : lancer SOUS gdb, puis
 #    figer le processus — gdb reprend la main et affiche toute la pile.
-gdb -q -nx -batch -x script.gdb ./target/release/kplayer
+gdb -q -nx -batch -x script.gdb ./target/release/rmplayer
 #    script.gdb :
-#      shell ( sleep 12; <envoyer la touche fautive>; kill -STOP $(pgrep -x kplayer) ) &
+#      shell ( sleep 12; <envoyer la touche fautive>; kill -STOP $(pgrep -x rmplayer) ) &
 #      run <film.mp4>
 #      thread apply all bt 40
 # 4. Chercher dans la pile : `lock_shared`/`lock_exclusive_slow` = verrou egui
@@ -400,4 +400,4 @@ gdb -q -nx -batch -x script.gdb ./target/release/kplayer
 | Masquage de l'interface (Tab) · aide (F1) | ✅ validés par comparaison d'images |
 | **Audit complet de l'interface** | ✅ **54/54** (`tools/audit-ui.sh` : boutons, 18 raccourcis, 4 fenêtres, contrôle statique des interblocages, vivacité, fermeture par `Q`) |
 | Fenêtres de réglages (4) | ✅ fermables par ✕ **et** par Échap (géométrie journalisée) |
-| Journal de diagnostic | ✅ géométrie des fenêtres + touches reçues, via `RUST_LOG=kplayer=info,kinterface=debug` |
+| Journal de diagnostic | ✅ géométrie des fenêtres + touches reçues, via `RUST_LOG=rmplayer=info,kinterface=debug` |

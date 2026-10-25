@@ -19,7 +19,7 @@
 # Usage : tools/verif-reseau.sh [écran]     (ffmpeg, Xvfb, xdotool, python3)
 set -u
 cd /media/blaise/LINUX_DATA/lecteur-linux
-KP=./target/release/kplayer
+KP=./target/release/rmplayer
 DISP="${1:-:96}"
 BASE=/tmp/kp-reseau
 PORT=8177
@@ -82,7 +82,7 @@ sleep 2
 serveur || { echo "serveur de test inaccessible sur le port $PORT"; exit 2; }
 ok "flux HLS de test servi sur $URL"
 
-# lire <journal> <durée_s> [arguments…] : lance KPlayer puis l'arrête.
+# lire <journal> <durée_s> [arguments…] : lance RMPlayer puis l'arrête.
 # La capture d'écran éventuelle est faite pendant que le lecteur tourne.
 # Pré-cache réseau : ce banc vérifie la **mécanique de reconnexion**. Avec une
 # réserve active (6 s par défaut), le lecteur n'a plus besoin du serveur pendant
@@ -91,7 +91,7 @@ ok "flux HLS de test servi sur $URL"
 # reconnexion. On la désactive ici, et le dernier contrôle vérifie au contraire
 # qu'avec une réserve une courte disparition passe inaperçue.
 precache() {  # precache <ms>
-    python3 - "$XDG_CONFIG_HOME/kplayer/config.json" "$1" <<'PY'
+    python3 - "$XDG_CONFIG_HOME/rmplayer/config.json" "$1" <<'PY'
 import json, os, sys
 chemin, ms = sys.argv[1], int(sys.argv[2])
 os.makedirs(os.path.dirname(chemin), exist_ok=True)
@@ -106,8 +106,8 @@ PY
 precache 0
 
 lancer() {
-    rm -f "$1" "$XDG_CACHE_HOME/kplayer/positions.json"
-    RUST_LOG=kplayer=debug "$KP" "${@:2}" >"$1" 2>&1 &
+    rm -f "$1" "$XDG_CACHE_HOME/rmplayer/positions.json"
+    RUST_LOG=rmplayer=debug "$KP" "${@:2}" >"$1" 2>&1 &
     KP_PID=$!
 }
 arreter() {
@@ -231,7 +231,7 @@ capture "$BASE/panne.png"
 # Total ≈ 37 s après la coupure : les 8 tentatives (≈ 33 s) sont épuisées.
 attendre 25
 # La boucle d'événements doit encore répondre : Q ferme le lecteur proprement.
-WID=$(xdotool search --pid "$KP_PID" --name KPlayer 2>/dev/null | head -1)
+WID=$(xdotool search --pid "$KP_PID" --name RMPlayer 2>/dev/null | head -1)
 if [ -n "${WID:-}" ]; then
     eval "$(xdotool getwindowgeometry --shell "$WID" 2>/dev/null)"
     xdotool mousemove $((X + WIDTH / 2)) $((Y + HEIGHT / 2))
@@ -243,7 +243,7 @@ fi
 if kill -0 "$KP_PID" 2>/dev/null; then VIVANT="non"; else VIVANT="oui"; fi
 arreter "$BASE/panne.log"
 rm -f "$BASE/sentinelles/panne"
-if [ "$VIVANT" = "oui" ] && grep -q "KPlayer quitté" "$BASE/panne.log.txt"; then
+if [ "$VIVANT" = "oui" ] && grep -q "RMPlayer quitté" "$BASE/panne.log.txt"; then
     ok "l'interface répond encore pendant la panne (Q ferme le lecteur)"
 else
     ko "l'interface ne répond plus pendant une panne prolongée"
@@ -292,7 +292,7 @@ lancer "$BASE/gel.log" "$URL"
 attendre 5
 touch "$BASE/sentinelles/gel"
 attendre 6           # coupure détectée, sonde lancée
-WID=$(xdotool search --pid "$KP_PID" --name KPlayer 2>/dev/null | head -1)
+WID=$(xdotool search --pid "$KP_PID" --name RMPlayer 2>/dev/null | head -1)
 if [ -n "${WID:-}" ]; then
     eval "$(xdotool getwindowgeometry --shell "$WID" 2>/dev/null)"
     xdotool mousemove $((X + WIDTH / 2)) $((Y + HEIGHT / 2))
@@ -369,7 +369,7 @@ import re, sys
 from datetime import datetime
 ev = []
 for l in open(sys.argv[1], encoding='utf-8', errors='replace'):
-    m = re.search(r'(\S+Z)\s+DEBUG kplayer::player: Horloge: audio (\d+) ms', l)
+    m = re.search(r'(\S+Z)\s+DEBUG rmplayer::player: Horloge: audio (\d+) ms', l)
     if m:
         ev.append((datetime.fromisoformat(m.group(1).rstrip('Z')), int(m.group(2))))
 if len(ev) < 5:
