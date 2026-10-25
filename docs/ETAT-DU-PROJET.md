@@ -17,12 +17,12 @@ Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`, sous **git** (branche `main`
 | | |
 |---|---|
 | Objet | Lecteur vidéo pour Linux, en Rust, sur FFmpeg 7.1 (`/opt/ffmpeg-7.1`) |
-| Code | 29 280 lignes, 27 modules (`src/`) |
+| Code | 32 496 lignes, 30 modules (`src/`) |
 | Binaire | `target/release/rmplayer` (≈ 52 Mo, rapport de crash exploitable) |
 | Lancement | `./run.sh film.mp4` (ou icône / ligne de commande avec `--no-hwdec`, `--fullscreen`) |
 | Compilation | `cargo build --release` — **0 avertissement** |
-| Tests unitaires | 176 (`cargo test --release`, stables d'une exécution à l'autre) |
-| Bancs de contrôle | 44, lancés par `tools/tout-verifier.sh` ; **liste et description de chacun** : `README.md` (§ Outils) ; dernier résultat de la suite complète : `docs/DERNIERE-SUITE.txt` |
+| Tests unitaires | 210 (`cargo test --release`, stables d'une exécution à l'autre) |
+| Bancs de contrôle | 50, lancés par `tools/tout-verifier.sh` ; **liste et description de chacun** : `README.md` (§ Outils) ; dernier résultat de la suite complète : `docs/DERNIERE-SUITE.txt` |
 | Vérification ciblée | `tools/verif-rapide.sh <sujet…>` (`--liste` donne les sujets) : ne rejoue que les bancs concernés par une modification |
 | Suite complète | `tools/tout-verifier.sh` — démarre l'écran virtuel si besoin, **verrouille** (une seule suite à la fois), pose l'environnement des bancs (`env-bancs.sh`), ~50 min |
 
@@ -253,7 +253,7 @@ seul hérite de l'environnement de l'appelant et peut échouer sans qu'une ligne
 cd /media/blaise/LINUX_DATA/lecteur-linux
 export LD_LIBRARY_PATH=/opt/ffmpeg-7.1/lib
 
-cargo test --release                       # 176 tests unitaires
+cargo test --release                       # 210 tests unitaires
 tools/verif-rapide.sh --liste              # les sujets de vérification ciblée
 tools/verif-rapide.sh ui peripheriques     # seulement ce qu'une modification touche
 tools/tout-verifier.sh                     # toute la suite (~50 min, verrou, un seul à la fois)
