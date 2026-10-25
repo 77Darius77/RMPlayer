@@ -18,7 +18,9 @@
 #      VA-API) et par la chaîne CPU (filtre actif) — défaut trouvé en s.37 : la matrice était
 #      déduite de la taille de l'image réduite, donc 601 d'un côté et 709 de l'autre.
 #   7. raccourcis clavier (aucun réglage préalable, juste des touches) : Ctrl+K bascule « Rogner » et
-#      revient au mode précédent ; Alt+flèches glissent l'image de 2 % par appui ; Alt+0 la recentre.
+#      revient au mode précédent ; Alt+flèches glissent l'image de 2 % par appui ; Alt+0 la recentre ;
+#      la touche K parcourt TOUS les modes (6 appuis depuis « automatique » arrivent sur « rogner » : le
+#      clavier sautait remplir / rogner / personnalisé, alors que le menu à la souris les parcourait).
 #
 # Usage : tools/verif-affichage.sh [écran]      (défaut : :99)
 set -u
@@ -220,6 +222,11 @@ RB=$(mesure k_retour)
 if [ "$(c "$RB" 1)" -gt 1000 ] && [ $(( $(c "$RB" 3) - $(c "$RB" 2) )) -lt 1000 ] && [ "$(c "$RB" 6)" -gt 500 ]; then
     ok "Ctrl+K deux fois : retour au mode précédent (bandes latérales, rouge visible)"
 else ko "Ctrl+K deux fois : $RB (attendu la référence)"; fi
+capture_touches k_cycle k k k k k k
+KK=$(mesure k_cycle)
+if [ "$(c "$KK" 2)" -le 12 ] && [ "$(c "$KK" 3)" -ge 1262 ] && [ "$(c "$KK" 6)" -eq 0 ]; then
+    ok "K ×6 depuis « automatique » arrive sur « rogner » (le clavier parcourt tous les modes)"
+else ko "K ×6 : $KK (attendu : image rognée, vert d'un bord à l'autre)"; fi
 capture_touches k_droite alt+Right alt+Right alt+Right alt+Right alt+Right
 KD=$(mesure k_droite); dd=$(( $(c "$KD" 2) - $(c "$REF" 2) ))
 echo "  Alt+→ ×5 : bord gauche $(c "$REF" 2) → $(c "$KD" 2) (+$dd, attendu ≈ $attendu)"
@@ -233,9 +240,15 @@ capture_touches k_bas alt+Down alt+Down alt+Down alt+Down alt+Down
 KB=$(mesure k_bas); db=$(( $(c "$KB" 4) - $(c "$REF" 4) ))
 if [ "$db" -gt $(( hauteur / 10 - 20 )) ] && [ "$db" -lt $(( hauteur / 10 + 25 )) ]; then ok "Alt+↓ ×5 glisse l'image de ≈ 10 % vers le bas (+$db px)"
 else ko "Alt+↓ ×5 : +$db px (attendu ≈ $(( hauteur / 10 )))"; fi
+capture_touches k_decale alt+Left alt+Left alt+Left alt+Down alt+Down
+KX=$(mesure k_decale)
+if [ "$KX" != "$REF" ]; then ok "précondition : 5 décalages déplacent bien l'image ($KX contre $REF)"
+else ko "précondition : l'image n'a pas bougé après 5 décalages (le contrôle du recentrage ne prouverait rien)"; fi
 capture_touches k_centre alt+Left alt+Left alt+Left alt+Down alt+Down alt+0
 KC=$(mesure k_centre)
-if [ "$KC" = "$REF" ]; then ok "Alt+0 recentre l'image (identique à la référence après 5 décalages)"
+# La géométrie du vert (n, xmin, xmax, ymin, ymax) est comparée ; le décompte de rouge ne l'est pas : le
+# message « Image recentrée », affiché en haut, en recouvre une partie au moment de la capture.
+if [ "$(echo "$KC" | cut -d' ' -f1-5)" = "$(echo "$REF" | cut -d' ' -f1-5)" ]; then ok "Alt+0 recentre l'image (même géométrie que la référence après 5 décalages)"
 else ko "Alt+0 : $KC contre la référence $REF"; fi
 
 echo

@@ -113,6 +113,9 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Fenêtres détachables (s.37)** : Préférences, Statistiques, Aide, À propos en vraies fenêtres
   système, `verif-fenetres-detachables` 24/24 (piège 127). Non fait : « Ouvrir une adresse » et les
   menus déroulants de la barre (fenêtres contextuelles d'egui, bornées par la fenêtre du lecteur).
+- **Raccourcis « rogner » et « glisser l'image » (s.37)** : `Ctrl+K`, `Alt+flèches`, `Alt+0`,
+  `verif-affichage` 16/16. Corrigé au passage : `K` au clavier sautait remplir / rogner / personnalisé,
+  et enregistrait la configuration AVANT de poser la nouvelle valeur (piège 130).
 - **Signets renommables (s.37)** : `Ctrl+Maj+N` ou ✎ du menu, saisie dans une boîte ; `verif-signets` 13/13.
   Corrigé au passage : les lettres tapées dans un champ de texte (adresse, langues, nom) étaient
   reçues comme raccourcis (piège 129).

@@ -35,6 +35,9 @@ use crate::subtitles::SubtitleManager;
 const TEMPORISATION_GEOMETRIE: std::time::Duration = std::time::Duration::from_millis(600);
 
 /// Application principale egui
+/// Pas d'un appui sur les raccourcis « glisser l'image », en pour cent de la taille affichée.
+const PAS_GLISSEMENT: f32 = 2.0;
+
 /// État de la boîte « Renommer le signet ».
 struct RenommageSignet {
     media: PathBuf,
@@ -124,6 +127,8 @@ pub struct App {
     /// Un champ de TEXTE éditable avait le focus à la fin de l'image précédente (egui publie alors
     /// `output.ime`). Voir la garde des raccourcis dans `update`.
     saisie_texte_active: bool,
+    /// Mode d'aspect à rétablir quand on quitte « rogner » par son raccourci.
+    aspect_avant_rogner: crate::config::AspectMode,
     /// Action en attente de capture (réglages : « appuyez sur une touche »).
     pub(crate) capture_raccourci: Option<Action>,
     /// Mode **réglage du recadrage** : l'image d'origine est affichée (recadrage
@@ -673,6 +678,7 @@ impl App {
             signets: crate::signets::Signets::load(),
             signet_renommage: None,
             saisie_texte_active: false,
+            aspect_avant_rogner: crate::config::AspectMode::Auto,
             capture_raccourci: None,
             crop_reglage: false,
             molette_accumulee: 0.0,
@@ -1454,21 +1460,13 @@ impl App {
             }
             Action::PanneauPlaylist => self.basculer_panneau_playlist(),
             Action::Capture => self.take_screenshot(),
-            Action::Aspect => {
-                let suivant = match self.config.video.aspect {
-                    crate::config::AspectMode::Auto => crate::config::AspectMode::Ratio16x9,
-                    crate::config::AspectMode::Ratio16x9 => crate::config::AspectMode::Ratio4x3,
-                    crate::config::AspectMode::Ratio4x3 => crate::config::AspectMode::Ratio185,
-                    crate::config::AspectMode::Ratio185 => crate::config::AspectMode::Ratio235,
-                    crate::config::AspectMode::Ratio235 => crate::config::AspectMode::Remplir,
-                    crate::config::AspectMode::Remplir => crate::config::AspectMode::Rogner,
-                    crate::config::AspectMode::Rogner => crate::config::AspectMode::Personnalise,
-                    crate::config::AspectMode::Personnalise => crate::config::AspectMode::Auto,
-                };
-                let _ = self.config.save();
-                self.annonce(&format!("Rapport d'aspect : {:?}", suivant));
-                self.config.video.aspect = suivant;
-            }
+            Action::Aspect => self.aspect_suivant(),
+            Action::AspectRogner => self.basculer_rogner(),
+            Action::ImageGlisserGauche => self.glisser_image(-PAS_GLISSEMENT, 0.0),
+            Action::ImageGlisserDroite => self.glisser_image(PAS_GLISSEMENT, 0.0),
+            Action::ImageGlisserHaut => self.glisser_image(0.0, -PAS_GLISSEMENT),
+            Action::ImageGlisserBas => self.glisser_image(0.0, PAS_GLISSEMENT),
+            Action::ImageCentrer => self.centrer_image(),
             Action::Reculer5s => self.decaler(-5000),
             Action::Avancer5s => self.decaler(5000),
             Action::Reculer1s => self.decaler(-1000),
@@ -1620,6 +1618,64 @@ impl App {
             }
             None => self.annonce(if avant { "Aucun signet précédent" } else { "Aucun signet suivant" }),
         }
+    }
+
+    /// Rapport d'aspect suivant, sur le cycle COMPLET (automatique → 16:9 → 4:3 → 1,85 → 2,35 →
+    /// remplir → rogner → personnalisé). Un seul chemin pour le clavier et la souris : le clavier
+    /// sautait auparavant les trois derniers modes (piège 6 : deux chemins pour une action).
+    fn aspect_suivant(&mut self) {
+        use crate::config::AspectMode::*;
+        let suivant = match self.config.video.aspect {
+            Auto => Ratio16x9,
+            Ratio16x9 => Ratio4x3,
+            Ratio4x3 => Ratio185,
+            Ratio185 => Ratio235,
+            Ratio235 => Remplir,
+            Remplir => Rogner,
+            Rogner => Personnalise,
+            Personnalise => Auto,
+        };
+        self.definir_aspect(suivant);
+    }
+
+    /// Fixe le rapport d'aspect, l'enregistre (APRÈS le changement : l'ancienne version de « K »
+    /// écrivait la configuration avant de poser la nouvelle valeur) et l'annonce.
+    fn definir_aspect(&mut self, mode: crate::config::AspectMode) {
+        tracing::info!(target: "kinterface", "rapport d'aspect : {:?}", mode);
+        self.config.video.aspect = mode;
+        let _ = self.config.save();
+        self.annonce(&format!("Rapport d'aspect : {}", mode.label()));
+    }
+
+    /// Bascule « remplir en rognant » ; quitter ce mode rétablit celui d'avant.
+    fn basculer_rogner(&mut self) {
+        use crate::config::AspectMode::Rogner;
+        let courant = self.config.video.aspect;
+        if courant == Rogner {
+            let avant = self.aspect_avant_rogner;
+            self.definir_aspect(avant);
+        } else {
+            self.aspect_avant_rogner = courant;
+            self.definir_aspect(Rogner);
+        }
+    }
+
+    /// Décale l'image de `dx` / `dy` pour cent (bornes ±50 %), comme les curseurs des préférences.
+    fn glisser_image(&mut self, dx: f32, dy: f32) {
+        let v = &mut self.config.video;
+        v.pan_x_percent = (v.pan_x_percent + dx).clamp(-50.0, 50.0);
+        v.pan_y_percent = (v.pan_y_percent + dy).clamp(-50.0, 50.0);
+        let (x, y) = (v.pan_x_percent, v.pan_y_percent);
+        let _ = self.config.save();
+        self.annonce(&format!("Image décalée : horizontal {x:+.0} %, vertical {y:+.0} %"));
+    }
+
+    /// Remet l'image au centre.
+    fn centrer_image(&mut self) {
+        self.config.video.pan_x_percent = 0.0;
+        self.config.video.pan_y_percent = 0.0;
+        let _ = self.config.save();
+        self.annonce("Image recentrée");
     }
 
     /// Ouvre la boîte de renommage du signet de la position courante (à 1,5 s près).
@@ -3408,22 +3464,14 @@ impl eframe::App for App {
                             self.last_frame_pts_ms = 0;
                             self.annonce(&format!("Image précédente ({} ms)", cible));
                         }
-                        // Rapport d'aspect : cycle automatique → 16:9 → 4:3 → 1.85 → 2.35.
-                        Action::Aspect => {
-                            use crate::config::AspectMode::*;
-                            let suivant = match self.config.video.aspect {
-                                Auto => Ratio16x9,
-                                Ratio16x9 => Ratio4x3,
-                                Ratio4x3 => Ratio185,
-                                Ratio185 => Ratio235,
-                                Ratio235 => Auto,
-                                _ => Auto,
-                            };
-                            tracing::info!(target: "kinterface", "rapport d'aspect : {:?}", suivant);
-                            self.config.video.aspect = suivant.clone();
-                            self.annonce(&format!("Rapport d'aspect : {}", suivant.label()));
-                            let _ = self.config.save();
-                        }
+                        // Rapport d'aspect : même fonction que la souris (cycle complet).
+                        Action::Aspect => self.aspect_suivant(),
+                        Action::AspectRogner => self.basculer_rogner(),
+                        Action::ImageGlisserGauche => self.glisser_image(-PAS_GLISSEMENT, 0.0),
+                        Action::ImageGlisserDroite => self.glisser_image(PAS_GLISSEMENT, 0.0),
+                        Action::ImageGlisserHaut => self.glisser_image(0.0, -PAS_GLISSEMENT),
+                        Action::ImageGlisserBas => self.glisser_image(0.0, PAS_GLISSEMENT),
+                        Action::ImageCentrer => self.centrer_image(),
 
                         // Préférences (F5)
                         Action::Preferences => {
