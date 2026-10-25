@@ -44,7 +44,7 @@ Lecteur vidéo **Rust + egui** (Linux), sans dépendance à un lecteur externe :
 directement (`ffmpeg-sys-next`, FFmpeg 7.1.3 de `/opt/ffmpeg-7.1`), audio par `cpal`,
 réglages en JSON. Dépôt : `/media/blaise/LINUX_DATA/lecteur-linux`. **Contrôle de version
 git depuis la session 36** (branche `main`, étiquettes `session36` = l'état à 505 contrôles,
-`session36-repli-hdr` = 509 contrôles, repli HDR borné, et `session37` = 629 contrôles, lots 1 à 6 + saut en pause + pistes audio ; pas de dépôt distant) ; les archives de `sauvegardes/` restent comme copies hors
+`session36-repli-hdr` = 509 contrôles, repli HDR borné, et `session37` = 629 contrôles, lots 1 à 6 + saut en pause + pistes audio ; dépôt distant : <https://github.com/77Darius77/RMPlayer>, `main` publié) ; les archives de `sauvegardes/` restent comme copies hors
 dépôt (non suivies par git).
 
 ## Les trois optimisations en place (mesurées, session 31)
