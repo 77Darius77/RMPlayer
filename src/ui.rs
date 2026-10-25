@@ -3741,25 +3741,6 @@ impl eframe::App for App {
                         }
                     }
 
-                    ui.separator();
-                    ui.horizontal(|ui| {
-                        ui.label("Langue préférée");
-                        if ui
-                            .add(
-                                egui::TextEdit::singleline(&mut self.config.audio.default_language)
-                                    .desired_width(50.0),
-                            )
-                            .on_hover_text("fre, eng… — appliquée au prochain chargement")
-                            .changed()
-                        {
-                            let _ = self.config.save();
-                            self.player.set_track_preferences(
-                                &self.config.audio.langues_preferees(),
-                                &self.config.subtitles.langues_preferees(),
-                                self.config.subtitles.use_embedded,
-                            );
-                        }
-                    });
                 }));
                 
                 journaliser_menu(ui.menu_button("📝 Sous-titres", |ui| {
