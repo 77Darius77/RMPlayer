@@ -102,6 +102,7 @@ continue alors sans son (avertissement « lecture vidéo seule »).
 | `Ctrl+Maj+→` | Signet : aller au suivant |
 | `Ctrl+Maj+←` | Signet : aller au précédent |
 | `Ctrl+Maj+B` | Signet : supprimer celui de la position |
+| `Ctrl+Maj+N` | Signet : renommer celui de la position |
 | `[`, `Maj+Molette↓` | Vitesse −0,1 |
 | `]`, `Maj+Molette↑` | Vitesse +0,1 |
 | `\` | Vitesse normale (1,0×) |
@@ -282,7 +283,8 @@ adresse » restent dans le lecteur. Mesuré côté système : `tools/verif-fenet
 
 - **Fichiers récents** (menu *Fichier*, 10 entrées, « effacer ») ; **lecture aléatoire** et
   **glisser-déposer** dans la playlist ; reprise à la position quittée.
-- **Signets** par média : `Ctrl+B` pose, `Ctrl+Maj+→/←` navigue, `Ctrl+Maj+B` supprime ;
+- **Signets** par média : `Ctrl+B` pose, `Ctrl+Maj+→/←` navigue, `Ctrl+Maj+B` supprime,
+  `Ctrl+Maj+N` **renomme** celui de la position (ou le crayon ✎ du menu *Lecture ▸ Signets*) ;
   conservés d'une session à l'autre.
 - **Répétition A-B** (`A` / `B`) avec nombre de répétitions et délai ; `--boucle-ab A B` depuis la
   ligne de commande.
@@ -542,7 +544,6 @@ L'inventaire complet, avec les preuves, est tenu dans
 - **encodage des sous-titres** : l'encodage imposé ne s'applique qu'aux fichiers **externes** ;
 - **plein écran sur plusieurs moniteurs** : les autres écrans noircis ne sont pas gérés (non
   mesurable sous Wayland) ; pas de langue d'interface (le français seul) ;
-- **signets** : on ne peut pas encore les renommer ;
 - la liste complète du reste à faire est dans `docs/PROCHAINES-FONCTIONS.md`.
 
 Ce qui **est** implémenté et mesuré (filtres d'image, égaliseur 18 bandes, traitements
@@ -587,7 +588,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-soustitres-langues.sh [écran]` | **Langues par priorité, durées mini/maxi, piste mémorisée, alphabet** — 12 contrôles |
 | `verif-couleur.sh` | **Matrice et plage de couleur** : couleur RVB d'origine retrouvée (BT.601/709, limitée/complète) — 11 contrôles |
 | `verif-affichage.sh [écran]` | **Rogner et glisser**, et couleur identique par la chaîne GPU et la chaîne CPU — 7 contrôles |
-| `verif-signets.sh [écran]` | **Signets** par média : ajouter, suivant/précédent, supprimer, après redémarrage — 7 contrôles |
+| `verif-signets.sh [écran]` | **Signets** par média : ajouter, suivant/précédent, supprimer, **renommer** (saisie réelle), après redémarrage ; **les touches tapées dans un champ de texte ne déclenchent aucun raccourci** — 13 contrôles |
 | `verif-souris.sh [écran]` | **Souris avec Ctrl / Maj / Alt** : effets lus sur MPRIS — 4 contrôles |
 | `verif-decodeur.sh` | **Décodeur par codec** : décodeur réellement ouvert, repli sur le défaut — 7 contrôles |
 | `verif-systeme.sh [écran]` | **Démarrage automatique, priorité (nice de tous les fils), fréquence maximale** — 10 contrôles |

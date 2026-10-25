@@ -35,6 +35,23 @@ use crate::subtitles::SubtitleManager;
 const TEMPORISATION_GEOMETRIE: std::time::Duration = std::time::Duration::from_millis(600);
 
 /// Application principale egui
+/// État de la boîte « Renommer le signet ».
+struct RenommageSignet {
+    media: PathBuf,
+    index: usize,
+    ms: u64,
+    saisie: String,
+    /// Le champ a déjà reçu le focus (une seule fois, à l'ouverture).
+    a_le_focus: bool,
+}
+
+/// Touches qui restent des raccourcis pendant la saisie d'un texte : `Échap` (fermer) et les touches
+/// de fonction. Les autres appartiennent au champ de saisie.
+fn touche_active_pendant_saisie(touche: egui::Key) -> bool {
+    use egui::Key::*;
+    matches!(touche, Escape | F1 | F2 | F3 | F4 | F5 | F6 | F7 | F8 | F9 | F10 | F11 | F12)
+}
+
 pub struct App {
     pub player: VideoPlayer,
     renderer: VideoRenderer,
@@ -102,6 +119,11 @@ pub struct App {
     pistes_choisies: crate::pistes::PistesChoisies,
     /// Marque-pages par média (`signets.json`, dossier de configuration).
     signets: crate::signets::Signets,
+    /// Boîte « Renommer le signet » ouverte (média, index, position, saisie).
+    signet_renommage: Option<RenommageSignet>,
+    /// Un champ de TEXTE éditable avait le focus à la fin de l'image précédente (egui publie alors
+    /// `output.ime`). Voir la garde des raccourcis dans `update`.
+    saisie_texte_active: bool,
     /// Action en attente de capture (réglages : « appuyez sur une touche »).
     pub(crate) capture_raccourci: Option<Action>,
     /// Mode **réglage du recadrage** : l'image d'origine est affichée (recadrage
@@ -649,6 +671,8 @@ impl App {
             raccourcis,
             pistes_choisies: crate::pistes::PistesChoisies::load(),
             signets: crate::signets::Signets::load(),
+            signet_renommage: None,
+            saisie_texte_active: false,
             capture_raccourci: None,
             crop_reglage: false,
             molette_accumulee: 0.0,
@@ -998,6 +1022,10 @@ impl App {
     /// Ferme la fenêtre la plus « en avant » parmi celles qui sont ouvertes.
     /// Renvoie `true` si une fenêtre a été fermée.
     fn close_top_window(&mut self) -> bool {
+        if self.signet_renommage.take().is_some() {
+            self.annonce("Renommage annulé");
+            return true;
+        }
         let cible = if self.show_about {
             Some("À propos")
         } else if self.show_shortcuts {
@@ -1459,6 +1487,7 @@ impl App {
             Action::SignetAjouter => self.signet_ajouter(),
             Action::SignetSuivant => self.signet_aller(false),
             Action::SignetPrecedent => self.signet_aller(true),
+            Action::SignetRenommer => self.signet_renommer_ici(),
             // **Passer par `play_playlist_index`, pas par `player.play_next()`** :
             // le chemin direct sautait `appliquer_regles` et `after_media_loaded`
             // (sous-titres, chapitres, OSD) — donc une règle de profil automatique
@@ -1590,6 +1619,40 @@ impl App {
                 self.annonce(&format!("🔖 Signet à {}", crate::utils::format_time(ms)));
             }
             None => self.annonce(if avant { "Aucun signet précédent" } else { "Aucun signet suivant" }),
+        }
+    }
+
+    /// Ouvre la boîte de renommage du signet de la position courante (à 1,5 s près).
+    fn signet_renommer_ici(&mut self) {
+        let Some(media) = self.player.current_path().cloned() else { return };
+        let pos = self.player.current_position_ms();
+        match self.signets.index_proche(&media, pos) {
+            Some(i) => self.ouvrir_renommage(media, i),
+            None => self.annonce("Aucun signet à cette position"),
+        }
+    }
+
+    /// Ouvre la boîte de renommage du signet `index` du média : un seul chemin pour le raccourci
+    /// et le menu.
+    fn ouvrir_renommage(&mut self, media: PathBuf, index: usize) {
+        let Some(signet) = self.signets.liste(&media).get(index).cloned() else { return };
+        self.signet_renommage = Some(RenommageSignet {
+            media,
+            index,
+            ms: signet.ms,
+            saisie: signet.nom,
+            a_le_focus: false,
+        });
+    }
+
+    /// Applique le nom saisi et ferme la boîte.
+    fn valider_renommage(&mut self) {
+        let Some(r) = self.signet_renommage.take() else { return };
+        if self.signets.renommer(&r.media, r.index, &r.saisie) {
+            tracing::info!(target: "kinterface", "signet à {} ms renommé « {} »", r.ms, r.saisie.trim());
+            self.annonce("Signet renommé");
+        } else {
+            self.annonce("Nom vide : le signet garde son nom");
         }
     }
 
@@ -3081,6 +3144,13 @@ impl eframe::App for App {
             }
         }
 
+        // Pendant la saisie d'un texte (adresse, nom de signet, langues…), les touches vont au champ :
+        // `P` ne doit pas passer à l'élément précédent ni `F` basculer le plein écran. Seuls `Échap` et
+        // les touches de fonction restent actifs.
+        // **Pas `ctx.wants_keyboard_input()`** : il est vrai dès qu'un widget quelconque a le focus (un
+        // bouton après un clic ou un `Tab`) et bloquerait alors tous les raccourcis — l'audit de
+        // l'interface s'est figé là-dessus. On lit l'état relevé à la fin de l'image précédente.
+        let saisie_texte = self.saisie_texte_active;
         let actions: Vec<crate::raccourcis::Action> = ctx.input(|i| {
             let mut v = Vec::new();
             for evt in &i.raw.events {
@@ -3091,6 +3161,9 @@ impl eframe::App for App {
                     ..
                 } = evt
                 {
+                    if saisie_texte && !touche_active_pendant_saisie(*key) {
+                        continue;
+                    }
                     // Journal des touches au niveau debug : indispensable pour
                     // diagnostiquer une touche qui n'arrive pas (raccourci global du
                     // bureau, fenêtre sans focus…).
@@ -3286,6 +3359,7 @@ impl eframe::App for App {
                         Action::SignetSuivant => self.signet_aller(false),
                         Action::SignetPrecedent => self.signet_aller(true),
                         Action::SignetSupprimer => self.signet_supprimer_ici(),
+                        Action::SignetRenommer => self.signet_renommer_ici(),
                         // Piste de sous-titres suivante (fichiers externes)
                         Action::SousTitreSuivant => {
                             if self.subtitles.count() == 0 {
@@ -3576,6 +3650,7 @@ impl eframe::App for App {
                         .unwrap_or_default();
                     let mut aller_a: Option<u64> = None;
                     let mut supprimer: Option<usize> = None;
+                    let mut renommer: Option<usize> = None;
                     let mut ajouter = false;
                     ui.menu_button("🔖 Signets", |ui| {
                         if bouton_menu(ui, "➕ Ajouter à la position (Ctrl+B)").clicked() {
@@ -3589,6 +3664,9 @@ impl eframe::App for App {
                             ui.horizontal(|ui| {
                                 if bouton_menu(ui, format!("{}  {}", crate::utils::format_time(signet.ms), signet.nom)).clicked() {
                                     aller_a = Some(signet.ms);
+                                }
+                                if bouton_menu(ui, "✎").clicked() {
+                                    renommer = Some(i);
                                 }
                                 if bouton_menu(ui, "🗑").clicked() {
                                     supprimer = Some(i);
@@ -3604,6 +3682,9 @@ impl eframe::App for App {
                     }
                     if let (Some(i), Some(m)) = (supprimer, media_signets.as_ref()) {
                         self.signets.supprimer(m, i);
+                    }
+                    if let (Some(i), Some(m)) = (renommer, media_signets.as_ref()) {
+                        self.ouvrir_renommage(m.clone(), i);
                     }
                     if bouton_menu(ui, "⏭ Suivant (N)").clicked() {
                         self.element_suivant();
@@ -4671,6 +4752,48 @@ impl eframe::App for App {
             self.show_settings = ouvert;
         }
 
+        // Boîte « Renommer le signet »
+        if self.signet_renommage.is_some() {
+            let mut ouvert = true;
+            let mut valider = false;
+            let mut annuler = false;
+            let reponse = egui::Window::new("🔖 Renommer le signet")
+                .open(&mut ouvert)
+                .collapsible(false)
+                .resizable(false)
+                .default_pos([120.0, 160.0])
+                .default_width(380.0)
+                .show(ctx, |ui| {
+                    if let Some(r) = self.signet_renommage.as_mut() {
+                        ui.label(format!("Signet à {}", crate::utils::format_time(r.ms)));
+                        let rep = ui.add(egui::TextEdit::singleline(&mut r.saisie).desired_width(360.0));
+                        if !r.a_le_focus {
+                            rep.request_focus();
+                            r.a_le_focus = true;
+                        }
+                        if rep.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)) {
+                            valider = true;
+                        }
+                        ui.horizontal(|ui| {
+                            if ui.button("✔ Renommer").clicked() {
+                                valider = true;
+                            }
+                            if ui.button("Annuler").clicked() {
+                                annuler = true;
+                            }
+                        });
+                    }
+                });
+            if let Some(r) = &reponse {
+                tracing::debug!(target: "kinterface", "fenetre signet rect {:?}", r.response.rect);
+            }
+            if valider {
+                self.valider_renommage();
+            } else if annuler || !ouvert {
+                self.signet_renommage = None;
+            }
+        }
+
         // Fenêtre « Ouvrir une adresse »
         if self.show_url_dialog {
             let mut ouvert = self.show_url_dialog;
@@ -5105,6 +5228,10 @@ impl eframe::App for App {
         if self.geometrie_changee_le.is_some() {
             ctx.request_repaint_after(TEMPORISATION_GEOMETRIE);
         }
+
+        // Un champ de texte éditable a-t-il le focus ? (lu ICI, après le dessin de toutes les fenêtres,
+        // pour la garde des raccourcis de l'image suivante)
+        self.saisie_texte_active = ctx.output(|o| o.ime.is_some());
     }
 }
 

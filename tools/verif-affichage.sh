@@ -17,6 +17,8 @@
 #   6. couleur : un film HD non balisé donne la MÊME couleur par la chaîne GPU (réduction dans
 #      VA-API) et par la chaîne CPU (filtre actif) — défaut trouvé en s.37 : la matrice était
 #      déduite de la taille de l'image réduite, donc 601 d'un côté et 709 de l'autre.
+#   7. raccourcis clavier (aucun réglage préalable, juste des touches) : Ctrl+K bascule « Rogner » et
+#      revient au mode précédent ; Alt+flèches glissent l'image de 2 % par appui ; Alt+0 la recentre.
 #
 # Usage : tools/verif-affichage.sh [écran]      (défaut : :99)
 set -u
@@ -181,6 +183,60 @@ for nom, v in (("GPU", sys.argv[1]), ("CPU", sys.argv[2])):
         print(f"    ✗ chaîne {nom} : {p} loin de {o}"); sys.exit(1)
 FINPY
 if [ $? -eq 0 ]; then ok "les deux chaînes restituent la couleur d'origine (±7)"; else ko "couleur différente selon la chaîne (GPU : $GPU, CPU : $CPU)"; fi
+
+echo "=== 7. Raccourcis clavier : rogner et glisser l'image ==="
+# capture_touches <nom> <touche>… : lancement SANS réglage d'affichage, puis des touches, puis capture.
+capture_touches() {
+    local nom="$1"; shift
+    python3 - "$CONF" <<'PY'
+import json, sys
+json.dump({"video": {"hardware_decoding": False, "scaling_method": "Lanczos"}, "audio": {"device": "", "volume_max": 150},
+           "subtitles": {"auto_load": False}, "interface": {"show_osd": False, "screenshots_dir": "/tmp"},
+           "playback": {"resume": False}, "playlist": []}, open(sys.argv[1], "w"), indent=2)
+PY
+    arreter
+    "$KP" --fullscreen "$BASE/quatre-tiers.mp4" >"$BASE/$nom.log" 2>&1 &
+    local pid=$!
+    sleep 4.5
+    local id; id=$(xdotool search --pid "$pid" --name RMPlayer 2>/dev/null | tail -1)
+    xdotool windowfocus "$id" 2>/dev/null; sleep 0.3
+    local t
+    for t in "$@"; do xdotool key --window "$id" "$t" 2>/dev/null; sleep 0.5; done
+    sleep 1
+    xdotool mousemove 3 3 2>/dev/null || true; sleep 0.3
+    ffmpeg -hide_banner -loglevel error -f x11grab -video_size 1280x720 -i "$DISP+0,0" -frames:v 1 -y "$BASE/$nom.png"
+    kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; sleep 0.3
+}
+capture_touches k_aucune
+T0=$(mesure k_aucune)
+if [ "$T0" = "$REF" ]; then ok "témoin : sans touche, l'affichage est celui de la référence"; else ko "témoin : $T0 contre la référence $REF"; fi
+capture_touches k_rogner ctrl+k
+R=$(mesure k_rogner); echo "  Ctrl+K : $R"
+if [ "$(c "$R" 2)" -le 12 ] && [ "$(c "$R" 3)" -ge 1262 ] && [ "$(c "$R" 6)" -eq 0 ]; then
+    ok "Ctrl+K : l'image couvre toute la fenêtre et la bande rouge du haut est rognée"
+else ko "Ctrl+K : $R (attendu vert d'un bord à l'autre, rouge 0)"; fi
+capture_touches k_retour ctrl+k ctrl+k
+RB=$(mesure k_retour)
+if [ "$(c "$RB" 1)" -gt 1000 ] && [ $(( $(c "$RB" 3) - $(c "$RB" 2) )) -lt 1000 ] && [ "$(c "$RB" 6)" -gt 500 ]; then
+    ok "Ctrl+K deux fois : retour au mode précédent (bandes latérales, rouge visible)"
+else ko "Ctrl+K deux fois : $RB (attendu la référence)"; fi
+capture_touches k_droite alt+Right alt+Right alt+Right alt+Right alt+Right
+KD=$(mesure k_droite); dd=$(( $(c "$KD" 2) - $(c "$REF" 2) ))
+echo "  Alt+→ ×5 : bord gauche $(c "$REF" 2) → $(c "$KD" 2) (+$dd, attendu ≈ $attendu)"
+if [ "$dd" -gt $(( attendu - 15 )) ] && [ "$dd" -lt $(( attendu + 15 )) ]; then ok "Alt+→ ×5 glisse l'image de ≈ 10 % vers la droite (+$dd px)"
+else ko "Alt+→ ×5 : +$dd px (attendu ≈ $attendu)"; fi
+capture_touches k_gauche alt+Left alt+Left alt+Left alt+Left alt+Left
+KG=$(mesure k_gauche); dg=$(( $(c "$REF" 2) - $(c "$KG" 2) ))
+if [ "$dg" -gt $(( attendu - 15 )) ] && [ "$dg" -lt $(( attendu + 15 )) ]; then ok "Alt+← ×5 glisse l'image de ≈ 10 % vers la gauche (−$dg px)"
+else ko "Alt+← ×5 : −$dg px (attendu ≈ $attendu)"; fi
+capture_touches k_bas alt+Down alt+Down alt+Down alt+Down alt+Down
+KB=$(mesure k_bas); db=$(( $(c "$KB" 4) - $(c "$REF" 4) ))
+if [ "$db" -gt $(( hauteur / 10 - 20 )) ] && [ "$db" -lt $(( hauteur / 10 + 25 )) ]; then ok "Alt+↓ ×5 glisse l'image de ≈ 10 % vers le bas (+$db px)"
+else ko "Alt+↓ ×5 : +$db px (attendu ≈ $(( hauteur / 10 )))"; fi
+capture_touches k_centre alt+Left alt+Left alt+Left alt+Down alt+Down alt+0
+KC=$(mesure k_centre)
+if [ "$KC" = "$REF" ]; then ok "Alt+0 recentre l'image (identique à la référence après 5 décalages)"
+else ko "Alt+0 : $KC contre la référence $REF"; fi
 
 echo
 echo "=== Bilan : $PASS réussite(s), $FAIL échec(s) ==="

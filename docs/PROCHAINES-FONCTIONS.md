@@ -113,6 +113,9 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Fenêtres détachables (s.37)** : Préférences, Statistiques, Aide, À propos en vraies fenêtres
   système, `verif-fenetres-detachables` 24/24 (piège 127). Non fait : « Ouvrir une adresse » et les
   menus déroulants de la barre (fenêtres contextuelles d'egui, bornées par la fenêtre du lecteur).
+- **Signets renommables (s.37)** : `Ctrl+Maj+N` ou ✎ du menu, saisie dans une boîte ; `verif-signets` 13/13.
+  Corrigé au passage : les lettres tapées dans un champ de texte (adresse, langues, nom) étaient
+  reçues comme raccourcis (piège 129).
 - **Sortie audio (s.37)** : les vraies sorties PipeWire par leur nom, changement en cours de
   lecture (menu Audio, préférences, Ctrl+Maj+J), retour à « par défaut » qui efface la cible,
   `verif-peripheriques` 17/17 (piège 124). Non mesuré : le comportement d'un flux épinglé sur une

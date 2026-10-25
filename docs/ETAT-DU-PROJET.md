@@ -209,8 +209,7 @@ chaque fonction non faite, la raison, ligne par ligne. Vue d'ensemble :
 - **F3 — langue d'interface**, **F6** (sous-titres en ligne, enregistrement), reste de **F5** :
   hors périmètre actuel.
 - **Piste audio externe** (`.mka`, `.ac3` à côté du film) ; **reprise après perte du
-  périphérique de sortie** (PipeWire reroute le flux : rien d'observable ici) ; **renommer un
-  signet** ; encodage imposé pour les sous-titres **intégrés** (il ne vaut que pour les externes).
+  périphérique de sortie** (PipeWire reroute le flux : rien d'observable ici) ; encodage imposé pour les sous-titres **intégrés** (il ne vaut que pour les externes).
 - **Transcodage à la volée / extraction d'extraits** : hors du périmètre historique (« lecture »),
   à cadrer avant de commencer.
 

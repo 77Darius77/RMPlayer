@@ -42,6 +42,8 @@ pub enum Action {
     SignetSuivant,
     SignetPrecedent,
     SignetSupprimer,
+    /// Renommer le signet de la position courante (boîte de saisie).
+    SignetRenommer,
     VitesseMoins,
     VitessePlus,
     VitesseNormale,
@@ -95,6 +97,7 @@ impl Action {
         Action::SignetSuivant,
         Action::SignetPrecedent,
         Action::SignetSupprimer,
+        Action::SignetRenommer,
         Action::VitesseMoins,
         Action::VitessePlus,
         Action::VitesseNormale,
@@ -152,6 +155,7 @@ impl Action {
             Action::SignetSuivant => "signets.suivant",
             Action::SignetPrecedent => "signets.precedent",
             Action::SignetSupprimer => "signets.supprimer",
+            Action::SignetRenommer => "signets.renommer",
             Action::VitesseMoins => "vitesse.moins",
             Action::VitessePlus => "vitesse.plus",
             Action::VitesseNormale => "vitesse.normale",
@@ -206,6 +210,7 @@ impl Action {
             Action::SignetSuivant => "Signet : aller au suivant",
             Action::SignetPrecedent => "Signet : aller au précédent",
             Action::SignetSupprimer => "Signet : supprimer celui de la position",
+            Action::SignetRenommer => "Signet : renommer celui de la position",
             Action::VitesseMoins => "Vitesse −0,1",
             Action::VitessePlus => "Vitesse +0,1",
             Action::VitesseNormale => "Vitesse normale (1,0×)",
@@ -250,7 +255,8 @@ impl Action {
             | Action::SignetAjouter
             | Action::SignetSuivant
             | Action::SignetPrecedent
-            | Action::SignetSupprimer => "Lecture",
+            | Action::SignetSupprimer
+            | Action::SignetRenommer => "Lecture",
             Action::Reculer5s
             | Action::Reculer1s
             | Action::Reculer30s
@@ -308,6 +314,7 @@ impl Action {
             Action::SignetSuivant => "Ctrl+Maj+Droite",
             Action::SignetPrecedent => "Ctrl+Maj+Gauche",
             Action::SignetSupprimer => "Ctrl+Maj+B",
+            Action::SignetRenommer => "Ctrl+Maj+N",
             Action::VitesseMoins => "[, Maj+MoletteBas",
             Action::VitessePlus => "], Maj+MoletteHaut",
             Action::VitesseNormale => "\\",
