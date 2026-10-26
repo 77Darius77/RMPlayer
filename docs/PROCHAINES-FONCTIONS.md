@@ -136,6 +136,9 @@ doivent vivre avec la configuration, pas dans le cache.
 - **Raccourcis « rogner » et « glisser l'image » (s.37)** : `Ctrl+K`, `Alt+flèches`, `Alt+0`,
   `verif-affichage` 16/16. Corrigé au passage : `K` au clavier sautait remplir / rogner / personnalisé,
   et enregistrait la configuration AVANT de poser la nouvelle valeur (piège 130).
+- **Recadrage fin (s.37)** : curseurs de bord sans aimantation + boutons − / + (1 px, 10 avec Maj) dans le menu
+  contextuel, `tests_curseur_recadrage` 3/3 (piège 139). Non fait : mêmes boutons dans les préférences (leurs champs
+  numériques acceptent déjà la saisie exacte).
 - **Signets renommables (s.37)** : `Ctrl+Maj+N` ou ✎ du menu, saisie dans une boîte ; `verif-signets` 13/13.
   Corrigé au passage : les lettres tapées dans un champ de texte (adresse, langues, nom) étaient
   reçues comme raccourcis (piège 129).

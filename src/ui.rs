@@ -471,6 +471,55 @@ mod tests_curseur_recadrage {
     }
 
     #[test]
+    fn les_boutons_moins_et_plus_ajustent_le_bord_d_un_pixel() {
+        let ctx = egui::Context::default();
+        let mut valeur = 100u32;
+        let ecran = egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(600.0, 200.0));
+        let boutons = std::cell::Cell::new((egui::Rect::NOTHING, egui::Rect::NOTHING));
+        // « modifiée » : c'est ce signal qui fait appliquer le recadrage dans le menu.
+        let modifiee = std::cell::Cell::new(false);
+        let mut passe = |valeur: &mut u32, evenements: Vec<egui::Event>, maj: bool| {
+            let entree = egui::RawInput {
+                screen_rect: Some(ecran),
+                events: evenements,
+                modifiers: egui::Modifiers { shift: maj, ..Default::default() },
+                ..Default::default()
+            };
+            let _ = ctx.run(entree, |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    let (r, moins, plus) = curseur_bord_avec_boutons(ui, valeur, "");
+                    boutons.set((moins, plus));
+                    modifiee.set(modifiee.get() || r.changed());
+                });
+            });
+        };
+        let clic = |passe: &mut dyn FnMut(&mut u32, Vec<egui::Event>, bool), valeur: &mut u32, centre: egui::Pos2, maj: bool| {
+            let mods = egui::Modifiers { shift: maj, ..Default::default() };
+            let ev = |enfonce| egui::Event::PointerButton { pos: centre, button: egui::PointerButton::Primary, pressed: enfonce, modifiers: mods };
+            passe(valeur, vec![egui::Event::PointerMoved(centre)], maj);
+            passe(valeur, vec![ev(true)], maj);
+            passe(valeur, vec![ev(false)], maj);
+        };
+        passe(&mut valeur, vec![], false);
+        let (moins, plus) = boutons.get();
+        assert!(plus.width() > 0.0 && moins.width() > 0.0, "les deux boutons doivent exister : {moins:?} {plus:?}");
+        clic(&mut passe, &mut valeur, plus.center(), false);
+        assert_eq!(valeur, 101, "un clic sur + ajoute un pixel");
+        assert!(modifiee.get(), "le clic doit marquer la réponse comme modifiée");
+        clic(&mut passe, &mut valeur, moins.center(), false);
+        clic(&mut passe, &mut valeur, moins.center(), false);
+        assert_eq!(valeur, 99, "deux clics sur − retirent deux pixels");
+        clic(&mut passe, &mut valeur, plus.center(), true);
+        assert_eq!(valeur, 109, "Maj + clic sur + ajoute dix pixels");
+        valeur = 0;
+        clic(&mut passe, &mut valeur, moins.center(), false);
+        assert_eq!(valeur, 0, "le bord ne devient pas négatif");
+        valeur = 500;
+        clic(&mut passe, &mut valeur, plus.center(), false);
+        assert_eq!(valeur, 500, "le bord ne dépasse pas 500");
+    }
+
+    #[test]
     fn les_fleches_du_clavier_deplacent_le_curseur_de_un_en_un() {
         let ctx = egui::Context::default();
         let mut valeur = 100u32;
@@ -692,7 +741,40 @@ fn ligne_menu(ui: &mut egui::Ui, actif: bool, libelle: impl Into<egui::WidgetTex
 /// il aimantait la valeur sur les multiples de 5 ou de 10, et un pixel précis devenait impossible à régler.
 /// Les flèches du clavier avancent déjà d'une valeur à la fois (verrouillé par un test).
 fn curseur_bord(ui: &mut egui::Ui, valeur: &mut u32, nom: &str) -> egui::Response {
-    ui.add(egui::Slider::new(valeur, 0..=500).smart_aim(false).text(nom))
+    curseur_bord_avec_boutons(ui, valeur, nom).0
+}
+
+/// Le curseur et ses deux boutons « − » / « + » (un pixel par clic, dix avec Maj). Renvoie la réponse
+/// du curseur — marquée modifiée si un bouton a bougé la valeur — puis les rectangles des deux boutons.
+fn curseur_bord_avec_boutons(
+    ui: &mut egui::Ui,
+    valeur: &mut u32,
+    nom: &str,
+) -> (egui::Response, egui::Rect, egui::Rect) {
+    const MAX: u32 = 500;
+    let maj = ui.input(|i| i.modifiers.shift);
+    let pas = if maj { 10 } else { 1 };
+    ui.horizontal(|ui| {
+        let mut reponse = ui.add(egui::Slider::new(valeur, 0..=MAX).smart_aim(false).text(nom));
+        let moins = ui
+            .small_button("−")
+            .on_hover_text("Retire 1 pixel (10 avec Maj)");
+        let plus = ui
+            .small_button("+")
+            .on_hover_text("Ajoute 1 pixel (10 avec Maj)");
+        let avant = *valeur;
+        if moins.clicked() {
+            *valeur = valeur.saturating_sub(pas);
+        }
+        if plus.clicked() {
+            *valeur = (*valeur + pas).min(MAX);
+        }
+        if *valeur != avant {
+            reponse.mark_changed();
+        }
+        (reponse, moins.rect, plus.rect)
+    })
+    .inner
 }
 
 /// Case à cocher de menu dont la géométrie est journalisée.

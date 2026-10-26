@@ -1335,8 +1335,9 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      court, impossible de régler un pixel précis. Corrigé : `curseur_bord` coupe `smart_aim`. Gardes (tests
      unitaires `tests_curseur_recadrage`) : en glissant par demi-pixels, 96 valeurs sur 101 sont atteintes entre
      50 et 150 (37 avant) ; les flèches du clavier avancent d'une valeur (egui le faisait déjà pour les entiers).
-     Limite : à la souris, un curseur court couvre plusieurs valeurs par pixel d'écran — le réglage exact
-     se fait aux flèches (clic puis ← →) ou en saisissant la valeur.
+     Limite : à la souris, un curseur court couvre plusieurs valeurs par pixel d'écran — d'où les boutons
+     **−** / **+** ajoutés à côté de chaque curseur du menu contextuel (1 pixel par clic, 10 avec Maj ; test
+     `les_boutons_moins_et_plus_ajustent_le_bord_d_un_pixel`, bornes 0 et 500, signal « modifié » vérifié).
 
 ## 5. Reste à faire
 
