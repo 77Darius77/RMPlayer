@@ -542,8 +542,19 @@ Le lecteur énumère les pistes **audio** et de **sous-titres** du conteneur :
 Les sous-titres **image** (PGS des Blu-ray, DVD, DVB) sont rendus tels quels (position, taille et
 couleurs du disque).
 
-En ligne de commande : `--list-tracks`, `--audio-track <n>`, `--sub-track <n>`,
+En ligne de commande : `--list-tracks`, `--audio-track <n>`, `--audio-file <fichier>`, `--sub-track <n>`,
 `--dump-subs <fichier.txt>`.
+
+### Piste audio externe
+
+Un fichier son placé **à côté du film** (même dossier, nom commençant par celui du film : `film.mka`,
+`film.fr.mka`, `film - VF.ac3`, `.dts`, `.flac`, `.aac`, `.mp3`, `.ogg`, `.opus`, `.wav`…) est proposé comme
+piste audio dans le menu **Audio**, après celles du film (`--list-tracks` : index `1000`, `1001`…). Il n'est
+**jamais choisi d'office** : on le choisit dans le menu (ou avec `Ctrl+J`, qui fait défiler toutes les pistes). Le
+bouton **Ajouter un fichier son externe…** en prend un rangé ailleurs ; `--audio-file <fichier>` (comme chez mpv) le
+joue dès le départ. Le fichier est lu en parallèle du film, recalé à chaque saut et à chaque rechargement ; un
+fichier absent ou sans piste audio laisse le film avec son propre son. Le choix est mémorisé par film
+(réglage « mémoriser la piste audio »). Gardé par `tools/verif-audio-externe.sh`.
 
 ### Sous-titres externes
 
@@ -633,7 +644,7 @@ L'inventaire complet, avec les preuves, est tenu dans
 - **interpolation de mouvement** : non implémentée ;
 - **sortie audio** : pas de reprise propre si le périphérique disparaît en cours de lecture
   (PipeWire reroute le flux : rien d'observable ici, non mesuré pour une enceinte Bluetooth qui
-  s'éteint puis se rallume) ; pas de piste audio **externe** (`.mka`, `.ac3` à côté du film) ;
+  s'éteint puis se rallume) ; piste audio externe : pas de réglage de décalage (le fichier est supposé aligné) ;
 - **encodage des sous-titres** : l'encodage imposé ne s'applique qu'aux fichiers **externes** ;
 - **plein écran sur plusieurs moniteurs** : les autres écrans noircis ne sont pas gérés (non
   mesurable sous Wayland) ; pas de langue d'interface (le français seul) ;
@@ -698,6 +709,7 @@ renvoie au banc d'essai qui la vérifie.
 | `verif-migration.sh` | **Renommage KPlayer → RMPlayer** : un vrai lancement reprend les réglages, les positions de reprise et les thèmes de l'ancien dossier (copié, jamais déplacé), sans écraser le nouveau — 7 contrôles |
 | `verif-fenetres-detachables.sh [écran]` | **Fenêtres détachables** : Préférences, Statistiques, Aide, À propos deviennent de vraies fenêtres système (fenêtre distincte, déplacée hors du lecteur, contenu visible, rattachement, Échap, mémoire du choix, ancienne configuration) — 24 contrôles |
 | `verif-peripheriques.sh [écran]` | **Sortie audio** : deux sorties PipeWire factices ; le 440 Hz arrive sur la sortie choisie (enregistrement de son moniteur), changement en cours de lecture (raccourci et clic de menu), retour au défaut, ancien réglage ALSA, sortie disparue — 17 contrôles |
+| `verif-audio-externe.sh [écran]` | **Piste audio externe** : un `.mka` à deux fréquences (600 puis 900 Hz) lu à la place du son du film — alignement à 5 s, autre codec (AC-3), fichiers inutilisables, fichiers voisins listés, sauts avant et arrière en lecture réelle, choix au menu, rechargement du film — mesuré au son — 15 contrôles |
 | `verif-audio-pistes.sh [écran]` | **Pistes audio** : langues par priorité, commentaires écartés, piste par défaut, source mono, mémoire par film — mesuré au son — 11 contrôles |
 | `verif-mpris.sh` | **MPRIS** (module seul, mode `--mpris-test`, sans fenêtre) : nom sur le bus, métadonnées en µs, commandes reçues, `SetPosition` filtré par piste, réglages Volume/Shuffle/LoopStatus/Rate, `PropertiesChanged`, nom rendu, absence de bus gérée — 27 contrôles |
 | `verif-vignettes.sh` | **Vignettes de la barre** (module seul, chemin `--vignette`) : taille, position réelle à une image près, deux positions → deux images, déterminisme, largeur bornée, coût, sortie réutilisée, largeur non multiple de 32, hors durée — 14 contrôles, sans écran |

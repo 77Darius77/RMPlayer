@@ -314,7 +314,11 @@ struct SubtitleStream {
 }
 
 struct AudioStream {
+    /// Identifiant exposé à l'interface : l'index du flux dans le film, ou `EXTERNE_BASE + k` pour le
+    /// k-ième fichier son externe.
     index: i32,
+    /// Vrai si le son vient d'un fichier externe (lu par `pomper_audio_externe`, pas par la boucle du film).
+    externe: bool,
     codec_context: *mut AVCodecContext,
     /// Convertisseur vers f32 entrelacé (format de sortie audio)
     swr: *mut SwrContext,
@@ -325,6 +329,23 @@ struct AudioStream {
     ordre_sortie: Option<&'static [usize]>,
     /// Base de temps du stream audio (conversion PTS → ms)
     time_base: AVRational,
+}
+
+/// Index virtuel de la première piste audio externe : bien au-dessus de tout index de flux d'un conteneur.
+pub const EXTERNE_BASE: i32 = 1000;
+
+/// Fichier son externe ouvert comme source audio à la place de la piste du film (second conteneur,
+/// lu en parallèle du premier et recalé à chaque saut).
+struct AudioExterne {
+    format_context: *mut AVFormatContext,
+    /// Flux audio retenu dans ce fichier.
+    flux: i32,
+    /// Fin du fichier atteinte : plus rien à lire avant le prochain saut.
+    fini: bool,
+    /// Horodatage (ms) du dernier paquet lu : on ne lit pas plus loin que le film.
+    dernier_ms: u64,
+    /// Les paquets qui finissent avant cet instant sont jetés (un saut atterrit avant la cible).
+    plancher_ms: u64,
 }
 
 /// Chaîne de filtres FFmpeg **audio** (`abuffer → superequalizer → abuffersink`).
@@ -536,6 +557,11 @@ pub struct VideoPlayer {
     decalage_debut_us: i64,
     video_stream: Option<VideoStream>,
     audio_stream: Option<AudioStream>,
+    /// Fichiers son externes proposés pour le film courant (index virtuel = `EXTERNE_BASE` + rang) :
+    /// les voisins du film, plus ceux que l'utilisateur ajoute.
+    audio_externes: Vec<PathBuf>,
+    /// Fichier son externe actuellement lu, s'il y en a un.
+    audio_externe: Option<AudioExterne>,
     /// Sortie audio matérielle (cpal) + tampon circulaire (créée une seule fois)
     audio_output: Option<crate::audio::AudioOutput>,
     /// Vrai si aucun périphérique audio n'est disponible
@@ -762,6 +788,8 @@ impl VideoPlayer {
             decalage_debut_us: 0,
             video_stream: None,
             audio_stream: None,
+            audio_externes: Vec::new(),
+            audio_externe: None,
             audio_output: None,
             audio_disabled: false,
             audio_prefill_fait: false,
@@ -1081,9 +1109,26 @@ impl VideoPlayer {
     /// (taux, canaux), il faut donc tout reconstruire. Le tampon circulaire est
     /// vidé : sinon on entendrait un fragment de l'ancienne langue.
     fn open_audio_stream(&mut self, index: i32) -> Result<(), String> {
+        if index >= EXTERNE_BASE {
+            return self.ouvrir_audio_externe(index);
+        }
         let Some(format_context) = self.format_context else {
             return Err("aucun média chargé".to_string());
         };
+        // Une piste du film remplace le fichier externe éventuel.
+        self.fermer_audio_externe();
+        self.ouvrir_decodeur_audio(format_context, index, index, false)
+    }
+
+    /// Ouvre le décodeur audio du flux `flux` de `format_context` (le film ou un fichier externe).
+    /// `index` est l'identifiant exposé à l'interface.
+    fn ouvrir_decodeur_audio(
+        &mut self,
+        format_context: *mut AVFormatContext,
+        flux: i32,
+        index: i32,
+        externe: bool,
+    ) -> Result<(), String> {
         // Fermer l'ancien décodeur avant d'en ouvrir un autre.
         if let Some(mut ancien) = self.audio_stream.take() {
             unsafe {
@@ -1102,13 +1147,13 @@ impl VideoPlayer {
         unsafe {
             let streams = (*format_context).streams;
             let nb = (*format_context).nb_streams as usize;
-            if index < 0 || index as usize >= nb {
-                return Err(format!("piste audio {} hors du conteneur", index));
+            if flux < 0 || flux as usize >= nb {
+                return Err(format!("piste audio {} hors du conteneur", flux));
             }
-            let stream = &**streams.add(index as usize);
+            let stream = &**streams.add(flux as usize);
             let codecpar = &*stream.codecpar;
             if codecpar.codec_type != AVMediaType::AVMEDIA_TYPE_AUDIO {
-                return Err(format!("le flux {} n'est pas audio", index));
+                return Err(format!("le flux {} n'est pas audio", flux));
             }
 
             let out_cfg = self.ensure_audio_output();
@@ -1178,6 +1223,7 @@ impl VideoPlayer {
 
             self.audio_stream = Some(AudioStream {
                 index,
+                externe,
                 codec_context,
                 swr,
                 out_layout,
@@ -1427,7 +1473,15 @@ impl VideoPlayer {
             return;
         }
         if let Some(chemin) = self.current_path().cloned() {
-            self.pistes_audio.set(&chemin, &crate::pistes::Choix::Integree(index));
+            let choix = if index >= EXTERNE_BASE {
+                match self.audio_externes.get((index - EXTERNE_BASE) as usize) {
+                    Some(fichier) => crate::pistes::Choix::Externe(fichier.clone()),
+                    None => return,
+                }
+            } else {
+                crate::pistes::Choix::Integree(index)
+            };
+            self.pistes_audio.set(&chemin, &choix);
         }
     }
 
@@ -1438,6 +1492,202 @@ impl VideoPlayer {
 
     pub fn current_audio_stream(&self) -> Option<i32> {
         self.audio_stream.as_ref().map(|a| a.index)
+    }
+
+    /// Ajoute un fichier son externe aux pistes audio du film courant et renvoie son index virtuel
+    /// (`EXTERNE_BASE` + rang), à passer à `select_audio_stream`. Déjà connu : renvoie son index.
+    pub fn ajouter_audio_externe(&mut self, chemin: &std::path::Path) -> Result<i32, String> {
+        if self.format_context.is_none() {
+            return Err("aucun média chargé".to_string());
+        }
+        if let Some(rang) = self.audio_externes.iter().position(|p| p == chemin) {
+            return Ok(EXTERNE_BASE + rang as i32);
+        }
+        let index = EXTERNE_BASE + self.audio_externes.len() as i32;
+        let media = self.current_path().cloned();
+        let info = sonder_audio_externe(chemin, media.as_deref(), index)?;
+        self.audio_externes.push(chemin.to_path_buf());
+        if let Some(mi) = self.media_info.as_mut() {
+            mi.audio_tracks.push(info);
+        }
+        Ok(index)
+    }
+
+    /// Lit le fichier son externe `index` (virtuel) à la place de la piste du film.
+    fn ouvrir_audio_externe(&mut self, index: i32) -> Result<(), String> {
+        if self.format_context.is_none() {
+            return Err("aucun média chargé".to_string());
+        }
+        let chemin = self
+            .audio_externes
+            .get((index - EXTERNE_BASE) as usize)
+            .cloned()
+            .ok_or_else(|| format!("piste audio externe {} inconnue", index))?;
+        // Ouvert AVANT de toucher à la piste en cours : un fichier illisible laisse le film avec son son.
+        let (fichier, flux) = unsafe { ouvrir_fichier_audio(&chemin)? };
+        self.fermer_audio_externe();
+        if let Err(e) = self.ouvrir_decodeur_audio(fichier, flux, index, true) {
+            let mut f = fichier;
+            unsafe { avformat_close_input(&mut f) };
+            return Err(e);
+        }
+        let position = self.current_position_ms;
+        self.audio_externe = Some(AudioExterne {
+            format_context: fichier,
+            flux,
+            fini: false,
+            dernier_ms: 0,
+            plancher_ms: 0,
+        });
+        self.positionner_audio_externe(position);
+        tracing::info!("Piste audio externe : {}", chemin.display());
+        Ok(())
+    }
+
+    /// Ferme le fichier son externe (le décodeur qui en dépend est remplacé ou libéré par l'appelant).
+    fn fermer_audio_externe(&mut self) {
+        if let Some(mut externe) = self.audio_externe.take() {
+            unsafe { avformat_close_input(&mut externe.format_context) };
+        }
+    }
+
+    /// Replace le fichier externe sur `ms` (à l'ouverture et après chaque saut du film).
+    fn positionner_audio_externe(&mut self, ms: u64) {
+        let Some(externe) = self.audio_externe.as_mut() else {
+            return;
+        };
+        unsafe {
+            let flux = *(*externe.format_context).streams.add(externe.flux as usize);
+            let tb = (*flux).time_base;
+            let ts = if tb.num > 0 && tb.den > 0 {
+                (ms as i128 * tb.den as i128 / (tb.num as i128 * 1000)) as i64
+            } else {
+                0
+            };
+            let ret = av_seek_frame(externe.format_context, externe.flux, ts, AVSEEK_FLAG_BACKWARD);
+            // Un saut refusé (au-delà de la fin, format sans index) : silence jusqu'au prochain saut.
+            externe.fini = ret < 0;
+            tracing::debug!("Fichier son externe replacé sur {} ms (code {})", ms, ret);
+        }
+        externe.dernier_ms = 0;
+        externe.plancher_ms = ms;
+        if let Some(aus) = self.audio_stream.as_ref().filter(|a| a.externe) {
+            unsafe { avcodec_flush_buffers(aus.codec_context) };
+        }
+    }
+
+    /// Lit le fichier son externe jusqu'à ce qu'il ait rattrapé `reference_ms` (la position du paquet du
+    /// film qu'on vient de lire) : il avance au même pas que le film, donc reste aligné avec lui.
+    fn pomper_audio_externe(
+        &mut self,
+        reference_ms: u64,
+        position_ms: u64,
+        audio_format: Option<(i32, i32)>,
+        audio_filters: &str,
+    ) {
+        // Borne par appel : après un saut le fichier atterrit un peu avant la cible, et le rattrapage se fait
+        // sur plusieurs appels plutôt que d'un coup dans le fil d'interface.
+        for _ in 0..256 {
+            let Some(externe) = self.audio_externe.as_ref() else {
+                return;
+            };
+            if externe.fini || externe.dernier_ms > reference_ms {
+                return;
+            }
+            let (fichier, flux, plancher) = (externe.format_context, externe.flux, externe.plancher_ms);
+            unsafe {
+                let pkt = av_packet_alloc();
+                if pkt.is_null() {
+                    return;
+                }
+                if av_read_frame(fichier, pkt) < 0 {
+                    if let Some(e) = self.audio_externe.as_mut() {
+                        e.fini = true;
+                    }
+                    let mut p = pkt;
+                    av_packet_free(&mut p);
+                    return;
+                }
+                if (*pkt).stream_index == flux {
+                    let tb = (**(*fichier).streams.add(flux as usize)).time_base;
+                    let pts = if (*pkt).pts != AV_NOPTS_VALUE { (*pkt).pts } else { (*pkt).dts };
+                    let pts_ms = if pts != AV_NOPTS_VALUE && tb.den != 0 {
+                        Some((pts as i128 * tb.num as i128 * 1000 / tb.den as i128).max(0) as u64)
+                    } else {
+                        None
+                    };
+                    if let (Some(ms), Some(e)) = (pts_ms, self.audio_externe.as_mut()) {
+                        e.dernier_ms = e.dernier_ms.max(ms);
+                    }
+                    // Avant le plancher : son déjà dépassé, on ne le joue pas.
+                    if pts_ms.map_or(true, |ms| ms + 1 >= plancher) {
+                        self.decoder_paquet_audio(pkt, position_ms, audio_format, audio_filters);
+                    }
+                }
+                av_packet_unref(pkt);
+                let mut p = pkt;
+                av_packet_free(&mut p);
+            }
+        }
+    }
+
+    /// Décode un paquet audio (du film ou d'un fichier externe), convertit au format du périphérique,
+    /// applique l'égaliseur et pousse le tout dans le tampon de la carte son.
+    unsafe fn decoder_paquet_audio(
+        &mut self,
+        pkt: *mut AVPacket,
+        position_ms: u64,
+        audio_format: Option<(i32, i32)>,
+        audio_filters: &str,
+    ) {
+        let (Some(aus), Some(out)) = (self.audio_stream.as_mut(), self.audio_output.as_ref()) else {
+            return;
+        };
+        let send = avcodec_send_packet(aus.codec_context, pkt);
+        if send < 0 {
+            return;
+        }
+        let mut samples: Vec<f32> = Vec::new();
+        // Position média du premier échantillon du lot : elle sert d'origine à l'horloge audio (carte son
+        // maître).
+        let mut pts_audio: Option<u64> = None;
+        loop {
+            let frame = av_frame_alloc();
+            if frame.is_null() {
+                break;
+            }
+            let recv = avcodec_receive_frame(aus.codec_context, frame);
+            if recv == 0 {
+                if pts_audio.is_none() {
+                    pts_audio = Some(if (*frame).pts >= 0 && aus.time_base.den != 0 {
+                        ((*frame).pts as i128 * aus.time_base.num as i128 * 1000 / aus.time_base.den as i128)
+                            .max(0) as u64
+                    } else {
+                        position_ms
+                    });
+                }
+                decode_audio_frame_to_f32(aus, frame, &mut samples);
+            }
+            let mut f = frame;
+            av_frame_free(&mut f);
+            if recv != 0 {
+                break;
+            }
+        }
+        if !samples.is_empty() {
+            // Égaliseur : appliqué au format du périphérique, donc exactement sur le signal écouté.
+            if let Some((taux, canaux)) = audio_format {
+                apply_audio_filters(
+                    &mut self.audio_filters,
+                    &mut self.audio_filters_failed,
+                    audio_filters,
+                    taux,
+                    canaux,
+                    &mut samples,
+                );
+            }
+            out.push(&samples, pts_audio.unwrap_or(position_ms));
+        }
     }
 
     /// Applique de nouveaux réglages d'égalisation (effet immédiat).
@@ -1756,8 +2006,24 @@ impl VideoPlayer {
         };
         let position = self.current_position_ms;
         let was_paused = self.state == PlayerState::Paused;
+        // Les fichiers son externes ajoutés à la main, et celui qu'on écoute, survivent au rechargement.
+        let ajouts = self.audio_externes.clone();
+        let ecoute = self
+            .audio_stream
+            .as_ref()
+            .filter(|a| a.externe)
+            .and_then(|a| self.audio_externes.get((a.index - EXTERNE_BASE) as usize).cloned());
 
         self.load_file(path)?;
+        for fichier in ajouts {
+            let _ = self.ajouter_audio_externe(&fichier);
+        }
+        if let Some(fichier) = ecoute {
+            match self.ajouter_audio_externe(&fichier).and_then(|i| self.select_audio_stream(i)) {
+                Ok(()) => {}
+                Err(e) => tracing::warn!("Piste audio externe non rétablie après le rechargement : {}", e),
+            }
+        }
 
         if position > 0 {
             let _ = self.seek(position);
@@ -2059,6 +2325,35 @@ impl VideoPlayer {
                 }
             }
 
+            // Fichiers son voisins du film (`film.mka`, `film.fr.ac3`…) : proposés comme pistes audio externes,
+            // après celles du film. Jamais choisis d'office : ils changeraient le son sans qu'on l'ait demandé.
+            let mut externe_rappelee: Option<i32> = None;
+            if !est_reseau {
+                let rappel = match self.audio_remember.then(|| self.pistes_audio.get(&path)).flatten() {
+                    Some(crate::pistes::Choix::Externe(f)) => Some(f),
+                    _ => None,
+                };
+                let mut candidats = crate::pistes::audios_voisins(&path);
+                // Un fichier choisi autrefois, rangé ailleurs que près du film, reste proposé.
+                if let Some(f) = rappel.clone().filter(|f| f.is_file() && !candidats.contains(f)) {
+                    candidats.push(f);
+                }
+                for fichier in candidats {
+                    let index = EXTERNE_BASE + self.audio_externes.len() as i32;
+                    match sonder_audio_externe(&fichier, Some(&path), index) {
+                        Ok(info) => {
+                            tracing::info!("Piste audio externe {} : {}", audio_tracks.len(), info.label());
+                            if rappel.as_ref() == Some(&fichier) {
+                                externe_rappelee = Some(index);
+                            }
+                            self.audio_externes.push(fichier);
+                            audio_tracks.push(info);
+                        }
+                        Err(e) => tracing::debug!("Fichier son voisin ignoré : {}", e),
+                    }
+                }
+            }
+
             // Durée (en µs AV_TIME_BASE)
             let duration_ms = if (*format_context).duration > 0 {
                 ((*format_context).duration / 1000) as u64
@@ -2223,6 +2518,13 @@ impl VideoPlayer {
             if audio_index >= 0 {
                 if let Err(e) = self.open_audio_stream(audio_index) {
                     tracing::warn!("Piste audio {} inutilisable : {}", audio_index, e);
+                }
+            }
+            // Piste externe choisie à la main lors d'une précédente ouverture de ce film.
+            if let Some(index) = externe_rappelee {
+                match self.open_audio_stream(index) {
+                    Ok(()) => tracing::info!("Piste audio externe rappelée : {}", index),
+                    Err(e) => tracing::warn!("Piste audio externe inutilisable : {}", e),
                 }
             }
             // Sous-titres embarqués : choisir la piste une fois pour toutes.
@@ -2443,6 +2745,8 @@ impl VideoPlayer {
 
             let stream_index = (*pkt).stream_index;
             let mut handled = false;
+            // Position du film : le fichier son externe la rattrape (voir `pomper_audio_externe`).
+            let reference_ms = if self.audio_externe.is_some() { horodatage_ms(format_context, pkt) } else { None };
 
             if !video_ptr.is_null() && stream_index == (*video_ptr).index {
                 handled = true;
@@ -2458,76 +2762,27 @@ impl VideoPlayer {
             }
 
             // --- Stream audio : décodage + conversion + poussée dans le tampon ---
+            // Avec une piste audio EXTERNE, c'est `pomper_audio_externe` qui alimente le tampon : les paquets
+            // audio du film sont alors ignorés.
             if !handled {
-                if let (Some(aus), Some(out)) =
-                    (self.audio_stream.as_mut(), self.audio_output.as_ref())
-                {
-                    if stream_index == aus.index {
-                        // Pendant un seek, on jette l'audio antérieur à la cible
-                        // (sinon le tampon se remplit avec du son déjà dépassé).
-                        let drop_for_seek = match self.seek_target_ms {
-                            Some(target) if aus.time_base.den != 0 && (*pkt).pts >= 0 => {
-                                let pts_ms = ((*pkt).pts as i128
-                                    * aus.time_base.num as i128
-                                    * 1000
-                                    / aus.time_base.den as i128)
-                                    .max(0) as u64;
-                                pts_ms + 1 < target
-                            }
-                            _ => false,
-                        };
-                        if !drop_for_seek {
-                        let send = avcodec_send_packet(aus.codec_context, pkt);
-                        if send >= 0 {
-                            let mut samples: Vec<f32> = Vec::new();
-                            // Position média du premier échantillon du lot : elle
-                            // sert d'origine à l'horloge audio (carte son maître).
-                            let mut pts_audio: Option<u64> = None;
-                            loop {
-                                let frame = av_frame_alloc();
-                                if frame.is_null() {
-                                    break;
-                                }
-                                let recv = avcodec_receive_frame(aus.codec_context, frame);
-                                if recv == 0 {
-                                    if pts_audio.is_none() {
-                                        pts_audio = Some(if (*frame).pts >= 0
-                                            && aus.time_base.den != 0
-                                        {
-                                            ((*frame).pts as i128
-                                                * aus.time_base.num as i128
-                                                * 1000
-                                                / aus.time_base.den as i128)
-                                                .max(0) as u64
-                                        } else {
-                                            position_ms
-                                        });
-                                    }
-                                    decode_audio_frame_to_f32(aus, frame, &mut samples);
-                                }
-                                let mut f = frame;
-                                av_frame_free(&mut f);
-                                if recv != 0 {
-                                    break;
-                                }
-                            }
-                            if !samples.is_empty() {
-                                // Égaliseur : appliqué au format du périphérique,
-                                // donc exactement sur le signal écouté.
-                                if let Some((taux, canaux)) = audio_format {
-                                    apply_audio_filters(
-                                        &mut self.audio_filters,
-                                        &mut self.audio_filters_failed,
-                                        &audio_filters,
-                                        taux,
-                                        canaux,
-                                        &mut samples,
-                                    );
-                                }
-                                out.push(&samples, pts_audio.unwrap_or(position_ms));
-                            }
+                let pour_l_audio = matches!(
+                    self.audio_stream.as_ref(),
+                    Some(aus) if !aus.externe && stream_index == aus.index
+                ) && self.audio_output.is_some();
+                if pour_l_audio {
+                    // Pendant un seek, on jette l'audio antérieur à la cible (sinon le tampon se remplit
+                    // avec du son déjà dépassé).
+                    let drop_for_seek = match (self.audio_stream.as_ref(), self.seek_target_ms) {
+                        (Some(aus), Some(target)) if aus.time_base.den != 0 && (*pkt).pts >= 0 => {
+                            let pts_ms = ((*pkt).pts as i128 * aus.time_base.num as i128 * 1000
+                                / aus.time_base.den as i128)
+                                .max(0) as u64;
+                            pts_ms + 1 < target
                         }
-                        }
+                        _ => false,
+                    };
+                    if !drop_for_seek {
+                        self.decoder_paquet_audio(pkt, position_ms, audio_format, &audio_filters);
                     }
                 }
             }
@@ -2552,6 +2807,9 @@ impl VideoPlayer {
             av_packet_unref(pkt);
             let mut p = pkt;
             av_packet_free(&mut p);
+            if let Some(reference) = reference_ms {
+                self.pomper_audio_externe(reference, position_ms, audio_format, &audio_filters);
+            }
             true
         }
     }
@@ -3498,8 +3756,15 @@ impl VideoPlayer {
     /// format est celui du média (taux et canaux d'origine), ce qui rend la mesure
     /// indépendante du périphérique de l'utilisateur.
     pub fn dump_audio(&mut self) -> Option<(Vec<f32>, u32, u16)> {
-        let format_context = self.format_context?;
-        let audio_index = self.audio_stream.as_ref()?.index;
+        let format_film = self.format_context?;
+        // Le son vient du film, ou du fichier externe s'il est choisi.
+        let (format_context, audio_index, externe) = {
+            let aus = self.audio_stream.as_ref()?;
+            match (&self.audio_externe, aus.externe) {
+                (Some(e), true) => (e.format_context, e.flux, true),
+                _ => (format_film, aus.index, false),
+            }
+        };
 
         // Format de référence : celui du flux (pas du périphérique), pour que la
         // mesure soit reproductible sur n'importe quelle machine.
@@ -3549,7 +3814,7 @@ impl VideoPlayer {
                 break;
             }
             let ret = unsafe { av_read_frame(format_context, paquet) };
-            if ret >= 0 { unsafe { decaler_paquet(format_context, paquet, self.decalage_debut_us) }; }
+            if ret >= 0 && !externe { unsafe { decaler_paquet(format_context, paquet, self.decalage_debut_us) }; }
             if ret < 0 {
                 break; // fin de flux
             }
@@ -4125,6 +4390,8 @@ impl VideoPlayer {
                 if let Some(aus) = self.audio_stream.as_ref() {
                     avcodec_flush_buffers(aus.codec_context);
                 }
+                // Le fichier son externe se replace comme le film.
+                self.positionner_audio_externe(position_ms);
                 self.eof = false;
                 self.current_position_ms = position_ms;
                 // Recaler l'horloge sur la nouvelle position
@@ -4635,6 +4902,8 @@ impl VideoPlayer {
                     avcodec_free_context(&mut p);
                 }
             }
+            self.fermer_audio_externe();
+            self.audio_externes.clear();
             // La sortie audio n'est PAS détruite : sa destruction attend la fin du
             // thread audio (ce qui peut bloquer). On la met simplement en pause.
             if let Some(out) = self.audio_output.as_ref() {
@@ -7288,6 +7557,78 @@ impl Drop for VideoPlayer {
     fn drop(&mut self) {
         let _ = self.quit();
     }
+}
+
+/// Ouvre un fichier son et renvoie son conteneur avec le flux audio retenu. À l'appelant de le refermer.
+unsafe fn ouvrir_fichier_audio(chemin: &std::path::Path) -> Result<(*mut AVFormatContext, i32), String> {
+    let nom = chemin.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+    let c_chemin = CString::new(chemin.to_string_lossy().as_bytes())
+        .map_err(|_| "chemin invalide (octet nul)".to_string())?;
+    let mut fichier: *mut AVFormatContext = std::ptr::null_mut();
+    if avformat_open_input(&mut fichier, c_chemin.as_ptr(), std::ptr::null(), std::ptr::null_mut()) < 0 {
+        return Err(format!("{nom} : ouverture impossible"));
+    }
+    if avformat_find_stream_info(fichier, std::ptr::null_mut()) < 0 {
+        avformat_close_input(&mut fichier);
+        return Err(format!("{nom} : aucune information de flux lisible"));
+    }
+    let flux = av_find_best_stream(fichier, AVMediaType::AVMEDIA_TYPE_AUDIO, -1, -1, std::ptr::null_mut(), 0);
+    if flux < 0 {
+        avformat_close_input(&mut fichier);
+        return Err(format!("{nom} : aucune piste audio"));
+    }
+    Ok((fichier, flux))
+}
+
+/// Décrit un fichier son externe comme une piste audio (pour les menus et `--list-tracks`).
+fn sonder_audio_externe(
+    chemin: &std::path::Path,
+    media: Option<&std::path::Path>,
+    index: i32,
+) -> Result<TrackInfo, String> {
+    unsafe {
+        let (mut fichier, flux) = ouvrir_fichier_audio(chemin)?;
+        let stream = &**(*fichier).streams.add(flux as usize);
+        let codecpar = &*stream.codecpar;
+        let codec = avcodec_find_decoder(codecpar.codec_id);
+        let nom_codec = if !codec.is_null() && !(*codec).long_name.is_null() {
+            std::ffi::CStr::from_ptr((*codec).long_name).to_string_lossy().to_string()
+        } else {
+            format!("codec {}", codecpar.codec_id as i32)
+        };
+        let langue = stream_metadata(stream.metadata, "language");
+        let info = TrackInfo {
+            index,
+            codec: nom_codec,
+            language: if langue.is_empty() {
+                media.map(|m| crate::pistes::langue_du_nom(m, chemin)).unwrap_or_default()
+            } else {
+                langue
+            },
+            title: chemin.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+            channels: codecpar.ch_layout.nb_channels,
+            sample_rate: codecpar.sample_rate,
+            bitmap: false,
+            defaut: false,
+            commentaire: false,
+        };
+        avformat_close_input(&mut fichier);
+        Ok(info)
+    }
+}
+
+/// Position (ms) d'un paquet dans son flux, d'après son horodatage d'affichage ou, à défaut, de décodage.
+unsafe fn horodatage_ms(format_context: *mut AVFormatContext, pkt: *mut AVPacket) -> Option<u64> {
+    let t = if (*pkt).pts != AV_NOPTS_VALUE { (*pkt).pts } else { (*pkt).dts };
+    let flux = (*pkt).stream_index;
+    if t == AV_NOPTS_VALUE || flux < 0 || flux as u32 >= (*format_context).nb_streams {
+        return None;
+    }
+    let tb = (**(*format_context).streams.add(flux as usize)).time_base;
+    if tb.den == 0 {
+        return None;
+    }
+    Some((t as i128 * tb.num as i128 * 1000 / tb.den as i128).max(0) as u64)
 }
 
 /// Retranche le début du flux des horodatages d'un paquet (DVD : un titre ne commence pas à zéro).

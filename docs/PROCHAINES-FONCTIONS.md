@@ -149,8 +149,13 @@ doivent vivre avec la configuration, pas dans le cache.
   absente au lancement, elle, est mesurée (repli sur le défaut).
 - **Pistes audio (s.37)** : langues par priorité, commentaires et audiodescriptions écartés, piste
   « par défaut » du fichier, mémoire par film (Ctrl+J), `verif-audio-pistes` 11/11. Non fait :
-  piste audio **externe** (fichier `.mka`/`.ac3` à côté du film) et reprise après perte du
-  périphérique de sortie (sous PipeWire le serveur reroute le flux : rien à observer ici).
+  reprise après perte du périphérique de sortie (sous PipeWire le serveur reroute le flux : rien à
+  observer ici).
+- **Piste audio externe (s.37)** : fichiers son voisins du film (`.mka`, `.ac3`, `.dts`, `.flac`…) proposés dans le
+  menu Audio (index virtuels 1000+), `--audio-file`, bouton « Ajouter un fichier son externe… », lecture en
+  parallèle recalée à chaque saut et rechargement, mémoire par film ; `verif-audio-externe` 15/15 (piège 140).
+  Limites : aucun réglage de décalage (le fichier est supposé aligné sur le film) ; jamais choisi d'office ;
+  la règle de voisinage est simple (nom commençant par celui du film : `film2.flac` en est un pour `film.mkv`).
 - **Matrice de couleur « automatique » (lot 3)** : première version déduite de la taille de l'image
   *réduite* et des balises de l'image *filtrée* — BT.601 par la chaîne GPU, BT.709 par la chaîne CPU
   pour le même film. Trouvé par `verif-personnalisation` (inversion non mesurée), corrigé : la décision

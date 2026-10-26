@@ -97,6 +97,7 @@ run verif-migration tools/verif-migration.sh
 run verif-hdr-saut tools/verif-hdr-saut.sh "$DISP"
 run verif-capture tools/verif-capture.sh "$DISP"
 run verif-dvd tools/verif-dvd.sh "$DISP"
+run verif-audio-externe tools/verif-audio-externe.sh "$DISP"
 run verif-modes-lecture tools/verif-modes-lecture.sh "$DISP"
 run verif-haut-parleurs tools/verif-haut-parleurs.sh "$DISP"
 run verif-shaders tools/verif-shaders.sh "$DISP"

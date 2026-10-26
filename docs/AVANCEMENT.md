@@ -557,7 +557,7 @@ fonctions pures (détection, profondeur, plan, tramage, débanding, noms d'opér
 
 ### Sessions 36 et 37 — résumé
 
-Le détail de chaque défaut trouvé est dans les **pièges 114 à 139** (§4) ; les fonctions sont
+Le détail de chaque défaut trouvé est dans les **pièges 114 à 140** (§4) ; les fonctions sont
 décrites dans `docs/PROCHAINES-FONCTIONS.md` (lots 1 à 6) et mesurées par les bancs du README.
 
 - **Session 36** : revue externe, bancs rendus autonomes (`env-bancs.sh`), repli CPU **borné** du
@@ -1338,6 +1338,17 @@ Ces points ont chacun coûté du temps ; ils sont à garder en tête pour toute 
      Limite : à la souris, un curseur court couvre plusieurs valeurs par pixel d'écran — d'où les boutons
      **−** / **+** ajoutés à côté de chaque curseur du menu contextuel (1 pixel par clic, 10 avec Maj ; test
      `les_boutons_moins_et_plus_ajustent_le_bord_d_un_pixel`, bornes 0 et 500, signal « modifié » vérifié).
+140. 🟡 **Piste audio externe : trois pièges de mesure, aucun dans le moteur.** (a) Un banc qui **passait avant que la
+     fonction existe** : `--audio-file x.mka film.mkv` — l'option inconnue était ignorée, son fichier devenait le média
+     principal et le `.mka` jouait seul, donc le contrôle « le son vient du fichier externe » réussissait à vide.
+     Corrigé en donnant toujours le film AVANT l'option, de sorte que le banc échoue tant que l'option n'est pas lue.
+     (b) Un **saut jamais exécuté** : l'identifiant de piste MPRIS extrait était vide, `SetPosition ignoré (piste ≠
+     courante)` dans le journal, et le témoin (un son constant à 300 Hz) passait quand même. Corrigé : chaque saut du
+     banc est contrôlé par la position publiée. (c) Une **instabilité héritée** : `verif-haut-parleurs` B2 enregistrait
+     de ~20,5 s à ~22 s dans un film de 21 s (échec 1 fois sur 4, aussi sur `main`) ; film porté à 33 s, 4 exécutions
+     de suite vertes. Mutation vérifiée : sans le repositionnement du fichier externe dans `seek()`, le banc échoue
+     (saut à 1 s : 900 Hz au lieu de 600). **Leçon** : un témoin dont la valeur ne change pas avec l'action testée
+     (fréquence constante, sauts) ne prouve pas que l'action a eu lieu — contrôler l'action elle-même.
 
 ## 5. Reste à faire
 

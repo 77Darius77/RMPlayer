@@ -51,12 +51,12 @@
 
 | Fichier | Lignes | Rôle |
 |---|---|---|
-| `src/player.rs` | 7899 | Moteur de lecture (décodage VA-API, mise à l'échelle, cadence, pistes, filtres, reprise) |
-| `src/ui.rs` | 5666 | Interface (menus, OSD, playlist, fenêtres, mémoire de la fenêtre) |
+| `src/player.rs` | 8251 | Moteur de lecture (décodage VA-API, mise à l'échelle, cadence, pistes, filtres, reprise) |
+| `src/ui.rs` | 5880 | Interface (menus, OSD, playlist, fenêtres, mémoire de la fenêtre) |
 | `src/settings.rs` | 3520 | Fenêtre « Préférences » : sections dépliables (table `SECTIONS`) |
 | `src/config.rs` | 3096 | Configuration (réglages réellement appliqués), profils, export / import |
 | `src/ass.rs` | 2058 | Rendu ASS (styles, animations, karaoké, sous-titres image) |
-| `src/main.rs` | 1330 | Point d'entrée, options de ligne de commande, géométrie de fenêtre |
+| `src/main.rs` | 1358 | Point d'entrée, options de ligne de commande, géométrie de fenêtre |
 | `src/dvd.rs` | 1139 | DVD-Vidéo : IFO (titres, chapitres, cellules, pistes), `libdvdread` chargée à l'exécution, flux d'un titre pour FFmpeg (AVIO) |
 | `src/raccourcis.rs` | 1063 | Table unique des raccourcis clavier et souris (défauts, personnalisation, aide F1) |
 | `src/hdr.rs` | 998 | HDR : détection PQ/HLG/BT.2020, plan de conversion (GPU/CPU), tramage, débanding |
@@ -76,12 +76,12 @@
 | `src/theme.rs` | 131 | Thèmes externes JSON |
 | `src/migration.rs` | 128 | Reprise des données de l'ancien nom (KPlayer) |
 | `src/tray.rs` | 120 | Icône de zone de notification (StatusNotifierItem) |
-| `src/pistes.rs` | 117 | Mémoire des pistes choisies à la main |
+| `src/pistes.rs` | 208 | Mémoire des pistes choisies à la main ; fichiers son voisins d'un film (pistes audio externes) |
 | `src/x11.rs` | 114 | « Fenêtre toujours au-dessus » (`_NET_WM_STATE`) |
 | `src/fenetre.rs` | 97 | Fenêtres flottantes détachables (viewport immédiat) |
 | `src/positions.rs` | 73 | Reprise de lecture |
 | `src/renderer.rs` | 43 | Transport des images |
-| **Total** | **32384** | 30 modules (hors `tools/`) |
+| **Total** | **33069** | 30 modules (hors `tools/`) |
 
 `tools/` : 50 bancs lancés par `tout-verifier.sh`, plus les outils de diagnostic (`audit-ui.sh`,
 `check-ctx-reentrance.py`, `vivacite.sh`, `diag-gel.sh`, `capture-lecteur.sh`…) et les

@@ -1019,6 +1019,26 @@ impl App {
         }
     }
 
+    /// Ajoute un fichier son externe aux pistes du film et le joue (bouton du menu Audio).
+    fn choisir_audio_externe(&mut self, chemin: &std::path::Path) {
+        let nom = chemin.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
+        let resultat = self
+            .player
+            .ajouter_audio_externe(chemin)
+            .and_then(|index| self.player.select_audio_stream(index).map(|()| index));
+        match resultat {
+            Ok(index) => {
+                self.player.memoriser_piste_audio(index);
+                tracing::info!(target: "kinterface", "piste audio externe ajoutée : {}", nom);
+                self.annonce(&format!("Audio : {nom}"));
+            }
+            Err(e) => {
+                tracing::warn!(target: "kinterface", "piste audio externe refusée : {}", e);
+                self.annonce(&format!("Piste audio externe indisponible : {e}"));
+            }
+        }
+    }
+
     /// Note la piste que l'utilisateur vient de choisir, pour le média ouvert.
     fn memoriser_piste_choisie(&mut self, choix: crate::pistes::Choix) {
         if !self.config.subtitles.remember_track {
@@ -4257,6 +4277,17 @@ impl eframe::App for App {
                                     self.annonce(&format!("Piste audio indisponible : {}", e));
                                 }
                             }
+                        }
+                    }
+                    // Un fichier son rangé ailleurs que près du film (.mka, .ac3, .flac…).
+                    if self.player.current_path().is_some()
+                        && bouton_menu(ui, "📂 Ajouter un fichier son externe…").clicked()
+                    {
+                        if let Some(chemin) = rfd::FileDialog::new()
+                            .add_filter("Fichiers son", crate::pistes::EXTENSIONS_AUDIO)
+                            .pick_file()
+                        {
+                            self.choisir_audio_externe(&chemin);
                         }
                     }
 
