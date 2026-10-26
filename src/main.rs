@@ -104,6 +104,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "--speed",
         "--profil",
         "--audio-track",
+        "--audio-file",
         "--sub-track",
         "--bench",
         "--bench-taille",
@@ -340,6 +341,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .position(|a| a == "--audio-track")
         .and_then(|p| args.get(p + 1))
         .and_then(|v| v.parse().ok());
+    // `--audio-file <fichier>` : ce fichier son remplace la piste du film (comme `--audio-file` de mpv).
+    let audio_fichier: Option<PathBuf> = args
+        .iter()
+        .position(|a| a == "--audio-file")
+        .and_then(|p| args.get(p + 1))
+        .map(PathBuf::from);
     let piste_subs: Option<i32> = args
         .iter()
         .position(|a| a == "--sub-track")
@@ -651,6 +658,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("--list-tracks : chargement impossible : {}", e);
             std::process::exit(1);
         }
+        if let Some(fichier) = &audio_fichier {
+            imposer_audio_externe(&mut player, fichier);
+        }
         if let Some(info) = player.media_info() {
             println!("vidéo : {} ({}x{}, {:.2} i/s)", info.video_codec, info.resolution.0, info.resolution.1, info.fps);
             if let Some((nom, materiel)) = player.video_decoder() {
@@ -825,6 +835,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Err(e) = player.load_file(media.clone()) {
             eprintln!("--dump-audio : chargement impossible : {}", e);
             std::process::exit(1);
+        }
+        if let Some(fichier) = &audio_fichier {
+            imposer_audio_externe(&mut player, fichier);
         }
         if let Some(index) = piste_audio {
             if let Err(e) = player.select_audio_stream(index) {
@@ -1281,6 +1294,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             if let Some(first) = cli_files.first() {
                 app.load_media(first);
+                if let Some(fichier) = &audio_fichier {
+                    imposer_audio_externe(&mut app.player, fichier);
+                }
             }
             // APRÈS le chargement : avant, il n'y a pas de contexte de format et le
             // seek est sans effet (défaut constaté : trois captures identiques).
@@ -1306,6 +1322,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }),
     )
     .map_err(|e| format!("Erreur eframe: {}", e).into())
+}
+
+/// `--audio-file` : lit ce fichier son à la place de la piste du film. Un fichier inutilisable est signalé et
+/// le film garde sa piste.
+fn imposer_audio_externe(lecteur: &mut player::VideoPlayer, fichier: &std::path::Path) {
+    let resultat = lecteur
+        .ajouter_audio_externe(fichier)
+        .and_then(|index| lecteur.select_audio_stream(index));
+    if let Err(e) = resultat {
+        eprintln!("--audio-file : {} — le film garde sa piste audio", e);
+        tracing::warn!("--audio-file : {}", e);
+    }
 }
 
 /// Applique au moteur la règle de profil qui concerne le média ouvert, sur les

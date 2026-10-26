@@ -20,6 +20,8 @@ Usage : analyse-audio.py <commande> <fichier.wav> [arguments]
   freq     <wav>                fréquence dominante (Hz) et durée (s)
   queue    <wav> <ms> <ms>      énergie RMS entre deux instants (ms)
   debut    <wav> [seuil]        premier instant audible (ms)
+  freqfen  <wav> <ms> <ms>      fréquence dominante (Hz) entre deux instants (ms), « -1 » si silence
+  bascule  <wav> <f1> <f2>      instant (ms) où la fréquence dominante passe de f1 à f2, « -1 » si jamais
   enceintes <wav> <f1,f2,…>     JSON : nombre de canaux et, par canal, l'amplitude à chaque fréquence
 """
 import struct
@@ -114,6 +116,34 @@ def cmd_queue(path, debut_ms, fin_ms):
     print(f"{np.sqrt(np.mean(seg**2)):.6f}")
 
 
+def dominante(seg, taux):
+    """Fréquence dominante d'un morceau de signal, ou None s'il est (presque) silencieux."""
+    if len(seg) < 64 or np.sqrt(np.mean(seg**2)) < 1e-4:
+        return None
+    X = np.abs(np.fft.rfft(seg * np.hanning(len(seg))))
+    return np.fft.rfftfreq(len(seg), 1 / taux)[np.argmax(X)]
+
+
+def cmd_freqfen(path, debut_ms, fin_ms):
+    x, taux = mono(path)
+    a, b = int(float(debut_ms) * taux / 1000), int(float(fin_ms) * taux / 1000)
+    f = dominante(x[a:b], taux)
+    print("-1" if f is None else f"{f:.1f}")
+
+
+def cmd_bascule(path, f1, f2):
+    """Premier instant où une fenêtre de 100 ms est plus proche de f2 que de f1 (pas de 25 ms)."""
+    x, taux = mono(path)
+    f1, f2 = float(f1), float(f2)
+    pas, taille = int(0.025 * taux), int(0.1 * taux)
+    for a in range(0, len(x) - taille, pas):
+        f = dominante(x[a:a + taille], taux)
+        if f is not None and abs(f - f2) < abs(f - f1):
+            print(f"{(a + taille / 2) * 1000 / taux:.0f}")
+            return
+    print("-1")
+
+
 def cmd_debut(path, seuil="0.01"):
     x, taux = mono(path)
     audibles = np.nonzero(np.abs(x) > float(seuil))[0]
@@ -157,6 +187,8 @@ COMMANDES = {
     "freq": cmd_freq,
     "queue": cmd_queue,
     "debut": cmd_debut,
+    "freqfen": cmd_freqfen,
+    "bascule": cmd_bascule,
 }
 
 
