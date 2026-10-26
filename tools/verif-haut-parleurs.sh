@@ -190,7 +190,8 @@ lance() {  # lance <enceintes> <source>
 }
 
 echo "--- B1. enceintes 5.1 sur la sortie à 6 canaux"
-env -u LD_LIBRARY_PATH ffmpeg -hide_banner -loglevel error -stream_loop 6 -i "$BASE/s51.mkv" -c copy -y "$BASE/s51longue.mkv"
+# 33 s : B2 enregistre de ~20,5 s à ~22 s ; avec 21 s le film finissait PENDANT l'enregistrement (échec 1 fois sur 4).
+env -u LD_LIBRARY_PATH ffmpeg -hide_banner -loglevel error -stream_loop 10 -i "$BASE/s51.mkv" -c copy -y "$BASE/s51longue.mkv"
 lance 5.1 s51longue.mkv
 enregistre "$BASE/b1.wav"
 M=$(matrice "$BASE/b1.wav" "$FREQ51")
